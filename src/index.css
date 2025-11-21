@@ -1,0 +1,14 @@
+:root {
+  --tooltip-bg: #ffffff;
+  --tooltip-text: #1e293b;
+}
+
+.dark {
+  --tooltip-bg: #1e293b;
+  --tooltip-text: #f8fafc;
+}
+
+html,
+body {
+  overscroll-behavior-y: none;
+}

@@ -13,18 +13,30 @@ export enum ExpenseCategory {
   OTHER = 'Other'
 }
 
+export enum IncomeCategory {
+  SALARY = 'Salary',
+  FREELANCE = 'Freelance',
+  INVESTMENT = 'Investment',
+  GIFT = 'Gift',
+  OTHER = 'Other Income'
+}
+
+export type TransactionType = 'income' | 'expense';
+
 export interface Expense {
   id: string;
   description: string;
   amount: number;
   date: string;
-  category: ExpenseCategory;
+  type: TransactionType;
+  category: ExpenseCategory | IncomeCategory;
   tags: string[];
   createdAt: number;
 }
 
 export interface AIClassificationResult {
-  category: ExpenseCategory;
+  type?: TransactionType;
+  category: ExpenseCategory | IncomeCategory;
   tags: string[];
   predictedAmount?: number;
 }

@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, History, Plus } from 'lucide-react';
+import { LayoutDashboard, History, Plus, Moon, Sun } from 'lucide-react';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseList from './components/ExpenseList';
 import ExpenseStats from './components/ExpenseStats';
-import { type Expense, ExpenseCategory } from './types';
-import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from './services/db';
+import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } from './types';
+import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from './services/api';
 
 const App: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark' ||
+        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
 
   useEffect(() => {
     const initData = async () => {
@@ -27,6 +46,8 @@ const App: React.FC = () => {
               // Using put (updateExpenseInDB logic uses put) is safer for ID collisions or just use add and catch.
               // Since db logic is separate, let's just use add and catch error or assume clean slate.
               try {
+                // Add type if missing during migration
+                if (!expense.type) expense.type = 'expense';
                 await addExpenseToDB(expense);
               } catch (e) {
                 // Ignore duplicate key errors during migration
@@ -49,7 +70,7 @@ const App: React.FC = () => {
     initData();
   }, []);
 
-  const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory; tags: string[] }) => {
+  const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
       // Update existing expense
       const updatedExpense = { ...editingExpense, ...data };
@@ -116,21 +137,28 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-24 relative">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 pb-24 relative transition-colors duration-200">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-indigo-600 p-1.5 rounded-lg">
               <LayoutDashboard className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
-              SmartSpend AI
+              Money Hater
             </h1>
           </div>
           <div className="text-sm text-slate-500 font-medium">
             {expenses.length} Transactions
           </div>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
+            aria-label="Toggle Dark Mode"
+          >
+            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
         </div>
       </header>
 
@@ -142,7 +170,7 @@ const App: React.FC = () => {
         {/* Recent Expenses List - Full Width */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <History className="w-5 h-5 text-slate-400" />
               Transaction History
             </h2>
@@ -167,7 +195,7 @@ const App: React.FC = () => {
           setEditingExpense(null);
           setIsFormOpen(true);
         }}
-        className="fixed bottom-8 right-8 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-xl shadow-indigo-300 transition-all hover:scale-105 z-40 flex items-center gap-3 group"
+        className="fixed bottom-8 right-8 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-xl shadow-indigo-300 dark:shadow-indigo-900/40 transition-all hover:scale-105 z-40 flex items-center gap-3 group"
         aria-label="Add New Expense"
       >
         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
@@ -180,7 +208,7 @@ const App: React.FC = () => {
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
             onClick={handleCloseForm}
           />
-          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <ExpenseForm
               onSubmit={handleSaveExpense}
               onCancel={handleCloseForm}

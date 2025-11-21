@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import type { Expense } from '../types';
-import { TrendingUp, DollarSign, Calendar, Filter, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, Filter, ChevronDown, Wallet } from 'lucide-react';
 
 interface ExpenseStatsProps {
   expenses: Expense[];
@@ -17,7 +17,18 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [summaryPeriod, setSummaryPeriod] = useState<'month' | 'year'>('month');
 
-  const totalAmount = useMemo(() => expenses.reduce((sum, item) => sum + item.amount, 0), [expenses]);
+  const { totalIncome, totalExpense, netBalance } = useMemo(() => {
+    return expenses.reduce((acc, item) => {
+      if (item.type === 'income') {
+        acc.totalIncome += item.amount;
+        acc.netBalance += item.amount;
+      } else {
+        acc.totalExpense += item.amount;
+        acc.netBalance -= item.amount;
+      }
+      return acc;
+    }, { totalIncome: 0, totalExpense: 0, netBalance: 0 });
+  }, [expenses]);
 
   // Get unique months from expenses for the filter dropdown
   const availableMonths = useMemo(() => {
@@ -37,6 +48,9 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
     if (selectedMonth !== 'all') {
       filteredExpenses = expenses.filter(e => e.date.startsWith(selectedMonth));
     }
+
+    // Only show expenses in the pie chart for now
+    filteredExpenses = filteredExpenses.filter(e => e.type !== 'income');
 
     const map = new Map<string, number>();
     filteredExpenses.forEach(exp => {
@@ -64,7 +78,16 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
           return year === currentYear;
         }
       })
-      .reduce((sum, e) => sum + e.amount, 0);
+      .reduce((acc, e) => {
+        if (e.type === 'income') {
+          acc.income += e.amount;
+          acc.expense += 0;
+        } else {
+          acc.income += 0;
+          acc.expense += e.amount;
+        }
+        return acc;
+      }, { income: 0, expense: 0 });
   }, [expenses, summaryPeriod]);
 
   const formatMonth = (monthStr: string) => {
@@ -77,28 +100,34 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
       {/* Summary Cards */}
       <div className="lg:col-span-1 space-y-4">
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg shadow-indigo-200">
+        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20">
           <div className="flex items-center gap-3 mb-2 opacity-90">
-            <DollarSign className="w-5 h-5" />
-            <span className="font-medium">Total Spend</span>
+            <Wallet className="w-5 h-5" />
+            <span className="font-medium">Net Balance</span>
           </div>
           <div className="text-4xl font-bold tracking-tight">
-            ฿{totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ฿{netBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="mt-4 text-indigo-100 text-sm flex items-center gap-1">
-            <TrendingUp className="w-4 h-4" />
-            <span>Lifetime expenses tracked</span>
+          <div className="mt-4 text-indigo-100 text-sm flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <TrendingUp className="w-4 h-4 text-green-300" />
+              <span>+฿{totalIncome.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <TrendingDown className="w-4 h-4 text-red-300" />
+              <span>-฿{totalExpense.toLocaleString()}</span>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-2 text-slate-500">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors">
+          <div className="flex items-center gap-3 mb-2 text-slate-500 dark:text-slate-400">
             <Calendar className="w-5 h-5" />
             <div className="relative">
               <select
                 value={summaryPeriod}
                 onChange={(e) => setSummaryPeriod(e.target.value as 'month' | 'year')}
-                className="appearance-none bg-transparent font-medium text-slate-600 hover:text-indigo-600 cursor-pointer outline-none pr-5 py-1"
+                className="appearance-none bg-transparent font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer outline-none pr-5 py-1"
               >
                 <option value="month">This Month</option>
                 <option value="year">This Year</option>
@@ -106,22 +135,33 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
               <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
             </div>
           </div>
-          <div className="text-3xl font-bold text-slate-800">
-            ฿{currentPeriodTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Income</div>
+              <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                +฿{currentPeriodTotal.income.toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Expense</div>
+              <div className="text-lg font-bold text-red-600 dark:text-red-400">
+                -฿{currentPeriodTotal.expense.toLocaleString()}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Chart */}
-      <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+      <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col transition-colors">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">Spending by Category</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white">Spending by Category</h3>
 
           <div className="relative">
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent block w-full pl-3 pr-8 py-2 outline-none cursor-pointer font-medium transition-colors"
+              className="appearance-none bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent block w-full pl-3 pr-8 py-2 outline-none cursor-pointer font-medium transition-colors"
             >
               <option value="all">All Time</option>
               {availableMonths.map(month => (
@@ -153,13 +193,13 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
                 </Pie>
                 <Tooltip
                   formatter={(value: number) => [`฿${value.toFixed(2)}`, 'Amount']}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--tooltip-bg, #fff)', color: 'var(--tooltip-text, #1e293b)' }}
                 />
                 <Legend layout="vertical" align="right" verticalAlign="middle" />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
               <p>No expenses found for this period</p>
             </div>
           )}
