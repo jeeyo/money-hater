@@ -145,7 +145,7 @@ const Dashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-indigo-600 p-1.5 rounded-lg">
-              <img src="/icon-192.jpeg" alt="Currency selector icon" className="w-5 h-5" />
+              <img src="/icon-192.png" alt="Money Hater icon" className="w-5 h-5" />
             </div>
             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
               Money Hater

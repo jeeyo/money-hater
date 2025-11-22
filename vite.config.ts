@@ -13,23 +13,20 @@ export default defineConfig({
         name: 'Money Hater',
         short_name: 'MoneyHater',
         description: 'Expense Tracker',
-        start_url: 'https://money-hater.jeeyo.workers.dev/',
-        scope: 'https://money-hater.jeeyo.workers.dev/',
+        start_url: '.',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [
           {
-            src: '/icon-192.jpeg',
+            src: '/icon-192.png',
             sizes: '192x192',
-            type: 'image/jpeg',
-            purpose: 'any'
+            type: 'image/png'
           },
           {
-            src: '/icon-512.jpeg',
+            src: '/icon-512.png',
             sizes: '512x512',
-            type: 'image/jpeg',
-            purpose: 'any'
+            type: 'image/png'
           }
         ]
       }
