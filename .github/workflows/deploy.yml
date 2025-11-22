@@ -13,7 +13,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Deploy Application
-    
+    env:
+      DATABASE_URL: file:./dev.db
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,9 +28,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Load .env file
-        uses: aarcangeli/load-dotenv@v1
 
       - name: Generate Prisma Client
         run: npx prisma generate
