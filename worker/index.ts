@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { GoogleGenAI, Type } from "@google/genai";
 import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
 import { hashPassword, comparePassword, generateToken, generateResetToken } from './auth';
@@ -8,6 +9,7 @@ import { authMiddleware, getAuthUser } from './middleware';
 type Bindings = {
   money_hater_db: D1Database;
   JWT_SECRET: string; // JWT secret from Cloudflare env
+  GEMINI_API_KEY: string; // Gemini API key from Cloudflare env
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -20,6 +22,24 @@ const getPrisma = (c: any) => {
   const adapter = new PrismaD1(c.env.money_hater_db);
   return new PrismaClient({ adapter });
 };
+
+// Expense Categories (mirrored from frontend types)
+const ExpenseCategory = {
+  FOOD: 'Food & Dining',
+  TRANSPORT: 'Transportation',
+  HOUSING: 'Housing',
+  UTILITIES: 'Utilities',
+  ENTERTAINMENT: 'Entertainment',
+  SHOPPING: 'Shopping',
+  HEALTH: 'Health & Fitness',
+  TRAVEL: 'Travel',
+  EDUCATION: 'Education',
+  BUSINESS: 'Business',
+  GROCERIES: 'Groceries',
+  OTHER: 'Other'
+};
+
+const categoriesList = Object.values(ExpenseCategory).join(', ');
 
 // ============================================
 // PUBLIC ROUTES (No authentication required)
@@ -395,6 +415,74 @@ app.delete('/api/expenses/:id', authMiddleware, async (c) => {
   } catch (err) {
     console.error('Delete expense error:', err);
     return c.json({ error: 'Expense not found' }, 404);
+  }
+});
+
+// Classify expense using Gemini
+app.post('/api/classify', authMiddleware, async (c) => {
+  try {
+    const { description, amount } = await c.req.json() as { description: string, amount?: number };
+
+    if (!description) {
+      return c.json({ error: 'Description is required' }, 400);
+    }
+
+    const apiKey = c.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY is not configured');
+      return c.json({ error: 'AI service not configured' }, 500);
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const model = 'gemini-2.5-flash';
+
+    const prompt = `
+        Analyze the following expense description and amount (if provided) to determine the most appropriate category and generate 1-3 relevant tags.
+
+        Description: "${description}"
+        ${amount ? `Amount: ${amount}` : ''}
+
+        Available Categories: ${categoriesList}
+
+        Rules:
+        1. Select exactly one category from the provided list.
+        2. Generate 1 to 3 short, relevant tags (lowercase).
+        3. If the description is ambiguous, use your best judgment based on common spending habits.
+      `;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            category: {
+              type: Type.STRING,
+              enum: Object.values(ExpenseCategory),
+            },
+            tags: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ["category", "tags"],
+        },
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      return c.json({ error: 'Failed to generate classification' }, 500);
+    }
+
+    const data = JSON.parse(text);
+    return c.json(data);
+
+  } catch (err) {
+    console.error('Classification error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 

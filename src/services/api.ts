@@ -5,7 +5,7 @@ const API_BASE = '/api/expenses';
 /**
  * Get authorization headers with JWT token
  */
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',

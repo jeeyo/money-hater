@@ -12,6 +12,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@google/genai": "^1.30.0",
     "@prisma/adapter-d1": "^7.0.0",
     "@prisma/client": "^6.19.0",
     "dotenv": "^17.2.3",

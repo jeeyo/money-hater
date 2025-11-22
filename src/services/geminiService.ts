@@ -1,64 +1,33 @@
-// import { GoogleGenAI, Type } from "@google/genai";
-// import { ExpenseCategory, type AIClassificationResult } from '../types';
-import type { AIClassificationResult } from '../types';
+import { type AIClassificationResult } from '../types';
+import { getAuthHeaders } from './api';
 
-// const apiKey = process.env.API_KEY || '';
-// const ai = new GoogleGenAI({ apiKey });
+export const classifyExpense = async (description: string, amount?: number): Promise<AIClassificationResult | null> => {
+  if (!description) return null;
 
-// // Helper to get enum values for the prompt
-// const categoriesList = Object.values(ExpenseCategory).join(', ');
+  try {
+    const response = await fetch('/api/classify', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ description, amount }),
+    });
 
-export const classifyExpense = async (_description: string, _amount?: number): Promise<AIClassificationResult | null> => {
-  // if (!description) return null;
+    if (response.status === 401) {
+      // Token expired or invalid - redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
 
-  // try {
-  //   const model = 'gemini-2.5-flash';
+    if (!response.ok) {
+      throw new Error('Failed to classify expense');
+    }
 
-  //   const prompt = `
-  //     Analyze the following expense description and amount (if provided) to determine the most appropriate category and generate 1-3 relevant tags.
+    const data = await response.json() as AIClassificationResult;
+    return data;
 
-  //     Description: "${description}"
-  //     ${amount ? `Amount: ${amount}` : ''}
-
-  //     Available Categories: ${categoriesList}
-
-  //     Rules:
-  //     1. Select exactly one category from the provided list.
-  //     2. Generate 1 to 3 short, relevant tags (lowercase).
-  //     3. If the description is ambiguous, use your best judgment based on common spending habits.
-  //   `;
-
-  //   const response = await ai.models.generateContent({
-  //     model,
-  //     contents: prompt,
-  //     config: {
-  //       responseMimeType: "application/json",
-  //       responseSchema: {
-  //         type: Type.OBJECT,
-  //         properties: {
-  //           category: {
-  //             type: Type.STRING,
-  //             enum: Object.values(ExpenseCategory),
-  //           },
-  //           tags: {
-  //             type: Type.ARRAY,
-  //             items: { type: Type.STRING },
-  //           },
-  //         },
-  //         required: ["category", "tags"],
-  //       },
-  //     },
-  //   });
-
-  //   const text = response.text;
-  //   if (!text) return null;
-
-  //   const data = JSON.parse(text) as AIClassificationResult;
-  //   return data;
-
-  // } catch (error) {
-  //   console.error("Error classifying expense:", error);
-  //   return null;
-  // }
-  return null;
+  } catch (error) {
+    console.error("Error classifying expense:", error);
+    return null;
+  }
 };
