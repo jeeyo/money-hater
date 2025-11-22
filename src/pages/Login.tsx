@@ -35,53 +35,53 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1 className="auth-title">Welcome Back</h1>
-        <p className="auth-subtitle">Sign in to manage your expenses</p>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="bg-slate-800 p-8 rounded-2xl w-full max-w-[400px] shadow-2xl border border-slate-700">
+        <h1 className="text-3xl font-bold mb-2 text-center">Welcome Back</h1>
+        <p className="text-slate-400 text-center mb-8">Sign in to manage your expenses</p>
 
         {error && (
-          <div style={{ color: 'var(--error)', marginBottom: '1rem', textAlign: 'center' }}>
+          <div className="text-red-500 mb-4 text-center">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="input-group">
-            <label className="input-label">Username</label>
+          <div className="mb-4">
+            <label className="block mb-2 text-slate-400 text-sm">Username</label>
             <input
               type="text"
-              className="input-field"
+              className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-50 transition-colors focus:border-indigo-500 focus:outline-none"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
             />
           </div>
 
-          <div className="input-group">
-            <label className="input-label">Password</label>
+          <div className="mb-4">
+            <label className="block mb-2 text-slate-400 text-sm">Password</label>
             <input
               type="password"
-              className="input-field"
+              className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-50 transition-colors focus:border-indigo-500 focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
-              <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>
+            <div className="text-right mt-2">
+              <Link to="/forgot-password" className="text-sm text-indigo-500">
                 Forgot Password?
               </Link>
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-            <LogIn size={20} style={{ marginRight: '0.5rem' }} />
+          <button type="submit" className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-500 text-white hover:bg-indigo-600 w-full">
+            <LogIn size={20} className="mr-2" />
             Sign In
           </button>
         </form>
 
-        <p style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-          Don't have an account? <Link to="/register" className="link">Sign up</Link>
+        <p className="mt-6 text-center text-slate-400">
+          Don't have an account? <Link to="/register" className="text-indigo-500 no-underline hover:underline">Sign up</Link>
         </p>
       </div>
     </div>
