@@ -170,7 +170,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
                 </select>
                 {/* Custom dropdown arrow because default one is ugly/hidden in some browsers with appearance-none */}
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  <img src="/icon-192.jpeg" alt="Currency selector icon" className="w-3 h-3" />
                 </div>
               </div>
             </div>

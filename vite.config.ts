@@ -19,12 +19,14 @@ export default defineConfig({
           {
             src: '/icon-192.jpeg',
             sizes: '192x192',
-            type: 'image/jpeg'
+            type: 'image/jpeg',
+            purpose: 'any maskable'
           },
           {
             src: '/icon-512.jpeg',
             sizes: '512x512',
-            type: 'image/jpeg'
+            type: 'image/jpeg',
+            purpose: 'any maskable'
           }
         ]
       }
