@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, History, Plus, Moon, Sun, LogOut } from 'lucide-react';
+import { History, Plus, Moon, Sun, LogOut } from 'lucide-react';
 import ExpenseForm from '../components/ExpenseForm';
 import ExpenseList from '../components/ExpenseList';
 import ExpenseStats from '../components/ExpenseStats';
