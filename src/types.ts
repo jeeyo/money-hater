@@ -40,3 +40,16 @@ export interface AIClassificationResult {
   tags: string[];
   predictedAmount?: number;
 }
+
+export interface User {
+  id: string;
+  username: string;
+  password?: string; // Optional because we don't want to send it back to client
+  email: string;
+  name: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+}

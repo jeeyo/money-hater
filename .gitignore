@@ -25,3 +25,16 @@ dist-ssr
 
 .wrangler
 .dev.vars*
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database files
+*.db
+*.db-journal
+prisma/dev.db
+
+# Prisma
+/src/generated/prisma

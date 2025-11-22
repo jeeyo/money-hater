@@ -1,78 +1,312 @@
-import type { Expense } from '../src/types';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { PrismaClient } from '@prisma/client';
+import { PrismaD1 } from '@prisma/adapter-d1';
+import { hashPassword, comparePassword, generateToken } from './auth';
+import { authMiddleware, getAuthUser } from './middleware';
 
-// In-memory storage
-let expenses: Expense[] = [];
-
-// Helper to handle CORS
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+type Bindings = {
+  money_hater_db: D1Database;
+  JWT_SECRET: string; // JWT secret from Cloudflare env
 };
 
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
+const app = new Hono<{ Bindings: Bindings }>();
 
-    // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+// Middleware
+app.use('/*', cors());
+
+// Helper to get Prisma client
+const getPrisma = (c: any) => {
+  const adapter = new PrismaD1(c.env.money_hater_db);
+  return new PrismaClient({ adapter });
+};
+
+// ============================================
+// PUBLIC ROUTES (No authentication required)
+// ============================================
+
+app.post('/api/auth/register', async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const data = await c.req.json() as any;
+
+    // Validation
+    if (!data.username || !data.password || !data.email) {
+      return c.json({ error: 'Missing required fields' }, 400);
     }
 
-    if (url.pathname.startsWith("/api/expenses")) {
-      try {
-        // GET /api/expenses
-        if (request.method === 'GET') {
-          return Response.json(expenses, { headers: corsHeaders });
-        }
+    if (data.password.length < 6) {
+      return c.json({ error: 'Password must be at least 6 characters' }, 400);
+    }
 
-        // POST /api/expenses
-        if (request.method === 'POST') {
-          const newExpense = await request.json() as Expense;
-          // Basic validation
-          if (!newExpense.id || !newExpense.amount || !newExpense.description) {
-            return new Response('Invalid expense data', { status: 400, headers: corsHeaders });
-          }
-          expenses.push(newExpense);
-          return Response.json(newExpense, { status: 201, headers: corsHeaders });
-        }
-
-        // PUT /api/expenses/:id
-        if (request.method === 'PUT') {
-          const id = url.pathname.split('/').pop();
-          if (!id) return new Response('Missing ID', { status: 400, headers: corsHeaders });
-
-          const updatedExpense = await request.json() as Expense;
-          const index = expenses.findIndex(e => e.id === id);
-
-          if (index !== -1) {
-            expenses[index] = { ...expenses[index], ...updatedExpense };
-            return Response.json(expenses[index], { headers: corsHeaders });
-          } else {
-            return new Response('Expense not found', { status: 404, headers: corsHeaders });
-          }
-        }
-
-        // DELETE /api/expenses/:id
-        if (request.method === 'DELETE') {
-          const id = url.pathname.split('/').pop();
-          if (!id) return new Response('Missing ID', { status: 400, headers: corsHeaders });
-
-          const initialLength = expenses.length;
-          expenses = expenses.filter(e => e.id !== id);
-
-          if (expenses.length < initialLength) {
-            return new Response(null, { status: 204, headers: corsHeaders });
-          } else {
-            return new Response('Expense not found', { status: 404, headers: corsHeaders });
-          }
-        }
-      } catch (err) {
-        return new Response('Internal Server Error', { status: 500, headers: corsHeaders });
+    // Check if user already exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: data.username },
+          { email: data.email }
+        ]
       }
+    });
+
+    if (existingUser) {
+      if (existingUser.email === data.email) {
+        return c.json({ error: 'Email already registered' }, 409);
+      }
+      return c.json({ error: 'Username already taken' }, 409);
     }
 
-    return new Response('Not Found', { status: 404, headers: corsHeaders });
-  },
-} satisfies ExportedHandler;
+    // Hash password
+    const hashedPassword = await hashPassword(data.password);
 
+    // Create user
+    const newUser = await prisma.user.create({
+      data: {
+        username: data.username,
+        password: hashedPassword,
+        email: data.email,
+        name: data.name || data.username
+      }
+    });
+
+    // Generate JWT token
+    const token = await generateToken(
+      {
+        userId: newUser.id,
+        email: newUser.email,
+        username: newUser.username
+      },
+      c.env.JWT_SECRET
+    );
+    // Return user without password
+    const { password, ...userWithoutPassword } = newUser;
+    return c.json({
+      user: userWithoutPassword,
+      token
+    }, 201);
+  } catch (err) {
+    console.error('Registration error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/auth/login', async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const data = await c.req.json() as any;
+
+    if (!data.username || !data.password) {
+      return c.json({ error: 'Missing username or password' }, 400);
+    }
+
+    // Find user by username
+    const user = await prisma.user.findFirst({
+      where: { username: data.username }
+    });
+
+    if (!user) {
+      return c.json({ error: 'Invalid credentials' }, 401);
+    }
+
+    // Verify password
+    const isValidPassword = await comparePassword(data.password, user.password);
+
+    if (!isValidPassword) {
+      return c.json({ error: 'Invalid credentials' }, 401);
+    }
+
+    // Generate JWT token
+    const token = await generateToken(
+      {
+        userId: user.id,
+        email: user.email,
+        username: user.username
+      },
+      c.env.JWT_SECRET
+    );
+    // Return user without password
+    const { password, ...userWithoutPassword } = user;
+    return c.json({
+      user: userWithoutPassword,
+      token
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// ============================================
+// PROTECTED ROUTES (Authentication required)
+// ============================================
+
+// Get current user info
+app.get('/api/auth/me', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const authUser = getAuthUser(c);
+
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true
+      }
+    });
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    return c.json({ user });
+  } catch (err) {
+    console.error('Get user error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// Get expenses for authenticated user
+app.get('/api/expenses', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const authUser = getAuthUser(c);
+
+    // Get only expenses for the authenticated user
+    const expenses = await prisma.expense.findMany({
+      where: {
+        userId: authUser.userId
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+
+    // Transform data back to frontend format
+    const formattedExpenses = expenses.map(e => ({
+      ...e,
+      tags: JSON.parse(e.tags),
+      date: e.date.toISOString()
+    }));
+
+    return c.json(formattedExpenses);
+  } catch (err) {
+    console.error('Get expenses error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// Create expense for authenticated user
+app.post('/api/expenses', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const authUser = getAuthUser(c);
+    const newExpense = await c.req.json() as any;
+
+    // Validation
+    if (!newExpense.amount || !newExpense.description) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    // Create expense for the authenticated user
+    const createdExpense = await prisma.expense.create({
+      data: {
+        amount: parseFloat(newExpense.amount),
+        description: newExpense.description,
+        date: new Date(newExpense.date || Date.now()),
+        type: newExpense.type || 'expense',
+        category: newExpense.category || 'Other',
+        tags: JSON.stringify(newExpense.tags || []),
+        createdAt: newExpense.createdAt || Date.now(),
+        userId: authUser.userId // Use authenticated user's ID
+      }
+    });
+
+    return c.json({
+      ...createdExpense,
+      tags: JSON.parse(createdExpense.tags),
+      date: createdExpense.date.toISOString()
+    }, 201);
+  } catch (err) {
+    console.error('Create expense error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// Update expense (only if it belongs to authenticated user)
+app.put('/api/expenses/:id', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const authUser = getAuthUser(c);
+    const id = c.req.param('id');
+    const updatedExpense = await c.req.json() as any;
+
+    // Check if expense exists and belongs to user
+    const existingExpense = await prisma.expense.findFirst({
+      where: {
+        id,
+        userId: authUser.userId
+      }
+    });
+
+    if (!existingExpense) {
+      return c.json({ error: 'Expense not found or unauthorized' }, 404);
+    }
+
+    // Update expense
+    const expense = await prisma.expense.update({
+      where: { id },
+      data: {
+        amount: updatedExpense.amount ? parseFloat(updatedExpense.amount) : undefined,
+        description: updatedExpense.description,
+        date: updatedExpense.date ? new Date(updatedExpense.date) : undefined,
+        type: updatedExpense.type,
+        category: updatedExpense.category,
+        tags: updatedExpense.tags ? JSON.stringify(updatedExpense.tags) : undefined,
+      }
+    });
+
+    return c.json({
+      ...expense,
+      tags: JSON.parse(expense.tags),
+      date: expense.date.toISOString()
+    });
+  } catch (err) {
+    console.error('Update expense error:', err);
+    return c.json({ error: 'Expense not found or error occurred' }, 404);
+  }
+});
+
+// Delete expense (only if it belongs to authenticated user)
+app.delete('/api/expenses/:id', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const authUser = getAuthUser(c);
+    const id = c.req.param('id');
+
+    // Check if expense exists and belongs to user
+    const existingExpense = await prisma.expense.findFirst({
+      where: {
+        id,
+        userId: authUser.userId
+      }
+    });
+
+    if (!existingExpense) {
+      return c.json({ error: 'Expense not found or unauthorized' }, 404);
+    }
+
+    // Delete expense
+    await prisma.expense.delete({
+      where: { id }
+    });
+
+    return c.body(null, 204);
+  } catch (err) {
+    console.error('Delete expense error:', err);
+    return c.json({ error: 'Expense not found' }, 404);
+  }
+});
+
+export default app;

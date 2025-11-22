@@ -1,5 +1,6 @@
 // import { GoogleGenAI, Type } from "@google/genai";
-import { ExpenseCategory, type AIClassificationResult } from '../types';
+// import { ExpenseCategory, type AIClassificationResult } from '../types';
+import type { AIClassificationResult } from '../types';
 
 // const apiKey = process.env.API_KEY || '';
 // const ai = new GoogleGenAI({ apiKey });
@@ -7,7 +8,7 @@ import { ExpenseCategory, type AIClassificationResult } from '../types';
 // // Helper to get enum values for the prompt
 // const categoriesList = Object.values(ExpenseCategory).join(', ');
 
-export const classifyExpense = async (description: string, amount?: number): Promise<AIClassificationResult | null> => {
+export const classifyExpense = async (_description: string, _amount?: number): Promise<AIClassificationResult | null> => {
   // if (!description) return null;
 
   // try {

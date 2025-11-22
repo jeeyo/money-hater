@@ -8,16 +8,16 @@ const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = (event) => {
+    request.onerror = (_event) => {
       console.error("IndexedDB error:", request.error);
       reject("Error opening database");
     };
 
-    request.onsuccess = (event) => {
+    request.onsuccess = (_event) => {
       resolve(request.result);
     };
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = (_event) => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
@@ -35,7 +35,7 @@ export const getAllExpenses = async (): Promise<Expense[]> => {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAll();
 
-    request.onsuccess = () => {
+    request.onsuccess = (_event) => {
       // Sort by date (newest first), then by creation time
       const result = request.result as Expense[];
       result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt);

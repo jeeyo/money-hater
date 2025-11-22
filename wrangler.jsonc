@@ -1,9 +1,32 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "money-hater",
-  "compatibility_date": "2025-04-03",
-  "assets": {
-    "not_found_handling": "single-page-application"
-  },
-  "main": "./worker/index.ts"
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "money-hater",
+	"compatibility_date": "2025-04-03",
+	"main": "./worker/index.ts",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "money_hater_db",
+			"database_name": "money-hater-db",
+			"database_id": "ee76d04c-c492-4f8a-b1e4-03bd5d58596d"
+		}
+	],
+	"observability": {
+		"enabled": false,
+		"head_sampling_rate": 1,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"persist": true,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": false,
+			"persist": true,
+			"head_sampling_rate": 1
+		}
+	}
 }

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import type { Expense } from '../types';
+import type { Expense } from '../types'; // Keeping Expense as it's used in ExpenseStatsProps
 import { TrendingUp, TrendingDown, Calendar, Filter, ChevronDown, Wallet } from 'lucide-react';
 
 interface ExpenseStatsProps {
@@ -187,12 +187,12 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {categoryData.map((_, index) => (
+                    <Cell key={`cell - ${index} `} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => [`฿${value.toFixed(2)}`, 'Amount']}
+                  formatter={(value: number) => [`฿${value.toFixed(2)} `, 'Amount']}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--tooltip-bg, #fff)', color: 'var(--tooltip-text, #1e293b)' }}
                 />
                 <Legend layout="vertical" align="right" verticalAlign="middle" />

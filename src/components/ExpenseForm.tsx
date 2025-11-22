@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react';
-import { ExpenseCategory, IncomeCategory, type AIClassificationResult, type Expense, type TransactionType } from '../types';
+import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
 
 interface ExpenseFormProps {
@@ -29,7 +29,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
     setIsThinking(true);
     const amountNum = parseFloat(amount);
     // Pass the amount to AI, but it doesn't strictly rely on currency for categorization
-    const result = await classifyExpense(description, isNaN(amountNum) ? undefined : amountNum);
+    const result: AIClassificationResult | null = await classifyExpense(description, isNaN(amountNum) ? undefined : amountNum);
 
     if (result) {
       if (result.type) setType(result.type);

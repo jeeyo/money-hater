@@ -1,0 +1,39 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id       String    @id @default(uuid())
+  email    String    @unique
+  username String    @unique
+  password String
+  name     String?
+  expenses Expense[]
+  
+  @@index([email])
+  @@index([username])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  description String
+  amount      Float
+  date        DateTime
+  type        String
+  category    String
+  tags        String
+  createdAt   Float
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([date])
+  @@index([type])
+  @@index([userId, date])
+}
