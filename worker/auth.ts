@@ -256,3 +256,14 @@ function base64UrlDecodeString(data: string): string {
 
   return atob(base64);
 }
+
+/**
+ * Generate a random reset token
+ */
+export function generateResetToken(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}

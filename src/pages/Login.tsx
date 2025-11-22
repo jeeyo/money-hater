@@ -67,6 +67,11 @@ export const Login: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+              <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: 'var(--primary)' }}>
+                Forgot Password?
+              </Link>
+            </div>
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>

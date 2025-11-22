@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
-import { hashPassword, comparePassword, generateToken } from './auth';
+import { hashPassword, comparePassword, generateToken, generateResetToken } from './auth';
 import { authMiddleware, getAuthUser } from './middleware';
 
 type Bindings = {
@@ -132,6 +132,95 @@ app.post('/api/auth/login', async (c) => {
     });
   } catch (err) {
     console.error('Login error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/auth/forgot-password', async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const data = await c.req.json() as any;
+
+    if (!data.email) {
+      return c.json({ error: 'Missing email' }, 400);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: data.email }
+    });
+
+    if (!user) {
+      // For security, don't reveal if user exists
+      return c.json({ message: 'If an account with that email exists, we sent you a reset link.' });
+    }
+
+    const resetToken = generateResetToken();
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken,
+        resetTokenExpiry
+      }
+    });
+
+    // For this demo, we'll return the link.
+    const origin = new URL(c.req.url).origin;
+    const resetLink = `${origin}/reset-password?token=${resetToken}`;
+    console.log(`Reset link for ${user.email}: ${resetLink}`);
+
+    // TODO: Send email
+    return c.json({
+      message: 'If an account with that email exists, we sent you a reset link.',
+      debug_link: resetLink // REMOVE IN PRODUCTION
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/auth/reset-password', async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const data = await c.req.json() as any;
+
+    if (!data.token || !data.password) {
+      return c.json({ error: 'Missing token or password' }, 400);
+    }
+
+    if (data.password.length < 6) {
+      return c.json({ error: 'Password must be at least 6 characters' }, 400);
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: data.token,
+        resetTokenExpiry: {
+          gt: new Date()
+        }
+      }
+    });
+
+    if (!user) {
+      return c.json({ error: 'Invalid or expired reset token' }, 400);
+    }
+
+    const hashedPassword = await hashPassword(data.password);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null
+      }
+    });
+
+    return c.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('Reset password error:', err);
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
