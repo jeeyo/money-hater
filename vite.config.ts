@@ -9,9 +9,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
+        id: 'money-hater',
         name: 'Money Hater',
         short_name: 'MoneyHater',
-        description: 'Expense Tracker PWA',
+        description: 'Expense Tracker',
+        start_url: 'https://money-hater.jeeyo.workers.dev/',
+        scope: 'https://money-hater.jeeyo.workers.dev/',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
