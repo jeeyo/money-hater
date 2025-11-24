@@ -10,6 +10,7 @@ type Bindings = {
   money_hater_db: D1Database;
   JWT_SECRET: string; // JWT secret from Cloudflare env
   GEMINI_API_KEY: string; // Gemini API key from Cloudflare env
+  BUCKET: R2Bucket; // R2 Bucket binding
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -327,9 +328,10 @@ app.post('/api/expenses', authMiddleware, async (c) => {
         type: newExpense.type || 'expense',
         category: newExpense.category || 'Other',
         tags: JSON.stringify(newExpense.tags || []),
+        attachmentUrl: newExpense.attachmentUrl,
         createdAt: newExpense.createdAt || Date.now(),
         userId: authUser.userId // Use authenticated user's ID
-      }
+      } as any
     });
 
     return c.json({
@@ -373,7 +375,8 @@ app.put('/api/expenses/:id', authMiddleware, async (c) => {
         type: updatedExpense.type,
         category: updatedExpense.category,
         tags: updatedExpense.tags ? JSON.stringify(updatedExpense.tags) : undefined,
-      }
+        attachmentUrl: updatedExpense.attachmentUrl,
+      } as any
     });
 
     return c.json({
@@ -482,6 +485,186 @@ app.post('/api/classify', authMiddleware, async (c) => {
 
   } catch (err) {
     console.error('Classification error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// Analyze receipt using Gemini Vision
+app.post('/api/analyze-receipt', authMiddleware, async (c) => {
+  let uploadedFileUri: string | null = null;
+
+  try {
+    const body = await c.req.parseBody();
+    const file = body['file'];
+
+    if (!file || !(file instanceof File)) {
+      return c.json({ error: 'No file uploaded' }, 400);
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      return c.json({ error: 'Only image files are supported' }, 400);
+    }
+
+    const apiKey = c.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY is not configured');
+      return c.json({ error: 'AI service not configured' }, 500);
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Upload file to Gemini Files API
+    const myfile = await ai.files.upload({
+      file: file, // Pass the File/Blob directly
+      config: {
+        mimeType: file.type,
+      },
+    });
+
+    uploadedFileUri = myfile.uri ?? null;
+    console.log(`Uploaded file: ${uploadedFileUri}`);
+
+    const model = 'gemini-2.5-flash';
+
+    const prompt = `
+      Analyze this receipt image and extract the following information:
+      1. Description: A brief description of what was purchased (e.g., "Coffee at Starbucks", "Grocery shopping")
+      2. Amount: The total amount paid (as a number, without currency symbols)
+      3. Date: The date of the transaction in ISO format (YYYY-MM-DD)
+      4. Category: Select the most appropriate category from this list: ${categoriesList}
+      5. Tags: Generate 1-3 relevant tags (lowercase)
+
+      Rules:
+      - If you cannot clearly read the receipt or extract the information, set "error" to true
+      - Be conservative - only return data if you're confident about the information
+      - For the description, be specific but concise
+      - The amount should be a number only (no currency symbols)
+      - If the date is not visible, use today's date
+    `;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              fileData: {
+                fileUri: myfile.uri,
+                mimeType: myfile.mimeType,
+              },
+            },
+          ],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            error: {
+              type: Type.BOOLEAN,
+            },
+            description: {
+              type: Type.STRING,
+            },
+            amount: {
+              type: Type.NUMBER,
+            },
+            date: {
+              type: Type.STRING,
+            },
+            category: {
+              type: Type.STRING,
+              enum: Object.values(ExpenseCategory),
+            },
+            tags: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ["error"],
+        },
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      return c.json({ error: 'Failed to analyze receipt' }, 500);
+    }
+
+    const data = JSON.parse(text);
+
+    if (data.error) {
+      return c.json({ error: 'Unable to process receipt. Please ensure the image is clear and contains a valid receipt.' }, 400);
+    }
+
+    return c.json(data);
+
+  } catch (err) {
+    console.error('Receipt analysis error:', err);
+    return c.json({ error: 'Failed to analyze receipt' }, 500);
+  } finally {
+    // Clean up: Delete the uploaded file from Gemini
+    if (uploadedFileUri) {
+      try {
+        const ai = new GoogleGenAI({ apiKey: c.env.GEMINI_API_KEY });
+        await ai.files.delete({ name: uploadedFileUri });
+        console.log(`Deleted file: ${uploadedFileUri}`);
+      } catch (deleteErr) {
+        console.error('Failed to delete uploaded file:', deleteErr);
+        // Don't fail the request if cleanup fails
+      }
+    }
+  }
+});
+
+// Upload file to R2
+app.post('/api/upload', authMiddleware, async (c) => {
+  try {
+    const body = await c.req.parseBody();
+    const file = body['file'];
+
+    if (!file || !(file instanceof File)) {
+      return c.json({ error: 'No file uploaded' }, 400);
+    }
+
+    const authUser = getAuthUser(c);
+    const key = `${authUser.userId}/${Date.now()}-${file.name}`;
+
+    await c.env.BUCKET.put(key, file.stream(), {
+      httpMetadata: {
+        contentType: file.type,
+      },
+    });
+
+    return c.json({ key });
+  } catch (err) {
+    console.error('Upload error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// Get file from R2
+app.get('/api/files/:key', authMiddleware, async (c) => {
+  try {
+    const key = c.req.param('key');
+    const object = await c.env.BUCKET.get(key);
+
+    if (!object) {
+      return c.json({ error: 'File not found' }, 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+
+    return new Response(object.body, {
+      headers,
+    });
+  } catch (err) {
+    console.error('Get file error:', err);
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });

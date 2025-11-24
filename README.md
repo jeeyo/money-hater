@@ -7,6 +7,7 @@ A modern, full-stack expense tracking application built with React, TypeScript, 
 - **Frontend**: React 19 + TypeScript + Vite
 - **Backend**: Cloudflare Workers + Hono
 - **Database**: Cloudflare D1 (SQLite)
+- **Storage**: Cloudflare R2 (Object Storage)
 - **ORM**: Prisma with D1 Adapter
 - **Styling**: Custom CSS with modern design
 - **Charts**: Recharts
@@ -23,6 +24,7 @@ A modern, full-stack expense tracking application built with React, TypeScript, 
 - 💾 Persistent storage with D1
 - 🌐 Serverless architecture
 - ⚡ Fast and responsive UI
+- 📎 **File attachments** for receipts and invoices (R2 storage)
 - 🗄️ **Optimized database** with indexes
 
 ## 🛠️ Development Setup
@@ -124,6 +126,12 @@ money-hater/
 - `POST /api/expenses` - Create expense
 - `PUT /api/expenses/:id` - Update expense
 - `DELETE /api/expenses/:id` - Delete expense
+
+### File Storage
+- `POST /api/upload` - Upload file to R2
+- `GET /api/files/:key` - Get file from R2
+
+📚 **See [R2_SETUP.md](./R2_SETUP.md)** for R2 object storage setup and usage.
 
 ### Automated Deployment with GitHub Actions (Recommended)
 

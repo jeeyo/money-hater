@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip, Scan } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
+import Toast, { type ToastType } from './Toast';
+
 
 interface ExpenseFormProps {
-  onSubmit: (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => void;
+  onSubmit: (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[]; attachmentUrl?: string }) => void;
   onCancel?: () => void;
   initialData?: Expense | null;
 }
@@ -19,7 +21,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
   const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
   const [category, setCategory] = useState<ExpenseCategory | IncomeCategory>(initialData?.category || ExpenseCategory.OTHER);
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | undefined>(initialData?.attachmentUrl);
+  const [isUploading, setIsUploading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
 
   const isEditing = !!initialData;
 
@@ -35,6 +42,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
       if (result.type) setType(result.type);
       setCategory(result.category);
       setTags(result.tags);
+      // If user hasn't entered an amount and AI predicted one, use it
+      if (!amount && result.predictedAmount) {
+        setAmount(result.predictedAmount.toString());
+      }
     }
     setIsThinking(false);
   }, [description, amount]);
@@ -53,6 +64,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
       type,
       category,
       tags,
+      attachmentUrl,
     });
 
     // If not handling close in parent immediately, reset form
@@ -63,6 +75,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
       setType('expense');
       setCategory(ExpenseCategory.OTHER);
       setTags([]);
+      setAttachmentUrl(undefined);
     }
   };
 
@@ -80,6 +93,111 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(t => t !== tagToRemove));
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error('Upload failed');
+
+      const data = await res.json();
+      setAttachmentUrl(data.key);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setToast({ message: 'Failed to upload file', type: 'error' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleAnalyzeReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setToast({ message: 'Please upload an image file', type: 'warning' });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/analyze-receipt', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setToast({ message: data.error || 'Failed to analyze receipt', type: 'error' });
+        return;
+      }
+
+      // Auto-fill form with extracted data
+      if (data.description) setDescription(data.description);
+      if (data.amount) setAmount(data.amount.toString());
+      if (data.date) setDate(data.date);
+      if (data.category) setCategory(data.category);
+      if (data.tags && data.tags.length > 0) setTags(data.tags);
+
+      // Also upload the file for attachment
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      });
+
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        setAttachmentUrl(uploadData.key);
+      }
+
+      // Show success message with extracted details
+      const amountText = data.amount ? `฿${data.amount.toLocaleString()}` : '';
+      const categoryText = data.category || '';
+      const details = [amountText, categoryText].filter(Boolean).join(' • ');
+      const message = details
+        ? `Receipt analyzed: ${details}`
+        : 'Receipt analyzed successfully!';
+
+      setToast({ message, type: 'success' });
+    } catch (err) {
+      console.error('Receipt analysis error:', err);
+      setToast({ message: 'Failed to analyze receipt', type: 'error' });
+    } finally {
+      setIsAnalyzing(false);
+      // Reset the input so the same file can be selected again
+      e.target.value = '';
+    }
+  };
+
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 h-full flex flex-col transition-colors">
@@ -232,6 +350,73 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
             />
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Attachment</label>
+          <div className="flex items-center gap-2">
+            <label className="flex-1 cursor-pointer">
+              <div className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400">
+                {isUploading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : attachmentUrl ? (
+                  <>
+                    <Paperclip className="w-5 h-5 text-indigo-500" />
+                    <span className="text-indigo-500 font-medium">File Attached</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-5 h-5" />
+                    <span>Upload Receipt</span>
+                  </>
+                )}
+              </div>
+              <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" disabled={isUploading} />
+            </label>
+            {attachmentUrl && (
+              <button
+                type="button"
+                onClick={() => setAttachmentUrl(undefined)}
+                className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                title="Remove attachment"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">AI Receipt Analysis</label>
+          <label className="cursor-pointer block">
+            <div className={`flex items-center justify-center gap-3 p-4 border-2 border-dashed rounded-xl transition-all ${isAnalyzing
+              ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+              : 'border-indigo-300 dark:border-indigo-600 hover:border-indigo-500 dark:hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-900/30 dark:hover:to-purple-900/30'
+              }`}>
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-600 dark:text-indigo-400" />
+                  <span className="font-semibold text-indigo-700 dark:text-indigo-300">Analyzing Receipt...</span>
+                </>
+              ) : (
+                <>
+                  <Scan className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  <div className="flex flex-col items-start">
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">Scan Receipt with AI</span>
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400">Auto-fill form from receipt image</span>
+                  </div>
+                  <Sparkles className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                </>
+              )}
+            </div>
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleAnalyzeReceipt}
+              accept="image/*"
+              disabled={isAnalyzing}
+            />
+          </label>
+        </div>
       </div>
 
       <button
@@ -241,8 +426,17 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
         {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
         {isEditing ? 'Save Changes' : 'Add Transaction'}
       </button>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </form>
   );
 };
 
 export default ExpenseForm;
+

@@ -15,6 +15,12 @@
 			"database_id": "ee76d04c-c492-4f8a-b1e4-03bd5d58596d"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "BUCKET",
+			"bucket_name": "money-hater-storage"
+		}
+	],
 	"observability": {
 		"enabled": false,
 		"head_sampling_rate": 1,

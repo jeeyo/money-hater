@@ -31,6 +31,7 @@ export interface Expense {
   type: TransactionType;
   category: ExpenseCategory | IncomeCategory;
   tags: string[];
+  attachmentUrl?: string;
   createdAt: number;
 }
 
