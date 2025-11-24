@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:worker": "wrangler dev --port 8787",
+    "seed:local": "node scripts/seed-local.js",
+    "dev:worker": "npm run seed:local && wrangler dev --port 8787",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
