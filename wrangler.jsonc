@@ -8,6 +8,12 @@
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application"
 	},
+    "routes": [
+      {
+        "pattern": "hater.money",
+        "custom_domain": true
+      }
+    ],
 	"d1_databases": [
 		{
 			"binding": "money_hater_db",
