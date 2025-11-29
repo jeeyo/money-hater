@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip, Scan } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
 import Toast, { type ToastType } from './Toast';
@@ -372,6 +372,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
               </div>
               <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" disabled={isUploading} />
             </label>
+
+            <label className="cursor-pointer p-3 border-2 border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors" title="Scan Receipt with AI">
+              {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+              <input type="file" className="hidden" onChange={handleAnalyzeReceipt} accept="image/*" disabled={isAnalyzing} />
+            </label>
+
             {attachmentUrl && (
               <button
                 type="button"
@@ -385,38 +391,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">AI Receipt Analysis</label>
-          <label className="cursor-pointer block">
-            <div className={`flex items-center justify-center gap-3 p-4 border-2 border-dashed rounded-xl transition-all ${isAnalyzing
-              ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
-              : 'border-indigo-300 dark:border-indigo-600 hover:border-indigo-500 dark:hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-900/30 dark:hover:to-purple-900/30'
-              }`}>
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin text-indigo-600 dark:text-indigo-400" />
-                  <span className="font-semibold text-indigo-700 dark:text-indigo-300">Analyzing Receipt...</span>
-                </>
-              ) : (
-                <>
-                  <Scan className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                  <div className="flex flex-col items-start">
-                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">Scan Receipt with AI</span>
-                    <span className="text-xs text-indigo-600 dark:text-indigo-400">Auto-fill form from receipt image</span>
-                  </div>
-                  <Sparkles className="w-5 h-5 text-purple-500 dark:text-purple-400" />
-                </>
-              )}
-            </div>
-            <input
-              type="file"
-              className="hidden"
-              onChange={handleAnalyzeReceipt}
-              accept="image/*"
-              disabled={isAnalyzing}
-            />
-          </label>
-        </div>
+
       </div>
 
       <button
