@@ -11,12 +11,6 @@
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application"
 	},
-	"vars": {
-		"DATABASE_URL": "",
-		"GEMINI_API_KEY": "",
-		"JWT_SECRET": "",
-		"TURNSTILE_SECRET_KEY": ""
-	},
 	"routes": [
 		{
 			"pattern": "hater.money",
