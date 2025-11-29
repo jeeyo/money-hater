@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import type { Expense } from '../types'; // Keeping Expense as it's used in ExpenseStatsProps
 import { TrendingUp, TrendingDown, Calendar, Filter, ChevronDown, Wallet } from 'lucide-react';
@@ -41,6 +41,18 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
     // Sort descending (newest first)
     return Array.from(months).sort().reverse();
   }, [expenses]);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const categoryData = useMemo(() => {
     // Filter expenses based on selected month
@@ -195,7 +207,11 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
                   formatter={(value: number) => [`฿${value.toFixed(2)} `, 'Amount']}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--tooltip-bg, #fff)', color: 'var(--tooltip-text, #1e293b)' }}
                 />
-                <Legend layout="vertical" align="right" verticalAlign="middle" />
+                <Legend
+                  layout={isMobile ? 'horizontal' : 'vertical'}
+                  align={isMobile ? 'center' : 'right'}
+                  verticalAlign={isMobile ? 'bottom' : 'middle'}
+                />
               </PieChart>
             </ResponsiveContainer>
           ) : (
