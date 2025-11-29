@@ -2,6 +2,9 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "money-hater",
 	"compatibility_date": "2025-04-03",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"main": "./worker/index.ts",
 	"assets": {
 		"directory": "./dist",
