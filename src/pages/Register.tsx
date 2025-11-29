@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserPlus } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
+import { getTurnstileSiteKey } from '../services/turnstile';
 
 export const Register: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -85,7 +86,7 @@ export const Register: React.FC = () => {
 
           <div className="mb-6 flex justify-center">
             <Turnstile
-              siteKey="0x4AAAAAACDrTIQ7JEqrSBfd"
+              siteKey={getTurnstileSiteKey()}
               onSuccess={(token) => setTurnstileToken(token)}
             />
           </div>

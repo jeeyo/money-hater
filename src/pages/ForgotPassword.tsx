@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
+import { getTurnstileSiteKey } from '../services/turnstile';
 
 export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -77,7 +78,7 @@ export const ForgotPassword: React.FC = () => {
 
           <div className="mb-6 flex justify-center">
             <Turnstile
-              siteKey="0x4AAAAAACDrTIQ7JEqrSBfd"
+              siteKey={getTurnstileSiteKey()}
               onSuccess={(token) => setTurnstileToken(token)}
             />
           </div>

@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
 import { hashPassword, comparePassword, generateToken, generateResetToken, verifyTurnstile } from './auth';
 import { authMiddleware, getAuthUser } from './middleware';
+import { sendPasswordResetEmail } from './email';
 
 type Bindings = {
   money_hater_db: D1Database;
@@ -12,6 +13,7 @@ type Bindings = {
   GEMINI_API_KEY: string; // Gemini API key from Cloudflare env
   TURNSTILE_SECRET_KEY: string; // Turnstile secret key env
   BUCKET: R2Bucket; // R2 Bucket binding
+  MONEY_HATER_MAILER: any; // SendEmail binding (SendEmail from "cloudflare:email")
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -203,15 +205,15 @@ app.post('/api/auth/forgot-password', async (c) => {
       }
     });
 
-    // For this demo, we'll return the link.
     const origin = new URL(c.req.url).origin;
     const resetLink = `${origin}/reset-password?token=${resetToken}`;
-    console.log(`Reset link for ${user.email}: ${resetLink}`);
 
-    // TODO: Send email
+    // Send email
+    await sendPasswordResetEmail(user.email, resetLink, c.env.MONEY_HATER_MAILER);
+
     return c.json({
       message: 'If an account with that email exists, we sent you a reset link.',
-      debug_link: resetLink // REMOVE IN PRODUCTION
+      debug_link: c.env.MONEY_HATER_MAILER ? undefined : resetLink // Only show link if no API key (dev mode)
     });
   } catch (err) {
     console.error('Forgot password error:', err);
