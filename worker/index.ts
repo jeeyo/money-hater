@@ -3,13 +3,14 @@ import { cors } from 'hono/cors';
 import { GoogleGenAI, Type } from "@google/genai";
 import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
-import { hashPassword, comparePassword, generateToken, generateResetToken } from './auth';
+import { hashPassword, comparePassword, generateToken, generateResetToken, verifyTurnstile } from './auth';
 import { authMiddleware, getAuthUser } from './middleware';
 
 type Bindings = {
   money_hater_db: D1Database;
   JWT_SECRET: string; // JWT secret from Cloudflare env
   GEMINI_API_KEY: string; // Gemini API key from Cloudflare env
+  TURNSTILE_SECRET_KEY: string; // Turnstile secret key env
   BUCKET: R2Bucket; // R2 Bucket binding
 };
 
@@ -58,6 +59,14 @@ app.post('/api/auth/register', async (c) => {
 
     if (data.password.length < 6) {
       return c.json({ error: 'Password must be at least 6 characters' }, 400);
+    }
+
+    // Verify Turnstile
+    if (c.env.TURNSTILE_SECRET_KEY) {
+      const isHuman = await verifyTurnstile(data.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
+      if (!isHuman) {
+        return c.json({ error: 'Invalid captcha' }, 400);
+      }
     }
 
     // Check if user already exists
@@ -164,6 +173,14 @@ app.post('/api/auth/forgot-password', async (c) => {
 
     if (!data.email) {
       return c.json({ error: 'Missing email' }, 400);
+    }
+
+    // Verify Turnstile
+    if (c.env.TURNSTILE_SECRET_KEY) {
+      const isHuman = await verifyTurnstile(data.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
+      if (!isHuman) {
+        return c.json({ error: 'Invalid captcha' }, 400);
+      }
     }
 
     const user = await prisma.user.findUnique({

@@ -267,3 +267,25 @@ export function generateResetToken(): string {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
+
+/**
+ * Verify Cloudflare Turnstile token
+ */
+export async function verifyTurnstile(token: string, secretKey: string): Promise<boolean> {
+  try {
+    const formData = new FormData();
+    formData.append('secret', secretKey);
+    formData.append('response', token);
+
+    const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      body: formData,
+      method: 'POST',
+    });
+
+    const outcome = await result.json() as any;
+    return outcome.success;
+  } catch (error) {
+    console.error('Turnstile verification error:', error);
+    return false;
+  }
+}

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [debugLink, setDebugLink] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +20,7 @@ export const ForgotPassword: React.FC = () => {
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken }),
       });
 
       const data = await response.json();
@@ -70,6 +72,13 @@ export const ForgotPassword: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="mb-6 flex justify-center">
+            <Turnstile
+              siteKey="0x4AAAAAACDrTIQ7JEqrSBfd"
+              onSuccess={(token) => setTurnstileToken(token)}
             />
           </div>
 
