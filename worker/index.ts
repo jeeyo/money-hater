@@ -436,6 +436,17 @@ app.delete('/api/expenses/:id', authMiddleware, async (c) => {
       return c.json({ error: 'Expense not found or unauthorized' }, 404);
     }
 
+    // Delete attachment if exists
+    if (existingExpense.attachmentUrl) {
+      try {
+        await c.env.BUCKET.delete(existingExpense.attachmentUrl);
+        console.log(`Deleted attachment: ${existingExpense.attachmentUrl}`);
+      } catch (deleteErr) {
+        console.error('Failed to delete attachment:', deleteErr);
+        // Continue with expense deletion even if attachment deletion fails
+      }
+    }
+
     // Delete expense
     await prisma.expense.delete({
       where: { id }
