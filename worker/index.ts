@@ -13,7 +13,7 @@ type Bindings = {
   GEMINI_API_KEY: string; // Gemini API key from Cloudflare env
   TURNSTILE_SECRET_KEY: string; // Turnstile secret key env
   BUCKET: R2Bucket; // R2 Bucket binding
-  MONEY_HATER_MAILER: any; // SendEmail binding (SendEmail from "cloudflare:email")
+  RESEND_API_KEY: string; // Resend API Key
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -217,11 +217,11 @@ app.post('/api/auth/forgot-password', async (c) => {
     const resetLink = `${origin}/reset-password?token=${resetToken}`;
 
     // Send email
-    await sendPasswordResetEmail(user.email, resetLink, c.env.MONEY_HATER_MAILER);
+    await sendPasswordResetEmail(user.email, resetLink, c.env.RESEND_API_KEY);
 
     return c.json({
       message: 'If an account with that email exists, we sent you a reset link.',
-      debug_link: c.env.MONEY_HATER_MAILER ? undefined : resetLink // Only show link if no API key (dev mode)
+      debug_link: c.env.RESEND_API_KEY ? undefined : resetLink // Only show link if no API key (dev mode)
     });
   } catch (err) {
     console.error('Forgot password error:', err);

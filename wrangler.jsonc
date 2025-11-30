@@ -30,11 +30,6 @@
 			"bucket_name": "money-hater-storage"
 		}
 	],
-	"send_email": [
-		{
-			"name": "MONEY_HATER_MAILER"
-		}
-	],
 	"observability": {
 		"enabled": false,
 		"head_sampling_rate": 1,

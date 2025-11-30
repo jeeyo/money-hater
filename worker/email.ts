@@ -1,43 +1,40 @@
-import { EmailMessage } from "cloudflare:email";
-import { createMimeMessage } from "mimetext";
+import { Resend } from 'resend';
 
 export const sendPasswordResetEmail = async (
   email: string,
   resetLink: string,
-  sendEmailBinding: any // SendEmail from "cloudflare:email",
+  resendApiKey: string
 ) => {
-  if (!sendEmailBinding) {
-    console.warn('MONEY_HATER_MAILER binding is not set. Email not sent.');
+  if (!resendApiKey) {
+    console.warn('RESEND_API_KEY is not set. Email not sent.');
     console.log(`[DEV] Password Reset Link for ${email}: ${resetLink}`);
     return;
   }
 
-  const msg = createMimeMessage();
-  msg.setSender({ name: "Money Hater", addr: "noreply@hater.money" });
-  msg.setRecipient(email);
-  msg.setSubject("Reset your password");
-  msg.addMessage({
-    contentType: 'text/html',
-    data: `
-      <h1>Reset your password</h1>
-      <p>Click the link below to reset your password:</p>
-      <a href="${resetLink}">${resetLink}</a>
-      <p>If you didn't request this, please ignore this email.</p>
-    `
-  });
-
-  const message = new EmailMessage(
-    "noreply@hater.money",
-    email,
-    msg.asRaw()
-  );
+  const resend = new Resend(resendApiKey);
 
   try {
-    await sendEmailBinding.send(message);
-    console.log('Email sent successfully to', email);
+    const { data, error } = await resend.emails.send({
+      from: 'Money Hater <noreply@hater.money>',
+      to: [email],
+      subject: 'Reset your password',
+      html: `
+        <h1>Reset your password</h1>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>If you didn't request this, please ignore this email.</p>
+      `,
+    });
+
+    if (error) {
+      console.error('Failed to send email:', error);
+      console.log(`[FALLBACK] Password Reset Link for ${email}: ${resetLink}`);
+      return;
+    }
+
+    console.log('Email sent successfully to', email, 'ID:', data?.id);
   } catch (err) {
     console.error('Failed to send email:', err);
-    // In dev/demo, we might want to log the link anyway if email fails
     console.log(`[FALLBACK] Password Reset Link for ${email}: ${resetLink}`);
   }
 };

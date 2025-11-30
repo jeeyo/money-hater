@@ -11,11 +11,14 @@ export const ForgotPassword: React.FC = () => {
   const [debugLink, setDebugLink] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
 
+  const [isLoading, setIsLoading] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
     setDebugLink('');
+    setIsLoading(true);
 
     try {
       const response = await fetch('/api/auth/forgot-password', {
@@ -36,6 +39,8 @@ export const ForgotPassword: React.FC = () => {
       }
     } catch (err: any) {
       setError(err.message || 'Failed to send reset link');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -83,9 +88,22 @@ export const ForgotPassword: React.FC = () => {
             />
           </div>
 
-          <button type="submit" className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-500 text-white hover:bg-indigo-600 w-full">
-            <Mail size={20} className="mr-2" />
-            Send Reset Link
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-500 text-white hover:bg-indigo-600 w-full disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                Sending...
+              </>
+            ) : (
+              <>
+                <Mail size={20} className="mr-2" />
+                Send Reset Link
+              </>
+            )}
           </button>
         </form>
 
