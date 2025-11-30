@@ -68,7 +68,7 @@ Uploads a file to R2 and returns the storage key.
 ```
 
 ### Get File
-**GET** `/api/files/:key`
+**GET** `/api/attachments/:key`
 
 Retrieves a file from R2.
 
@@ -105,7 +105,7 @@ The `ExpenseForm` component includes file upload functionality:
 1. User selects a file (images or PDFs)
 2. File is uploaded to `/api/upload`
 3. Returned key is stored with the expense
-4. File can be retrieved later via `/api/files/:key`
+4. File can be retrieved later via `/api/attachments/:key`
 
 ## Security Considerations
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { type Expense, ExpenseCategory, IncomeCategory } from '../types';
-import { ShoppingBag, Coffee, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, Trash2, Edit2, DollarSign, Gift, TrendingUp } from 'lucide-react';
+import { ShoppingBag, Coffee, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, Trash2, Edit2, DollarSign, Gift, TrendingUp, Paperclip } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -35,6 +35,24 @@ const getCategoryIcon = (category: ExpenseCategory | IncomeCategory) => {
 };
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit }) => {
+  const handleViewAttachment = async (key: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/attachments/${encodeURIComponent(key)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch attachment');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Error viewing attachment:', err);
+      alert('Failed to view attachment');
+    }
+  };
+
   if (expenses.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-12 text-center transition-colors">
@@ -49,9 +67,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit })
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden shadow-sm transition-colors">
-      <div className="p-6 border-b border-slate-50 dark:border-slate-700">
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Recent Transactions</h3>
-      </div>
       <div className="divide-y divide-slate-50 dark:divide-slate-700">
         {expenses.map((expense) => (
           <div key={expense.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-4 group">
@@ -65,6 +80,15 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit })
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hidden sm:inline-block">
                   {expense.category}
                 </span>
+                {expense.attachmentUrl && (
+                  <button
+                    onClick={() => handleViewAttachment(expense.attachmentUrl!)}
+                    className="text-slate-400 hover:text-indigo-500 transition-colors"
+                    title="View Attachment"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span>{new Date(expense.date).toLocaleDateString()}</span>

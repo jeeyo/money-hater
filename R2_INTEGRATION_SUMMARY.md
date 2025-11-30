@@ -23,7 +23,7 @@ Added two new endpoints in `/worker/index.ts`:
 - **Returns**: `{ key: string }` - R2 object key
 
 #### Download Endpoint
-- **Route**: `GET /api/files/:key`
+- **Route**: `GET /api/attachments/:key`
 - **Auth**: Required (JWT)
 - **Returns**: File with appropriate headers
 

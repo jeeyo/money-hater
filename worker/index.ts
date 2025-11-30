@@ -666,7 +666,7 @@ app.post('/api/upload', authMiddleware, async (c) => {
 });
 
 // Get file from R2
-app.get('/api/files/:key', authMiddleware, async (c) => {
+app.get('/api/attachments/:key', authMiddleware, async (c) => {
   try {
     const key = c.req.param('key');
     const object = await c.env.BUCKET.get(key);

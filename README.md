@@ -129,7 +129,7 @@ money-hater/
 
 ### File Storage
 - `POST /api/upload` - Upload file to R2
-- `GET /api/files/:key` - Get file from R2
+- `GET /api/attachments/:key` - Get file from R2
 
 📚 **See [R2_SETUP.md](./R2_SETUP.md)** for R2 object storage setup and usage.
 

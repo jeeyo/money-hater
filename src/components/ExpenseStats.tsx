@@ -150,13 +150,13 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
           <div className="grid grid-cols-2 gap-4 mt-2">
             <div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Income</div>
-              <div className="text-lg font-bold text-green-600 dark:text-green-400">
+              <div className="text-xl font-bold text-green-600 dark:text-green-400">
                 +฿{currentPeriodTotal.income.toLocaleString()}
               </div>
             </div>
             <div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Expense</div>
-              <div className="text-lg font-bold text-red-600 dark:text-red-400">
+              <div className="text-xl font-bold text-red-600 dark:text-red-400">
                 -฿{currentPeriodTotal.expense.toLocaleString()}
               </div>
             </div>

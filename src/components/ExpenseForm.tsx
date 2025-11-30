@@ -25,6 +25,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
   const [isUploading, setIsUploading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAIEnabled, setIsAIEnabled] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
 
@@ -354,10 +355,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Attachment</label>
           <div className="flex items-center gap-2">
-            <label className="flex-1 cursor-pointer">
-              <div className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400">
-                {isUploading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+            <label className="flex-1 cursor-pointer group">
+              <div className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl transition-all duration-300 ${isAIEnabled
+                ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
+                : 'border-slate-300 dark:border-slate-600 hover:border-indigo-500 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400'
+                }`}>
+                {isUploading || isAnalyzing ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
                 ) : attachmentUrl ? (
                   <>
                     <Paperclip className="w-5 h-5 text-indigo-500" />
@@ -365,18 +369,37 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
                   </>
                 ) : (
                   <>
-                    <Upload className="w-5 h-5" />
-                    <span>Upload Receipt</span>
+                    {isAIEnabled ? (
+                      <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
+                    ) : (
+                      <Upload className="w-5 h-5 group-hover:text-indigo-500 transition-colors" />
+                    )}
+                    <span className={isAIEnabled ? "text-indigo-600 dark:text-indigo-400 font-medium" : "group-hover:text-indigo-500 transition-colors"}>
+                      {isAIEnabled ? 'Upload to AI' : 'Upload Receipt'}
+                    </span>
                   </>
                 )}
               </div>
-              <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" disabled={isUploading} />
+              <input
+                type="file"
+                className="hidden"
+                onChange={isAIEnabled ? handleAnalyzeReceipt : handleFileUpload}
+                accept={isAIEnabled ? "image/*" : "image/*,.pdf"}
+                disabled={isUploading || isAnalyzing}
+              />
             </label>
 
-            <label className="cursor-pointer p-3 border-2 border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors" title="Scan Receipt with AI">
-              {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-              <input type="file" className="hidden" onChange={handleAnalyzeReceipt} accept="image/*" disabled={isAnalyzing} />
-            </label>
+            <button
+              type="button"
+              onClick={() => setIsAIEnabled(!isAIEnabled)}
+              className={`p-3 border-2 rounded-xl transition-all duration-300 ${isAIEnabled
+                ? 'border-indigo-500 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-500 dark:hover:text-indigo-400'
+                }`}
+              title={isAIEnabled ? "Disable AI Receipt Reading" : "Enable AI Receipt Reading"}
+            >
+              <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-indigo-400' : ''}`} />
+            </button>
 
             {attachmentUrl && (
               <button
