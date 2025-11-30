@@ -199,6 +199,24 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
     }
   };
 
+  const handleViewAttachment = async (key: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/attachments/${encodeURIComponent(key)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch attachment');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Error viewing attachment:', err);
+      setToast({ message: 'Failed to view attachment', type: 'error' });
+    }
+  };
+
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 h-full flex flex-col transition-colors">
@@ -364,8 +382,19 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
                   <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
                 ) : attachmentUrl ? (
                   <>
-                    <Paperclip className="w-5 h-5 text-indigo-500" />
-                    <span className="text-indigo-500 font-medium">File Attached</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleViewAttachment(attachmentUrl);
+                      }}
+                      className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full transition-colors z-10"
+                      title="View Attachment"
+                    >
+                      <Paperclip className="w-5 h-5 text-indigo-500" />
+                    </button>
+                    <span className="text-indigo-500 font-medium">View</span>
                   </>
                 ) : (
                   <>
@@ -389,17 +418,19 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
               />
             </label>
 
-            <button
-              type="button"
-              onClick={() => setIsAIEnabled(!isAIEnabled)}
-              className={`p-3 border-2 rounded-xl transition-all duration-300 ${isAIEnabled
-                ? 'border-indigo-500 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
-                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-500 dark:hover:text-indigo-400'
-                }`}
-              title={isAIEnabled ? "Disable AI Receipt Reading" : "Enable AI Receipt Reading"}
-            >
-              <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-indigo-400' : ''}`} />
-            </button>
+            {!attachmentUrl && (
+              <button
+                type="button"
+                onClick={() => setIsAIEnabled(!isAIEnabled)}
+                className={`p-3 border-2 rounded-xl transition-all duration-300 ${isAIEnabled
+                  ? 'border-indigo-500 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-500 dark:hover:text-indigo-400'
+                  }`}
+                title={isAIEnabled ? "Disable AI Receipt Reading" : "Enable AI Receipt Reading"}
+              >
+                <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-indigo-400' : ''}`} />
+              </button>
+            )}
 
             {attachmentUrl && (
               <button

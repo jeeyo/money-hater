@@ -131,6 +131,14 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ error: 'Missing username or password' }, 400);
     }
 
+    // Verify Turnstile
+    if (c.env.TURNSTILE_SECRET_KEY) {
+      const isHuman = await verifyTurnstile(data.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
+      if (!isHuman) {
+        return c.json({ error: 'Invalid captcha' }, 400);
+      }
+    }
+
     // Find user by username
     const user = await prisma.user.findFirst({
       where: { username: data.username }

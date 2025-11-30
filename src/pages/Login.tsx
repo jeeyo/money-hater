@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
+import { getTurnstileSiteKey } from '../services/turnstile';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -18,7 +21,7 @@ export const Login: React.FC = () => {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, turnstileToken }),
       });
 
       if (!response.ok) {
@@ -72,6 +75,13 @@ export const Login: React.FC = () => {
                 Forgot Password?
               </Link>
             </div>
+          </div>
+
+          <div className="mb-6 flex justify-center">
+            <Turnstile
+              siteKey={getTurnstileSiteKey()}
+              onSuccess={(token) => setTurnstileToken(token)}
+            />
           </div>
 
           <button type="submit" className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-500 text-white hover:bg-indigo-600 w-full">
