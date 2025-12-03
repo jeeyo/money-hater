@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { GoogleGenAI, Type } from "@google/genai";
 import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
@@ -17,9 +16,6 @@ type Bindings = {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
-
-// Middleware
-app.use('/*', cors());
 
 // Helper to get Prisma client
 const getPrisma = (c: any) => {
