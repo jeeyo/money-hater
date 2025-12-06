@@ -33,6 +33,7 @@ export interface Expense {
   tags: string[];
   attachmentUrl?: string;
   createdAt: number;
+  accountId?: string;
 }
 
 export interface AIClassificationResult {

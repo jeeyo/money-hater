@@ -13,8 +13,9 @@ export function getAuthHeaders(): HeadersInit {
   };
 }
 
-export const getAllExpenses = async (): Promise<Expense[]> => {
-  const response = await fetch(API_BASE, {
+export const getAllExpenses = async (accountId?: string): Promise<Expense[]> => {
+  const url = accountId ? `${API_BASE}?accountId=${accountId}` : API_BASE;
+  const response = await fetch(url, {
     headers: getAuthHeaders()
   });
 

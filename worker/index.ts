@@ -5,6 +5,7 @@ import { PrismaD1 } from '@prisma/adapter-d1';
 import { hashPassword, comparePassword, generateToken, generateResetToken, verifyTurnstile } from './auth';
 import { authMiddleware, getAuthUser } from './middleware';
 import { sendPasswordResetEmail } from './email';
+import accounts from './accounts';
 
 type Bindings = {
   money_hater_db: D1Database;
@@ -273,6 +274,8 @@ app.post('/api/auth/reset-password', async (c) => {
 // PROTECTED ROUTES (Authentication required)
 // ============================================
 
+app.route('/api/accounts', accounts);
+
 // Get current user info
 app.get('/api/auth/me', authMiddleware, async (c) => {
   try {
@@ -306,11 +309,19 @@ app.get('/api/expenses', authMiddleware, async (c) => {
     const prisma = getPrisma(c);
     const authUser = getAuthUser(c);
 
-    // Get only expenses for the authenticated user
+    const accountId = c.req.query('accountId');
+
+    // Get only expenses for the authenticated user and specific account if provided
+    const whereClause: any = {
+      userId: authUser.userId
+    };
+
+    if (accountId) {
+      whereClause.accountId = accountId;
+    }
+
     const expenses = await prisma.expense.findMany({
-      where: {
-        userId: authUser.userId
-      },
+      where: whereClause,
       orderBy: {
         date: 'desc'
       }
@@ -353,7 +364,8 @@ app.post('/api/expenses', authMiddleware, async (c) => {
         tags: JSON.stringify(newExpense.tags || []),
         attachmentUrl: newExpense.attachmentUrl,
         createdAt: newExpense.createdAt || Date.now(),
-        userId: authUser.userId // Use authenticated user's ID
+        userId: authUser.userId, // Use authenticated user's ID
+        accountId: newExpense.accountId
       } as any
     });
 
@@ -399,6 +411,7 @@ app.put('/api/expenses/:id', authMiddleware, async (c) => {
         category: updatedExpense.category,
         tags: updatedExpense.tags ? JSON.stringify(updatedExpense.tags) : undefined,
         attachmentUrl: updatedExpense.attachmentUrl,
+        accountId: updatedExpense.accountId
       } as any
     });
 

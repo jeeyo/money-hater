@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 // import { Moon, Sun, LogOut, Bell, Search, Menu } from 'lucide-react';
-import { Moon, Sun, LogOut, Menu } from 'lucide-react';
+import { Moon, Sun, LogOut, Menu, ChevronDown, Settings, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAccount } from '../context/AccountContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -10,7 +11,9 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
+  const { accounts, selectedAccount, selectAccount } = useAccount();
   const navigate = useNavigate();
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -59,6 +62,62 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Account Switcher */}
+        <div className="relative">
+          <button
+            onClick={() => setShowAccountMenu(!showAccountMenu)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+          >
+            <Wallet className="w-4 h-4 text-indigo-500" />
+            <span className="text-sm font-medium text-slate-900 dark:text-white hidden sm:inline-block">
+              {selectedAccount?.name || 'Select Account'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          </button>
+
+          {showAccountMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowAccountMenu(false)}
+              ></div>
+              <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
+                <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Switch Account
+                </div>
+                {accounts.map(account => (
+                  <button
+                    key={account.id}
+                    onClick={() => {
+                      selectAccount(account);
+                      setShowAccountMenu(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${selectedAccount?.id === account.id
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                  >
+                    <span>{account.name}</span>
+                    {selectedAccount?.id === account.id && (
+                      <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                    )}
+                  </button>
+                ))}
+                <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+                <button
+                  onClick={() => {
+                    navigate('/accounts');
+                    setShowAccountMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Manage Accounts
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         {/* Notification */}
         {/* <button className="relative p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
           <Bell className="w-5 h-5 text-slate-700 dark:text-white" />

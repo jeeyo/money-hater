@@ -17,9 +17,23 @@ model User {
   resetToken String?
   resetTokenExpiry DateTime?
   expenses Expense[]
+  accounts Account[]
   
   @@index([email])
   @@index([username])
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   @default("normal") // normal, credit_card, savings, etc.
+  icon      String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+  createdAt Float    @default(0)
+
+  @@index([userId])
 }
 
 model Expense {
@@ -34,9 +48,12 @@ model Expense {
   createdAt   Float
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String?
+  account     Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
   @@index([userId])
   @@index([date])
   @@index([type])
   @@index([userId, date])
+  @@index([accountId])
 }

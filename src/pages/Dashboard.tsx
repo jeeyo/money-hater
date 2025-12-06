@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useAccount } from '../context/AccountContext';
 import ExpenseForm from '../components/ExpenseForm';
 import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } from '../types';
 import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from '../services/api';
@@ -10,6 +11,7 @@ import { getCategoryIcon } from '../utils/categoryIcons';
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
 const Dashboard: React.FC = () => {
+  const { selectedAccount } = useAccount();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -34,8 +36,12 @@ const Dashboard: React.FC = () => {
           }
         }
 
-        const dbData = await getAllExpenses();
-        setExpenses(dbData);
+        if (selectedAccount) {
+          const dbData = await getAllExpenses(selectedAccount.id);
+          setExpenses(dbData);
+        } else {
+          setExpenses([]);
+        }
       } catch (error) {
         console.error("Failed to load expenses:", error);
       } finally {
@@ -44,7 +50,7 @@ const Dashboard: React.FC = () => {
     };
 
     initData();
-  }, []);
+  }, [selectedAccount]);
 
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
@@ -54,8 +60,10 @@ const Dashboard: React.FC = () => {
 
       try {
         await updateExpenseInDB(updatedExpense);
-        const reloaded = await getAllExpenses();
-        setExpenses(reloaded);
+        if (selectedAccount) {
+          const reloaded = await getAllExpenses(selectedAccount.id);
+          setExpenses(reloaded);
+        }
       } catch (error) {
         console.error("Failed to update expense", error);
       }
@@ -63,6 +71,7 @@ const Dashboard: React.FC = () => {
       const newExpense: Expense = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
+        accountId: selectedAccount?.id,
         ...data
       };
 
@@ -71,8 +80,10 @@ const Dashboard: React.FC = () => {
 
       try {
         await addExpenseToDB(newExpense);
-        const reloaded = await getAllExpenses();
-        setExpenses(reloaded);
+        if (selectedAccount) {
+          const reloaded = await getAllExpenses(selectedAccount.id);
+          setExpenses(reloaded);
+        }
       } catch (error) {
         console.error("Failed to add expense", error);
       }
