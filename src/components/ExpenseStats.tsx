@@ -109,37 +109,37 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
       {/* Summary Cards */}
-      <div className="lg:col-span-1 space-y-4">
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20">
-          <div className="flex items-center gap-3 mb-2 opacity-90">
-            <Wallet className="w-5 h-5" />
-            <span className="font-medium">Net Balance</span>
+      <div className="lg:col-span-1 space-y-3">
+        <div className="bg-indigo-600 dark:bg-indigo-500 p-4 rounded-xl text-white shadow-sm">
+          <div className="flex items-center gap-2 mb-1.5 opacity-90">
+            <Wallet className="w-4 h-4" />
+            <span className="font-medium text-sm">Net Balance</span>
           </div>
-          <div className="text-4xl font-bold tracking-tight">
+          <div className="text-3xl font-semibold tracking-tight">
             ฿{netBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="mt-4 text-indigo-100 text-sm flex items-center gap-4">
+          <div className="mt-3 text-indigo-100 text-xs flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <TrendingUp className="w-4 h-4 text-green-300" />
+              <TrendingUp className="w-3.5 h-3.5 text-green-200" />
               <span>+฿{totalIncome.toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-1">
-              <TrendingDown className="w-4 h-4 text-red-300" />
+              <TrendingDown className="w-3.5 h-3.5 text-red-200" />
               <span>-฿{totalExpense.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors">
-          <div className="flex items-center gap-3 mb-2 text-slate-500 dark:text-slate-400">
-            <Calendar className="w-5 h-5" />
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
+          <div className="flex items-center gap-2 mb-1.5 text-slate-500 dark:text-slate-400">
+            <Calendar className="w-4 h-4" />
             <div className="relative">
               <select
                 value={summaryPeriod}
                 onChange={(e) => setSummaryPeriod(e.target.value as 'month' | 'year')}
-                className="appearance-none bg-transparent font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer outline-none pr-5 py-1"
+                className="appearance-none bg-transparent font-medium text-sm text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer outline-none pr-4 py-0.5"
               >
                 <option value="month">This Month</option>
                 <option value="year">This Year</option>
@@ -147,16 +147,16 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
               <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mt-2">
+          <div className="grid grid-cols-2 gap-3 mt-1.5">
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Income</div>
-              <div className="text-xl font-bold text-green-600 dark:text-green-400">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Income</div>
+              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
                 +฿{currentPeriodTotal.income.toLocaleString()}
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Expense</div>
-              <div className="text-xl font-bold text-red-600 dark:text-red-400">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Expense</div>
+              <div className="text-lg font-semibold text-red-600 dark:text-red-400">
                 -฿{currentPeriodTotal.expense.toLocaleString()}
               </div>
             </div>
@@ -165,15 +165,15 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
       </div>
 
       {/* Chart */}
-      <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col transition-colors">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white">Spending by Category</h3>
+      <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col transition-colors">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-slate-800 dark:text-white">Spending by Category</h3>
 
           <div className="relative">
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent block w-full pl-3 pr-8 py-2 outline-none cursor-pointer font-medium transition-colors"
+              className="appearance-none bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs rounded-lg focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 focus:border-transparent block w-full pl-2.5 pr-7 py-1.5 outline-none cursor-pointer font-medium transition-colors"
             >
               <option value="all">All Time</option>
               {availableMonths.map(month => (
@@ -182,7 +182,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
                 </option>
               ))}
             </select>
-            <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Filter className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           </div>
         </div>
 
@@ -215,8 +215,8 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-              <p>No expenses found for this period</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
+              <p className="text-sm">No expenses found for this period</p>
             </div>
           )}
         </div>

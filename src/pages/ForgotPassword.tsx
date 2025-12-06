@@ -45,43 +45,43 @@ export const ForgotPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="bg-slate-800 p-8 rounded-2xl w-full max-w-[400px] shadow-2xl border border-slate-700">
-        <h1 className="text-3xl font-bold mb-2 text-center">Forgot Password</h1>
-        <p className="text-slate-400 text-center mb-8">Enter your email to reset your password</p>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Forgot Password</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Enter your email to reset your password</p>
 
         {error && (
-          <div className="text-red-500 mb-4 text-center">
+          <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
             {error}
           </div>
         )}
 
         {message && (
-          <div className="text-green-500 mb-4 text-center">
+          <div className="text-green-600 dark:text-green-400 mb-4 text-center text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">
             {message}
           </div>
         )}
 
         {debugLink && (
-          <div className="mt-4 p-4 bg-gray-800 text-white rounded text-xs break-all">
+          <div className="mt-3 p-3 bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-xs break-all border border-slate-200 dark:border-slate-700">
             <strong>Debug Link (Dev Only):</strong><br />
-            <a href={debugLink} className="text-blue-400">{debugLink}</a>
+            <a href={debugLink} className="text-indigo-600 dark:text-indigo-400 hover:underline">{debugLink}</a>
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block mb-2 text-slate-400 text-sm">Email</label>
+          <div className="mb-3">
+            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Email</label>
             <input
               type="email"
-              className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-50 transition-colors focus:border-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
 
-          <div className="mb-6 flex justify-center">
+          <div className="mb-4 flex justify-center">
             <Turnstile
               siteKey={getTurnstileSiteKey()}
               onSuccess={(token) => setTurnstileToken(token)}
@@ -91,24 +91,24 @@ export const ForgotPassword: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-500 text-white hover:bg-indigo-600 w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Sending...
               </>
             ) : (
               <>
-                <Mail size={20} className="mr-2" />
+                <Mail size={16} className="mr-2" />
                 Send Reset Link
               </>
             )}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-slate-400">
-          Remember your password? <Link to="/login" className="text-indigo-500 no-underline hover:underline">Sign in</Link>
+        <p className="mt-4 text-center text-slate-500 dark:text-slate-400 text-xs">
+          Remember your password? <Link to="/login" className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium">Sign in</Link>
         </p>
       </div>
     </div>

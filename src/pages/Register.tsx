@@ -39,66 +39,66 @@ export const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="bg-slate-800 p-8 rounded-2xl w-full max-w-[400px] shadow-2xl border border-slate-700">
-        <h1 className="text-3xl font-bold mb-2 text-center">Create Account</h1>
-        <p className="text-slate-400 text-center mb-8">Start tracking your money today</p>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Create Account</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Start tracking your money today</p>
 
         {error && (
-          <div className="text-red-500 mb-4 text-center">
+          <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block mb-2 text-slate-400 text-sm">Username</label>
+          <div className="mb-3">
+            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Username</label>
             <input
               type="text"
-              className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-50 transition-colors focus:border-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
             />
           </div>
 
-          <div className="mb-4">
-            <label className="block mb-2 text-slate-400 text-sm">Email</label>
+          <div className="mb-3">
+            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Email</label>
             <input
               type="email"
-              className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-50 transition-colors focus:border-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
 
-          <div className="mb-4">
-            <label className="block mb-2 text-slate-400 text-sm">Password</label>
+          <div className="mb-3">
+            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Password</label>
             <input
               type="password"
-              className="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-50 transition-colors focus:border-indigo-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
 
-          <div className="mb-6 flex justify-center">
+          <div className="mb-4 flex justify-center">
             <Turnstile
               siteKey={getTurnstileSiteKey()}
               onSuccess={(token) => setTurnstileToken(token)}
             />
           </div>
 
-          <button type="submit" className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-500 text-white hover:bg-indigo-600 w-full">
-            <UserPlus size={20} className="mr-2" />
+          <button type="submit" className="inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 w-full">
+            <UserPlus size={16} className="mr-2" />
             Sign Up
           </button>
         </form>
 
-        <p className="mt-6 text-center text-slate-400">
-          Already have an account? <Link to="/login" className="text-indigo-500 no-underline hover:underline">Sign in</Link>
+        <p className="mt-4 text-center text-slate-500 dark:text-slate-400 text-xs">
+          Already have an account? <Link to="/login" className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium">Sign in</Link>
         </p>
       </div>
     </div>

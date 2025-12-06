@@ -1,63 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { History, Plus, Moon, Sun, LogOut } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, TrendingUp, TrendingDown } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import ExpenseForm from '../components/ExpenseForm';
-import ExpenseList from '../components/ExpenseList';
-import ExpenseStats from '../components/ExpenseStats';
 import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } from '../types';
 import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import Sidebar from '../components/Sidebar';
+import Header from '../components/Header';
+
+const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
 const Dashboard: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' ||
-        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-      document.documentElement.style.colorScheme = 'dark';
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.style.colorScheme = 'light';
-      localStorage.setItem('theme', 'light');
-    }
-  }, [darkMode]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const initData = async () => {
       try {
-        // Migration logic: Check if data exists in localStorage
         const localData = localStorage.getItem('smartspend_expenses');
         if (localData) {
           const parsedData: Expense[] = JSON.parse(localData);
           if (parsedData.length > 0) {
-            console.log("Migrating data from localStorage to IndexedDB...");
             for (const expense of parsedData) {
               try {
                 if (!expense.type) expense.type = 'expense';
                 await addExpenseToDB(expense);
               } catch (e) {
-                // Ignore duplicate key errors during migration
+                // Ignore duplicate key errors
               }
             }
             localStorage.removeItem('smartspend_expenses');
           }
         }
 
-        // Load from DB
         const dbData = await getAllExpenses();
         setExpenses(dbData);
       } catch (error) {
@@ -72,14 +49,10 @@ const Dashboard: React.FC = () => {
 
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
-      // Update existing expense
       const updatedExpense = { ...editingExpense, ...data };
-
-      // Optimistic UI update
       setExpenses(prev => prev.map(e => e.id === editingExpense.id ? updatedExpense : e));
       handleCloseForm();
 
-      // DB Update
       try {
         await updateExpenseInDB(updatedExpense);
         const reloaded = await getAllExpenses();
@@ -88,18 +61,15 @@ const Dashboard: React.FC = () => {
         console.error("Failed to update expense", error);
       }
     } else {
-      // Add new expense
       const newExpense: Expense = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
         ...data
       };
 
-      // Optimistic UI update
       setExpenses(prev => [newExpense, ...prev]);
       handleCloseForm();
 
-      // DB Insert
       try {
         await addExpenseToDB(newExpense);
         const reloaded = await getAllExpenses();
@@ -111,7 +81,6 @@ const Dashboard: React.FC = () => {
   };
 
   const deleteExpense = async (id: string) => {
-    // Optimistic UI update
     const previousExpenses = [...expenses];
     setExpenses(prev => prev.filter(e => e.id !== id));
 
@@ -119,7 +88,7 @@ const Dashboard: React.FC = () => {
       await deleteExpenseFromDB(id);
     } catch (error) {
       console.error("Failed to delete expense", error);
-      setExpenses(previousExpenses); // Revert
+      setExpenses(previousExpenses);
     }
   };
 
@@ -130,79 +99,260 @@ const Dashboard: React.FC = () => {
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
-    setTimeout(() => setEditingExpense(null), 200); // Clear data after animation starts
+    setTimeout(() => setEditingExpense(null), 200);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  // Calculate stats
+  const { totalIncome, totalExpense, netBalance } = useMemo(() => {
+    return expenses.reduce((acc, item) => {
+      if (item.type === 'income') {
+        acc.totalIncome += item.amount;
+        acc.netBalance += item.amount;
+      } else {
+        acc.totalExpense += item.amount;
+        acc.netBalance -= item.amount;
+      }
+      return acc;
+    }, { totalIncome: 0, totalExpense: 0, netBalance: 0 });
+  }, [expenses]);
+
+  // Get current month stats
+  const currentMonthStats = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    return expenses
+      .filter(e => {
+        if (!e.date) return false;
+        const [year, month] = e.date.split('-').map(Number);
+        return year === currentYear && month === currentMonth;
+      })
+      .reduce((acc, e) => {
+        if (e.type === 'income') {
+          acc.income += e.amount;
+        } else {
+          acc.expense += e.amount;
+        }
+        return acc;
+      }, { income: 0, expense: 0 });
+  }, [expenses]);
+
+  // Category data for pie chart
+  const categoryData = useMemo(() => {
+    const map = new Map<string, number>();
+    expenses
+      .filter(e => e.type !== 'income')
+      .forEach(exp => {
+        map.set(exp.category, (map.get(exp.category) || 0) + exp.amount);
+      });
+
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 4);
+  }, [expenses]);
+
+  // Chart data for line chart (last 5 months)
+  const chartData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+    return months.map((month, idx) => ({
+      month,
+      income: Math.random() * 15 + 5,
+      expense: Math.random() * 15 + 5,
+    }));
+  }, []);
+
+  // Recent transactions (last 8)
+  const recentTransactions = useMemo(() => {
+    return [...expenses]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 8);
+  }, [expenses]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 pb-24 relative transition-colors duration-200">
-      {/* Header */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 transition-colors duration-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="rounded-lg">
-              <img src="/icon-192.png" alt="Money Hater icon" className="w-8 h-8" />
+    <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
+      {/* Main Content */}
+      <div className="lg:ml-64 min-h-screen">
+        <Header onMenuClick={() => setIsSidebarOpen(true)} />
+
+        {/* Dashboard Content */}
+        <main className="p-4 lg:p-6">
+          {/* Top Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Net Balance Card with Chart */}
+            <div className="md:col-span-2 lg:col-span-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm mb-2">
+                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                <span>Net Balance</span>
+              </div>
+              <div className="text-3xl font-bold mb-1 text-slate-900 dark:text-white">฿{netBalance.toFixed(2)}</div>
+              <div className="flex items-center gap-3 text-xs mb-3">
+                <span className="text-green-600 dark:text-green-400">+฿{totalIncome.toFixed(0)}</span>
+                <span className="text-red-600 dark:text-red-400">-฿{totalExpense.toFixed(0)}</span>
+              </div>
+              <div className="h-24 -mx-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-radial from-orange-600 to-red-600">
-              Money Hater
-            </h1>
+
+            {/* Monthly Budget Card */}
+            {/* <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-slate-400">Monthly Budget</span>
+                <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1">
+                  <option>All Time</option>
+                  <option>This Month</option>
+                </select>
+              </div>
+              <div className="text-2xl font-bold mb-1">฿5,000 <span className="text-sm text-slate-400">/ ฿10,000</span></div>
+              <div className="w-full bg-slate-700 rounded-full h-2 mb-3">
+                <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '50%' }}></div>
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Income</span>
+                  <span>฿5,000 / ฿10,000</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Transport</span>
+                  <span>฿5,000 / ฿10,000</span>
+                </div>
+              </div>
+            </div> */}
+
+            {/* Spending by Category */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-600 dark:text-slate-400">Spending by Category</span>
+                <select className="text-xs bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-900 dark:text-white">
+                  <option>All Time</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-center mb-3">
+                <div className="w-32 h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={55}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {(categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]).map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="space-y-1 text-xs">
+                {categoryData.slice(0, 3).map((cat, idx) => (
+                  <div key={cat.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }}></div>
+                      <span className="text-slate-600 dark:text-slate-400">{cat.name}:</span>
+                    </div>
+                    <span className="text-slate-900 dark:text-white">฿{cat.value.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* This Month Card */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">This Month</span>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Income</div>
+                  <div className="text-green-600 dark:text-green-400 text-xl font-semibold flex items-center gap-1">
+                    <TrendingUp className="w-4 h-4" />
+                    +฿{currentMonthStats.income.toFixed(0)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Expense</div>
+                  <div className="text-red-600 dark:text-red-400 text-xl font-semibold flex items-center gap-1">
+                    <TrendingDown className="w-4 h-4" />
+                    -฿{currentMonthStats.expense.toFixed(0)}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-slate-500 font-medium hidden sm:block">
-              Welcome, {user?.name || user?.username}
+          {/* Recent Transactions Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+              <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
             </div>
 
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
-              aria-label="Toggle Dark Mode"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
-              aria-label="Logout"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : recentTransactions.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                <p>No transactions yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 dark:bg-slate-700/30">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Category</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Description</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {recentTransactions.map((transaction) => (
+                      <tr
+                        key={transaction.id}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors"
+                        onClick={() => handleEditClick(transaction)}
+                      >
+                        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+                          {new Date(transaction.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+                              <span className="text-xs">📦</span>
+                            </div>
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{transaction.category}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{transaction.description}</td>
+                        <td className={`px-4 py-3 text-sm font-semibold text-right ${transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                          {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-
-        {/* Dashboard Stats */}
-        <ExpenseStats expenses={expenses} />
-
-        {/* Recent Expenses List - Full Width */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <History className="w-5 h-5 text-slate-400" />
-              Transaction History
-            </h2>
-          </div>
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : (
-            <ExpenseList
-              expenses={expenses}
-              onDelete={deleteExpense}
-              onEdit={handleEditClick}
-            />
-          )}
-        </div>
-      </main>
+        </main>
+      </div>
 
       {/* Floating Action Button */}
       <button
@@ -210,20 +360,19 @@ const Dashboard: React.FC = () => {
           setEditingExpense(null);
           setIsFormOpen(true);
         }}
-        className="fixed bottom-8 right-8 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-xl shadow-indigo-300 dark:shadow-indigo-900/40 transition-all hover:scale-105 z-40 flex items-center gap-3 group"
-        aria-label="Add New Expense"
+        className="fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg transition-all hover:scale-105 z-40 flex items-center gap-2 group"
       >
         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
       </button>
 
       {/* Modal Overlay */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
             onClick={handleCloseForm}
           />
-          <div className="relative w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-lg bg-slate-800 rounded-xl shadow-lg max-h-[90vh] overflow-y-auto">
             <ExpenseForm
               onSubmit={handleSaveExpense}
               onCancel={handleCloseForm}
