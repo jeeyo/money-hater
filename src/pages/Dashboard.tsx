@@ -4,8 +4,8 @@ import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell } from 'recha
 import ExpenseForm from '../components/ExpenseForm';
 import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } from '../types';
 import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from '../services/api';
-import Sidebar from '../components/Sidebar';
-import Header from '../components/Header';
+import Layout from '../components/Layout';
+import { getCategoryIcon } from '../utils/categoryIcons';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
@@ -14,7 +14,6 @@ const Dashboard: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const initData = async () => {
@@ -205,188 +204,179 @@ const Dashboard: React.FC = () => {
   }, [expenses]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+    <Layout>
+      {/* Top Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+        {/* Net Balance Card with Chart */}
+        <div className="md:col-span-2 lg:col-span-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm mb-2">
+            <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <span>Net Balance</span>
+          </div>
+          <div className="text-3xl font-bold mb-1 text-slate-900 dark:text-white">฿{netBalance.toFixed(2)}</div>
+          <div className="flex items-center gap-3 text-xs mb-3">
+            <span className="text-green-600 dark:text-green-400">+฿{totalIncome.toFixed(0)}</span>
+            <span className="text-red-600 dark:text-red-400">-฿{totalExpense.toFixed(0)}</span>
+          </div>
+          <div className="h-24 -mx-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-      {/* Main Content */}
-      <div className="lg:ml-64 min-h-screen">
-        <Header onMenuClick={() => setIsSidebarOpen(true)} />
-
-        {/* Dashboard Content */}
-        <main className="p-4 lg:p-6">
-          {/* Top Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {/* Net Balance Card with Chart */}
-            <div className="md:col-span-2 lg:col-span-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm mb-2">
-                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                <span>Net Balance</span>
-              </div>
-              <div className="text-3xl font-bold mb-1 text-slate-900 dark:text-white">฿{netBalance.toFixed(2)}</div>
-              <div className="flex items-center gap-3 text-xs mb-3">
-                <span className="text-green-600 dark:text-green-400">+฿{totalIncome.toFixed(0)}</span>
-                <span className="text-red-600 dark:text-red-400">-฿{totalExpense.toFixed(0)}</span>
-              </div>
-              <div className="h-24 -mx-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+        {/* Monthly Budget Card */}
+        {/* <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-slate-400">Monthly Budget</span>
+            <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1">
+              <option>All Time</option>
+              <option>This Month</option>
+            </select>
+          </div>
+          <div className="text-2xl font-bold mb-1">฿5,000 <span className="text-sm text-slate-400">/ ฿10,000</span></div>
+          <div className="w-full bg-slate-700 rounded-full h-2 mb-3">
+            <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '50%' }}></div>
+          </div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Income</span>
+              <span>฿5,000 / ฿10,000</span>
             </div>
-
-            {/* Monthly Budget Card */}
-            {/* <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-400">Monthly Budget</span>
-                <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1">
-                  <option>All Time</option>
-                  <option>This Month</option>
-                </select>
-              </div>
-              <div className="text-2xl font-bold mb-1">฿5,000 <span className="text-sm text-slate-400">/ ฿10,000</span></div>
-              <div className="w-full bg-slate-700 rounded-full h-2 mb-3">
-                <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '50%' }}></div>
-              </div>
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Income</span>
-                  <span>฿5,000 / ฿10,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Transport</span>
-                  <span>฿5,000 / ฿10,000</span>
-                </div>
-              </div>
-            </div> */}
-
-            {/* Spending by Category */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Spending by Category</span>
-                <select className="text-xs bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-900 dark:text-white">
-                  <option>All Time</option>
-                </select>
-              </div>
-              <div className="flex items-center justify-center mb-3">
-                <div className="w-32 h-32">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={35}
-                        outerRadius={55}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {(categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]).map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="space-y-1 text-xs">
-                {categoryData.slice(0, 3).map((cat, idx) => (
-                  <div key={cat.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }}></div>
-                      <span className="text-slate-600 dark:text-slate-400">{cat.name}:</span>
-                    </div>
-                    <span className="text-slate-900 dark:text-white">฿{cat.value.toFixed(0)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* This Month Card */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                <span className="text-sm text-slate-600 dark:text-slate-400">This Month</span>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Income</div>
-                  <div className="text-green-600 dark:text-green-400 text-xl font-semibold flex items-center gap-1">
-                    <TrendingUp className="w-4 h-4" />
-                    +฿{currentMonthStats.income.toFixed(0)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Expense</div>
-                  <div className="text-red-600 dark:text-red-400 text-xl font-semibold flex items-center gap-1">
-                    <TrendingDown className="w-4 h-4" />
-                    -฿{currentMonthStats.expense.toFixed(0)}
-                  </div>
-                </div>
-              </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Transport</span>
+              <span>฿5,000 / ฿10,000</span>
             </div>
           </div>
+        </div> */}
 
-          {/* Recent Transactions Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-              <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
-            </div>
-
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              </div>
-            ) : recentTransactions.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-                <p>No transactions yet</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-700/30">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Category</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Description</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {recentTransactions.map((transaction) => (
-                      <tr
-                        key={transaction.id}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors"
-                        onClick={() => handleEditClick(transaction)}
-                      >
-                        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
-                          {new Date(transaction.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
-                              <span className="text-xs">📦</span>
-                            </div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300">{transaction.category}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{transaction.description}</td>
-                        <td className={`px-4 py-3 text-sm font-semibold text-right ${transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                          }`}>
-                          {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
-                        </td>
-                      </tr>
+        {/* Spending by Category */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-slate-600 dark:text-slate-400">Spending by Category</span>
+            <select className="text-xs bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-900 dark:text-white">
+              <option>All Time</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-center mb-3">
+            <div className="w-32 h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={35}
+                    outerRadius={55}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {(categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]).map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </main>
+          <div className="space-y-1 text-xs">
+            {categoryData.slice(0, 3).map((cat, idx) => (
+              <div key={cat.name} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }}></div>
+                  <span className="text-slate-600 dark:text-slate-400">{cat.name}:</span>
+                </div>
+                <span className="text-slate-900 dark:text-white">฿{cat.value.toFixed(0)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* This Month Card */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+            <span className="text-sm text-slate-600 dark:text-slate-400">This Month</span>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Income</div>
+              <div className="text-green-600 dark:text-green-400 text-xl font-semibold flex items-center gap-1">
+                <TrendingUp className="w-4 h-4" />
+                +฿{currentMonthStats.income.toFixed(0)}
+              </div>
+            </div>
+            <div>
+              <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Expense</div>
+              <div className="text-red-600 dark:text-red-400 text-xl font-semibold flex items-center gap-1">
+                <TrendingDown className="w-4 h-4" />
+                -฿{currentMonthStats.expense.toFixed(0)}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Recent Transactions Table */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : recentTransactions.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+            <p>No transactions yet</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 dark:bg-slate-700/30">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Description</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                {recentTransactions.map((transaction) => (
+                  <tr
+                    key={transaction.id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors"
+                    onClick={() => handleEditClick(transaction)}
+                  >
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+                      {new Date(transaction.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center">
+                          {getCategoryIcon(transaction.category)}
+                        </div>
+                        <span className="text-sm text-slate-700 dark:text-slate-300">{transaction.category}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{transaction.description}</td>
+                    <td className={`px-4 py-3 text-sm font-semibold text-right ${transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      }`}>
+                      {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
 
       {/* Floating Action Button */}
       <button
@@ -419,7 +409,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
 };
 

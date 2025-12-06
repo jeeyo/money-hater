@@ -1,38 +1,13 @@
 import React from 'react';
-import { type Expense, ExpenseCategory, IncomeCategory } from '../types';
-import { ShoppingBag, Coffee, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, Trash2, Edit2, DollarSign, Gift, TrendingUp } from 'lucide-react';
+import { type Expense } from '../types';
+import { Trash2, Edit2, ShoppingBag } from 'lucide-react';
+import { getCategoryIcon } from '../utils/categoryIcons';
 
 interface ExpenseListProps {
   expenses: Expense[];
   onDelete: (id: string) => void;
   onEdit: (expense: Expense) => void;
 }
-
-const getCategoryIcon = (category: ExpenseCategory | IncomeCategory) => {
-  switch (category) {
-    case ExpenseCategory.FOOD: return <Coffee className="w-4 h-4 text-orange-500" />;
-    case ExpenseCategory.GROCERIES: return <ShoppingCart className="w-4 h-4 text-green-500" />;
-    case ExpenseCategory.TRANSPORT: return <Car className="w-4 h-4 text-blue-500" />;
-    case ExpenseCategory.HOUSING: return <Home className="w-4 h-4 text-indigo-500" />;
-    case ExpenseCategory.UTILITIES: return <Zap className="w-4 h-4 text-yellow-500" />;
-    case ExpenseCategory.ENTERTAINMENT: return <Film className="w-4 h-4 text-pink-500" />;
-    case ExpenseCategory.HEALTH: return <Heart className="w-4 h-4 text-red-500" />;
-    case ExpenseCategory.BUSINESS: return <Briefcase className="w-4 h-4 text-slate-600" />;
-    case ExpenseCategory.EDUCATION: return <GraduationCap className="w-4 h-4 text-purple-500" />;
-    case ExpenseCategory.TRAVEL: return <Plane className="w-4 h-4 text-sky-500" />;
-    case ExpenseCategory.SHOPPING: return <ShoppingBag className="w-4 h-4 text-teal-500" />;
-    case ExpenseCategory.SHOPPING: return <ShoppingBag className="w-5 h-5 text-teal-500" />;
-
-    // Income Categories
-    case IncomeCategory.SALARY: return <DollarSign className="w-4 h-4 text-green-600" />;
-    case IncomeCategory.FREELANCE: return <Briefcase className="w-4 h-4 text-blue-600" />;
-    case IncomeCategory.INVESTMENT: return <TrendingUp className="w-4 h-4 text-purple-600" />;
-    case IncomeCategory.GIFT: return <Gift className="w-4 h-4 text-pink-500" />;
-    case IncomeCategory.OTHER: return <DollarSign className="w-4 h-4 text-slate-500" />;
-
-    default: return <HelpCircle className="w-4 h-4 text-slate-400" />;
-  }
-};
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit }) => {
   if (expenses.length === 0) {

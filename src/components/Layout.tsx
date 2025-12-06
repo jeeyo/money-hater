@@ -18,7 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
         {/* Page Content */}
-        <main className="p-4 lg:p-6">
+        <main className="p-2 sm:p-4">
           {children}
         </main>
       </div>
