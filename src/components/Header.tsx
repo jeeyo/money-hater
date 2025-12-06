@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Moon, Sun, LogOut, Bell, Search, Menu } from 'lucide-react';
+// import { Moon, Sun, LogOut, Bell, Search, Menu } from 'lucide-react';
+import { Moon, Sun, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {

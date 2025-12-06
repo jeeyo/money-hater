@@ -156,7 +156,7 @@ const Dashboard: React.FC = () => {
   // Chart data for line chart (last 5 months)
   const chartData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
-    return months.map((month, idx) => ({
+    return months.map((month) => ({
       month,
       income: Math.random() * 15 + 5,
       expense: Math.random() * 15 + 5,
@@ -376,6 +376,10 @@ const Dashboard: React.FC = () => {
             <ExpenseForm
               onSubmit={handleSaveExpense}
               onCancel={handleCloseForm}
+              onDelete={editingExpense ? () => {
+                deleteExpense(editingExpense.id);
+                handleCloseForm();
+              } : undefined}
               initialData={editingExpense}
             />
           </div>

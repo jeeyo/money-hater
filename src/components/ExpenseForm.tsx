@@ -8,12 +8,13 @@ import Toast, { type ToastType } from './Toast';
 interface ExpenseFormProps {
   onSubmit: (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[]; attachmentUrl?: string }) => void;
   onCancel?: () => void;
+  onDelete?: () => void;
   initialData?: Expense | null;
 }
 
 const EXCHANGE_RATE = 34; // 1 USD = 34 THB
 
-const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialData }) => {
+const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete, initialData }) => {
   const [description, setDescription] = useState(initialData?.description || '');
   const [amount, setAmount] = useState(initialData?.amount.toString() || '');
   const [currency, setCurrency] = useState<'THB' | 'USD'>('THB');
@@ -448,13 +449,25 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, initialDa
 
       </div>
 
-      <button
-        type="submit"
-        className="w-full mt-8 bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2"
-      >
-        {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-        {isEditing ? 'Save Changes' : 'Add Transaction'}
-      </button>
+      <div className="flex gap-3 mt-8">
+        {isEditing && onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex-1 bg-red-600 text-white p-3 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-md shadow-red-200 dark:shadow-none flex items-center justify-center gap-2"
+          >
+            <X className="w-5 h-5" />
+            Delete
+          </button>
+        )}
+        <button
+          type="submit"
+          className={`${isEditing && onDelete ? 'flex-1' : 'w-full'} bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2`}
+        >
+          {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+          {isEditing ? 'Save Changes' : 'Add Transaction'}
+        </button>
+      </div>
 
       {toast && (
         <Toast
