@@ -155,13 +155,47 @@ const Dashboard: React.FC = () => {
 
   // Chart data for line chart (last 5 months)
   const chartData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
-    return months.map((month) => ({
-      month,
-      income: Math.random() * 15 + 5,
-      expense: Math.random() * 15 + 5,
+    const dataMap = new Map<string, { income: number; expense: number }>();
+    const now = new Date();
+    const monthsData: { label: string; key: string }[] = [];
+
+    // Generate keys and labels for the last 5 months (e.g., '2023-01', 'Jan')
+    for (let i = 4; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+      const monthLabel = date.toLocaleString('en-US', { month: 'short' });
+      monthsData.push({ label: monthLabel, key: monthKey });
+      dataMap.set(monthKey, { income: 0, expense: 0 }); // Initialize with zero values
+    }
+
+    // Aggregate expenses into the map
+    expenses.forEach(exp => {
+      if (!exp.date) return;
+      const expenseDate = new Date(exp.date);
+      const year = expenseDate.getFullYear();
+      const month = expenseDate.getMonth() + 1;
+      const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+
+      if (dataMap.has(monthKey)) {
+        const current = dataMap.get(monthKey)!;
+        if (exp.type === 'income') {
+          current.income += exp.amount;
+        } else {
+          current.expense += exp.amount;
+        }
+        dataMap.set(monthKey, current);
+      }
+    });
+
+    // Convert map data to the desired array format, ensuring correct month order
+    return monthsData.map(m => ({
+      month: m.label,
+      income: dataMap.get(m.key)?.income || 0,
+      expense: dataMap.get(m.key)?.expense || 0,
     }));
-  }, []);
+  }, [expenses]);
 
   // Recent transactions (last 8)
   const recentTransactions = useMemo(() => {
