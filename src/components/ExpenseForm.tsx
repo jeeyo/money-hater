@@ -454,7 +454,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
           <button
             type="button"
             onClick={onDelete}
-            className="flex-1 bg-red-600 text-white p-3 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-md shadow-red-200 dark:shadow-none flex items-center justify-center gap-2"
+            className="flex-1 bg-red-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-md shadow-red-200 dark:shadow-none flex items-center justify-center gap-2"
           >
             <X className="w-5 h-5" />
             Delete
@@ -462,7 +462,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
         )}
         <button
           type="submit"
-          className={`${isEditing && onDelete ? 'flex-1' : 'w-full'} bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2`}
+          className={`${isEditing && onDelete ? 'flex-1' : 'w-full'} bg-indigo-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2`}
         >
           {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           {isEditing ? 'Save Changes' : 'Add Transaction'}

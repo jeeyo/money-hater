@@ -14,7 +14,7 @@ const ICON_OPTIONS = [
 ];
 
 const Accounts: React.FC = () => {
-  const { accounts, createAccount, updateAccount, deleteAccount } = useAccount();
+  const { accounts, selectedAccount, createAccount, updateAccount, deleteAccount } = useAccount();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -59,6 +59,12 @@ const Accounts: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    // Prevent deleting the currently active account
+    if (selectedAccount?.id === id) {
+      alert('Cannot delete the currently active account. Please switch to another account first.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this account? All associated expenses will be deleted.')) {
       try {
         await deleteAccount(id);
@@ -90,23 +96,38 @@ const Accounts: React.FC = () => {
               </div>
               <button
                 onClick={() => handleOpenModal()}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-sm text-white rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 Add Account
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-3">
               {accounts.map(account => {
                 const Icon = getIcon(account.icon);
                 return (
-                  <div key={account.id} className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                  <div key={account.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+                    <div className="flex items-center gap-4">
+                      {/* Icon */}
+                      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex-shrink-0">
                         <Icon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <div className="flex gap-2">
+
+                      {/* Name */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white truncate">{account.name}</h3>
+                      </div>
+
+                      {/* Type */}
+                      <div className="flex-shrink-0">
+                        <span className="px-3 py-1 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg capitalize">
+                          {account.type.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleOpenModal(account)}
                           className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -115,14 +136,17 @@ const Accounts: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleDelete(account.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          disabled={selectedAccount?.id === account.id}
+                          className={`p-2 rounded-lg transition-colors ${selectedAccount?.id === account.id
+                              ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                              : 'text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                            }`}
+                          title={selectedAccount?.id === account.id ? 'Cannot delete active account' : 'Delete account'}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{account.name}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 capitalize">{account.type.replace('_', ' ')}</p>
                   </div>
                 );
               })}
