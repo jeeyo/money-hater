@@ -118,9 +118,14 @@ export const SetPassword: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 w-full disabled:opacity-70 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Creating Account...' : (
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                Creating Account...
+              </>
+            ) : (
               <>
                 <CheckCircle size={16} className="mr-2" />
                 Complete Registration
