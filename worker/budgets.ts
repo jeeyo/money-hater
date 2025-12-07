@@ -105,6 +105,10 @@ app.post('/', authMiddleware, async (c) => {
       return c.json({ error: 'Missing required fields' }, 400);
     }
 
+    if (!authUser.userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const newBudget = await prisma.budget.create({
       data: {
         name: data.name,

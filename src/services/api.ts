@@ -1,4 +1,4 @@
-import type { Expense } from '../types';
+import type { Expense, Budget, BudgetWithStats } from '../types';
 
 const API_BASE = '/api/expenses';
 

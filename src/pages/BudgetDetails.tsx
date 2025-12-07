@@ -152,7 +152,7 @@ const BudgetDetails: React.FC = () => {
                   dataKey="value"
                   stroke="none"
                 >
-                  {gaugeData.map((entry, index) => (
+                  {gaugeData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

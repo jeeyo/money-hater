@@ -182,7 +182,7 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
         {/* Tags */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-            <Tag className="w-4 h-4 text-slate-400" /> TagsFilter (Optional)
+            <Tag className="w-4 h-4 text-slate-400" /> Tags (Optional)
           </label>
           <div className="flex flex-wrap gap-2 mb-2">
             {tags.map(tag => (
