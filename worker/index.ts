@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import { GoogleGenAI, Type } from "@google/genai";
 import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
-import { hashPassword, comparePassword, generateToken, generateResetToken, verifyTurnstile } from './auth';
+import { hashPassword, comparePassword, generateToken, generateResetToken, verifyTurnstile, verifyToken } from './auth';
 import { authMiddleware, getAuthUser } from './middleware';
-import { sendPasswordResetEmail } from './email';
+import { sendPasswordResetEmail, sendVerificationEmail } from './email';
 import accounts from './accounts';
 
 type Bindings = {
@@ -52,12 +52,8 @@ app.post('/api/auth/register', async (c) => {
     const data = await c.req.json() as any;
 
     // Validation
-    if (!data.username || !data.password || !data.email) {
+    if (!data.username || !data.email) {
       return c.json({ error: 'Missing required fields' }, 400);
-    }
-
-    if (data.password.length < 6) {
-      return c.json({ error: 'Password must be at least 6 characters' }, 400);
     }
 
     // Verify Turnstile
@@ -85,20 +81,79 @@ app.post('/api/auth/register', async (c) => {
       return c.json({ error: 'Username already taken' }, 409);
     }
 
+    // Generate registration token (valid for 1 hour)
+    const token = await generateToken(
+      {
+        email: data.email,
+        username: data.username
+      },
+      c.env.JWT_SECRET,
+      3600000 // 1 hour
+    );
+
+    const origin = new URL(c.req.url).origin;
+    const verificationLink = `${origin}/set-password?token=${token}`;
+
+    // Send verification email
+    await sendVerificationEmail(data.email, verificationLink, c.env.RESEND_API_KEY);
+
+    return c.json({
+      message: 'Verification email sent',
+      debug_link: c.env.RESEND_API_KEY ? undefined : verificationLink // Only show link if no API key (dev mode)
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/auth/complete-registration', async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const data = await c.req.json() as any;
+
+    if (!data.token || !data.password) {
+      return c.json({ error: 'Missing token or password' }, 400);
+    }
+
+    if (data.password.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters' }, 400);
+    }
+
+    // Verify token
+    const payload = await verifyToken(data.token, c.env.JWT_SECRET);
+    if (!payload || !payload.email || !payload.username) {
+      return c.json({ error: 'Invalid or expired registration token' }, 400);
+    }
+
+    // Check if user already exists (double check)
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: payload.username },
+          { email: payload.email }
+        ]
+      }
+    });
+
+    if (existingUser) {
+      return c.json({ error: 'User already exists' }, 409);
+    }
+
     // Hash password
     const hashedPassword = await hashPassword(data.password);
 
     // Create user
     const newUser = await prisma.user.create({
       data: {
-        username: data.username,
+        username: payload.username,
         password: hashedPassword,
-        email: data.email,
-        name: data.name || data.username
+        email: payload.email,
+        name: payload.username
       }
     });
 
-    // Generate JWT token
+    // Generate login token
     const token = await generateToken(
       {
         userId: newUser.id,
@@ -107,6 +162,7 @@ app.post('/api/auth/register', async (c) => {
       },
       c.env.JWT_SECRET
     );
+
     // Return user without password
     const { password, ...userWithoutPassword } = newUser;
     return c.json({
@@ -114,7 +170,7 @@ app.post('/api/auth/register', async (c) => {
       token
     }, 201);
   } catch (err) {
-    console.error('Registration error:', err);
+    console.error('Complete registration error:', err);
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
@@ -235,8 +291,8 @@ app.post('/api/auth/reset-password', async (c) => {
       return c.json({ error: 'Missing token or password' }, 400);
     }
 
-    if (data.password.length < 6) {
-      return c.json({ error: 'Password must be at least 6 characters' }, 400);
+    if (data.password.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters' }, 400);
     }
 
     const user = await prisma.user.findFirst({

@@ -7,7 +7,7 @@
 const JWT_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 export interface JWTPayload {
-  userId: string;
+  userId?: string;
   email: string;
   username: string;
   exp?: number;
@@ -103,14 +103,14 @@ export async function comparePassword(password: string, hashedPassword: string):
 /**
  * Generate a JWT token for a user
  */
-export async function generateToken(payload: JWTPayload, jwtSecret: string): Promise<string> {
+export async function generateToken(payload: JWTPayload, jwtSecret: string, expiresIn: number = JWT_EXPIRES_IN): Promise<string> {
   const header = {
     alg: 'HS256',
     typ: 'JWT'
   };
 
   const now = Date.now();
-  const exp = now + JWT_EXPIRES_IN;
+  const exp = now + expiresIn;
 
   const tokenPayload = {
     ...payload,

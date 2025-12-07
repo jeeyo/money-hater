@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { getTurnstileSiteKey } from '../services/turnstile';
@@ -8,11 +7,12 @@ import { getTurnstileSiteKey } from '../services/turnstile';
 export const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [debugLink, setDebugLink] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
-  const { login } = useAuth();
-  const navigate = useNavigate();
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +22,7 @@ export const Register: React.FC = () => {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password, turnstileToken }),
+        body: JSON.stringify({ username, email, turnstileToken }),
       });
 
       if (!response.ok) {
@@ -31,12 +31,43 @@ export const Register: React.FC = () => {
       }
 
       const data = await response.json();
-      login(data);
-      navigate('/');
+      setSuccess(true);
+      if (data.debug_link) {
+        setDebugLink(data.debug_link);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to register');
     }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
+          <div className="text-center">
+            <div className="mb-4 text-green-500 bg-green-50 dark:bg-green-900/20 p-3 rounded-full inline-block">
+              <UserPlus size={32} />
+            </div>
+            <h1 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-white">Check your email</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+              We've sent a verification link to <strong>{email}</strong>. Please check your inbox to complete your registration.
+            </p>
+            {debugLink && (
+              <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left">
+                <p className="text-xs text-yellow-800 dark:text-yellow-200 font-medium mb-1">DEV MODE:</p>
+                <a href={debugLink} className="text-xs text-indigo-600 dark:text-indigo-400 break-all hover:underline">
+                  {debugLink}
+                </a>
+              </div>
+            )}
+            <Link to="/login" className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline font-medium">
+              Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
@@ -73,16 +104,7 @@ export const Register: React.FC = () => {
             />
           </div>
 
-          <div className="mb-3">
-            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Password</label>
-            <input
-              type="password"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+
 
           <div className="mb-4 flex justify-center">
             <Turnstile
@@ -93,7 +115,7 @@ export const Register: React.FC = () => {
 
           <button type="submit" className="inline-flex items-center justify-center px-4 py-2 text-sm rounded-lg font-medium cursor-pointer transition-all border-none outline-none bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 w-full">
             <UserPlus size={16} className="mr-2" />
-            Sign Up
+            Send Verification Link
           </button>
         </form>
 
