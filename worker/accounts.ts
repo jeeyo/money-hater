@@ -32,6 +32,9 @@ app.get('/', authMiddleware, async (c) => {
 
     if (accounts.length === 0) {
       // Create default account
+      if (!authUser.userId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
       const defaultAccount = await prisma.account.create({
         data: {
           name: 'Default',
@@ -72,6 +75,10 @@ app.post('/', authMiddleware, async (c) => {
 
     if (!data.name) {
       return c.json({ error: 'Account name is required' }, 400);
+    }
+
+    if (!authUser.userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
     }
 
     const newAccount = await prisma.account.create({

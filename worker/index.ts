@@ -6,6 +6,7 @@ import { hashPassword, comparePassword, generateToken, generateResetToken, verif
 import { authMiddleware, getAuthUser } from './middleware';
 import { sendPasswordResetEmail, sendVerificationEmail } from './email';
 import accounts from './accounts';
+import budgets from './budgets';
 
 type Bindings = {
   money_hater_db: D1Database;
@@ -331,6 +332,7 @@ app.post('/api/auth/reset-password', async (c) => {
 // ============================================
 
 app.route('/api/accounts', accounts);
+app.route('/api/budgets', budgets);
 
 // Get current user info
 app.get('/api/auth/me', authMiddleware, async (c) => {

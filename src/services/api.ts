@@ -1,4 +1,4 @@
-import type { Expense } from '../types';
+import type { Expense, Budget, BudgetWithStats } from '../types';
 
 const API_BASE = '/api/expenses';
 
@@ -82,4 +82,51 @@ export const deleteExpenseFromDB = async (id: string): Promise<void> => {
   }
 
   if (!response.ok) throw new Error('Failed to delete expense');
+};
+
+// Budget API
+const BUDGETS_API_BASE = '/api/budgets';
+
+export const getBudgets = async (): Promise<BudgetWithStats[]> => {
+  const response = await fetch(BUDGETS_API_BASE, {
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) throw new Error('Failed to fetch budgets');
+  return response.json();
+};
+
+export const getBudgetDetails = async (id: string): Promise<BudgetWithStats & { transactions: Expense[] }> => {
+  const response = await fetch(`${BUDGETS_API_BASE}/${id}`, {
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) throw new Error('Failed to fetch budget details');
+  return response.json();
+};
+
+export const createBudget = async (budget: Omit<Budget, 'id' | 'createdAt' | 'userId'>): Promise<Budget> => {
+  const response = await fetch(BUDGETS_API_BASE, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(budget),
+  });
+  if (!response.ok) throw new Error('Failed to create budget');
+  return response.json();
+};
+
+export const updateBudget = async (id: string, budget: Partial<Budget>): Promise<Budget> => {
+  const response = await fetch(`${BUDGETS_API_BASE}/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(budget),
+  });
+  if (!response.ok) throw new Error('Failed to update budget');
+  return response.json();
+};
+
+export const deleteBudget = async (id: string): Promise<void> => {
+  const response = await fetch(`${BUDGETS_API_BASE}/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to delete budget');
 };

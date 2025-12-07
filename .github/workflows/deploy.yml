@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare
+name: CI/CD Pipeline
 
 on:
   push:
@@ -10,9 +10,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  # Run checks only for Pull Requests
+  check:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    name: Deploy Application
+    name: Check PR
     env:
       DATABASE_URL: file:./dev.db
 
@@ -35,22 +37,12 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Apply database migrations (Production)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: npx wrangler d1 migrations apply money-hater-db --remote
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify build
+        run: |
+          echo "✅ Build completed successfully"
+          echo "Deployment will happen when merged to main"
 
-      - name: Deploy to Cloudflare Workers
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: npx wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Check migrations (PR only)
-        if: github.event_name == 'pull_request'
+      - name: Check migrations
         run: |
           echo "✅ Migrations check passed"
           echo "Migrations will be applied when merged to main"
@@ -59,8 +51,41 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Build check (PR only)
-        if: github.event_name == 'pull_request'
-        run: |
-          echo "✅ Build completed successfully"
-          echo "Deployment will happen when merged to main"
+  # Deploy only on main branch pushes
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    env:
+      DATABASE_URL: file:./dev.db
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Apply database migrations
+        run: npx wrangler d1 migrations apply money-hater-db --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -55,3 +55,20 @@ export interface AuthResponse {
   user: User;
   token: string;
 }
+
+export interface Budget {
+  id: string;
+  name: string;
+  amount: number;
+  startDate: string;
+  endDate: string;
+  categories: string[];
+  tags: string[];
+  userId: string;
+  accountId?: string;
+  createdAt: number;
+}
+
+export interface BudgetWithStats extends Budget {
+  spent: number;
+}

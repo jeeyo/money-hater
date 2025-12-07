@@ -18,6 +18,7 @@ model User {
   resetTokenExpiry DateTime?
   expenses Expense[]
   accounts Account[]
+  budgets  Budget[]
   
   @@index([email])
   @@index([username])
@@ -31,6 +32,7 @@ model Account {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses  Expense[]
+  budgets   Budget[]
   createdAt Float    @default(0)
 
   @@index([userId])
@@ -55,5 +57,23 @@ model Expense {
   @@index([date])
   @@index([type])
   @@index([userId, date])
+  @@index([accountId])
+}
+
+model Budget {
+  id        String   @id @default(uuid())
+  name      String
+  amount    Float
+  startDate DateTime
+  endDate   DateTime
+  categories String // JSON string of category names
+  tags      String // JSON string of tags
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt Float
+  
+  @@index([userId])
   @@index([accountId])
 }
