@@ -14,7 +14,6 @@ const ICON_OPTIONS = [
 
 const Accounts: React.FC = () => {
   const { accounts, selectedAccount, createAccount, updateAccount, deleteAccount } = useAccount();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [formData, setFormData] = useState({

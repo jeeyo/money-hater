@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         id: 'money-hater',
         name: 'Money Hater',
-        short_name: 'MoneyHater',
+        short_name: 'Money Hater',
         description: 'Expense Tracker',
         start_url: '.',
         theme_color: '#ffffff',
