@@ -12,6 +12,7 @@ import Transactions from './pages/Transactions';
 import Budgets from './pages/Budgets';
 import Reports from './pages/Reports';
 import Accounts from './pages/Accounts';
+import BudgetDetails from './pages/BudgetDetails';
 import SettingsPage from './pages/SettingsPage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -58,6 +59,14 @@ const AppRoutes: React.FC = () => {
         element={
           <PrivateRoute>
             <Budgets />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/budgets/:id"
+        element={
+          <PrivateRoute>
+            <BudgetDetails />
           </PrivateRoute>
         }
       />
