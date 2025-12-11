@@ -57,34 +57,27 @@ const Dashboard: React.FC = () => {
   // Handle shared files from Web Share Target API
   useEffect(() => {
     const handleSharedFile = async () => {
-      const params = new URLSearchParams(window.location.search);
-      console.log('[Dashboard] URL params:', window.location.search);
-      console.log('[Dashboard] share_target param:', params.get('share_target'));
+      console.log('[Dashboard] Checking for shared file in IndexedDB...');
+      try {
+        const file = await getSharedFile();
+        console.log('[Dashboard] Retrieved file:', file);
 
-      if (params.get('share_target') === 'true') {
-        console.log('[Dashboard] Share target detected, retrieving file...');
-        try {
-          const file = await getSharedFile();
-          console.log('[Dashboard] Retrieved file:', file);
-
-          if (file) {
-            console.log('[Dashboard] File found, opening form...');
-            setSharedFile(file);
-            setIsFormOpen(true);
-            await clearSharedFile();
-          } else {
-            console.log('[Dashboard] No file found in IndexedDB');
-          }
-        } catch (error) {
-          console.error('[Dashboard] Error handling shared file:', error);
-        } finally {
-          // Clean up URL
-          window.history.replaceState({}, '', window.location.pathname);
+        if (file) {
+          console.log('[Dashboard] File found, opening form...');
+          setSharedFile(file);
+          setIsFormOpen(true);
+          await clearSharedFile();
+        } else {
+          console.log('[Dashboard] No file found in IndexedDB');
         }
+      } catch (error) {
+        console.error('[Dashboard] Error handling shared file:', error);
       }
     };
 
-    handleSharedFile();
+    // Small delay to ensure Dashboard is fully mounted
+    const timer = setTimeout(handleSharedFile, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {

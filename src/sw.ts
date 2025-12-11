@@ -28,10 +28,10 @@ async function handleShareTarget(request: Request): Promise<Response> {
       console.log('[SW] Valid image file, saving to IndexedDB...');
       // Store file in IndexedDB
       await saveSharedFile(file);
-      console.log('[SW] File saved, redirecting to /?share_target=true');
+      console.log('[SW] File saved, redirecting to /');
 
-      // Redirect to app with flag
-      return Response.redirect('/?share_target=true', 303);
+      // Redirect to app (Dashboard will check IndexedDB on mount)
+      return Response.redirect('/', 303);
     }
 
     console.log('[SW] No valid file, redirecting to /');
