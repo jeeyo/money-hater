@@ -94,6 +94,82 @@ app.get('/', authMiddleware, async (c) => {
   }
 });
 
+// Get a single budget
+app.get('/:id', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const authUser = getAuthUser(c);
+    const id = c.req.param('id');
+
+    const budget = await prisma.budget.findFirst({
+      where: {
+        id,
+        userId: authUser.userId
+      }
+    });
+
+    if (!budget) {
+      return c.json({ error: 'Budget not found' }, 404);
+    }
+
+    // Calculate spent amount
+    const categories: string[] = JSON.parse(budget.categories || '[]');
+    const tags: string[] = JSON.parse(budget.tags || '[]');
+
+    const whereClause: any = {
+      userId: authUser.userId,
+      date: {
+        gte: budget.startDate,
+        lte: budget.endDate
+      }
+    };
+
+    if (budget.accountId) {
+      whereClause.accountId = budget.accountId;
+    }
+
+    if (categories.length > 0) {
+      whereClause.category = {
+        in: categories
+      };
+    }
+
+    // Fetch expenses that match base criteria
+    const expenses = await prisma.expense.findMany({
+      where: whereClause,
+      select: {
+        amount: true,
+        tags: true
+      }
+    });
+
+    // Filter by tags in memory
+    let filteredExpenses = expenses;
+    if (tags.length > 0) {
+      filteredExpenses = expenses.filter(exp => {
+        try {
+          const expTags: string[] = JSON.parse(exp.tags);
+          return tags.some(tag => expTags.includes(tag));
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+
+    const spent = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+
+    return c.json({
+      ...budget,
+      categories,
+      tags,
+      spent
+    });
+  } catch (err) {
+    console.error('Get budget error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
 // Create a new budget
 app.post('/', authMiddleware, async (c) => {
   try {

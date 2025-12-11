@@ -76,7 +76,7 @@ const Budgets: React.FC = () => {
     <Layout>
       <div className="pb-20">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Running Budgets</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Budgets</h1>
           <button
             onClick={handleCreate}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
