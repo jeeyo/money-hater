@@ -388,11 +388,27 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Attachment</label>
           <div className="flex items-center gap-2">
+
+            {!attachmentUrl && (
+              <button
+                type="button"
+                onClick={() => setIsAIEnabled(!isAIEnabled)}
+                className={`p-3 border-2 rounded-xl transition-all duration-300 ${isAIEnabled
+                  ? 'border-indigo-500 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-500 dark:hover:text-indigo-400'
+                  }`}
+                title={isAIEnabled ? "Disable AI Receipt Reading" : "Enable AI Receipt Reading"}
+              >
+                <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-indigo-400' : ''}`} />
+              </button>
+            )}
+
             <label className="flex-1 cursor-pointer group">
               <div className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl transition-all duration-300 ${isAIEnabled
                 ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
                 : 'border-slate-300 dark:border-slate-600 hover:border-indigo-500 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400'
                 }`}>
+
                 {isUploading || isAnalyzing ? (
                   <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
                 ) : attachmentUrl ? (
@@ -432,20 +448,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
                 disabled={isUploading || isAnalyzing}
               />
             </label>
-
-            {!attachmentUrl && (
-              <button
-                type="button"
-                onClick={() => setIsAIEnabled(!isAIEnabled)}
-                className={`p-3 border-2 rounded-xl transition-all duration-300 ${isAIEnabled
-                  ? 'border-indigo-500 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-500 dark:hover:text-indigo-400'
-                  }`}
-                title={isAIEnabled ? "Disable AI Receipt Reading" : "Enable AI Receipt Reading"}
-              >
-                <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-indigo-400' : ''}`} />
-              </button>
-            )}
 
             {attachmentUrl && (
               <button
