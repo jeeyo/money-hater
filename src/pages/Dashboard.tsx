@@ -7,6 +7,7 @@ import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } f
 import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from '../services/api';
 import Layout from '../components/Layout';
 import { getCategoryIcon } from '../utils/categoryIcons';
+import { getSharedFile, clearSharedFile } from '../utils/idb';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
@@ -16,6 +17,7 @@ const Dashboard: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sharedFile, setSharedFile] = useState<File | null>(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -51,6 +53,30 @@ const Dashboard: React.FC = () => {
 
     initData();
   }, [selectedAccount]);
+
+  // Handle shared files from Web Share Target API
+  useEffect(() => {
+    const handleSharedFile = async () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('share_target') === 'true') {
+        try {
+          const file = await getSharedFile();
+          if (file) {
+            setSharedFile(file);
+            setIsFormOpen(true);
+            await clearSharedFile();
+          }
+        } catch (error) {
+          console.error('Error handling shared file:', error);
+        } finally {
+          // Clean up URL
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+    };
+
+    handleSharedFile();
+  }, []);
 
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
@@ -109,7 +135,10 @@ const Dashboard: React.FC = () => {
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
-    setTimeout(() => setEditingExpense(null), 200);
+    setTimeout(() => {
+      setEditingExpense(null);
+      setSharedFile(null);
+    }, 200);
   };
 
   // Calculate stats
@@ -416,6 +445,7 @@ const Dashboard: React.FC = () => {
                   handleCloseForm();
                 } : undefined}
                 initialData={editingExpense}
+                initialFile={sharedFile}
               />
             </div>
           </div>

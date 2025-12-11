@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
@@ -10,11 +10,12 @@ interface ExpenseFormProps {
   onCancel?: () => void;
   onDelete?: () => void;
   initialData?: Expense | null;
+  initialFile?: File | null;
 }
 
 const EXCHANGE_RATE = 34; // 1 USD = 34 THB
 
-const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete, initialData }) => {
+const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete, initialData, initialFile }) => {
   const [description, setDescription] = useState(initialData?.description || '');
   const [amount, setAmount] = useState(initialData?.amount.toString() || '');
   const [currency, setCurrency] = useState<'THB' | 'USD'>('THB');
@@ -31,6 +32,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
 
 
   const isEditing = !!initialData;
+
+  // Process shared file on mount
+  useEffect(() => {
+    if (initialFile) {
+      analyzeFile(initialFile);
+    }
+  }, [initialFile]);
 
   const handleAutoClassify = useCallback(async () => {
     if (!description) return;
@@ -126,10 +134,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
     }
   };
 
-  const handleAnalyzeReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Analyze a file (shared or uploaded)
+  const analyzeFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       setToast({ message: 'Please upload an image file', type: 'warning' });
@@ -195,9 +201,17 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
       setToast({ message: 'Failed to analyze receipt', type: 'error' });
     } finally {
       setIsAnalyzing(false);
-      // Reset the input so the same file can be selected again
-      e.target.value = '';
     }
+  };
+
+  const handleAnalyzeReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    await analyzeFile(file);
+
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
   };
 
   const handleViewAttachment = async (key: string) => {
