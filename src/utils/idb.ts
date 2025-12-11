@@ -21,24 +21,28 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 export async function getSharedFile(): Promise<File | null> {
+  console.log('[IDB] getSharedFile called');
   try {
     const db = await openDB();
+    console.log('[IDB] Database opened');
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(FILE_KEY);
 
       request.onsuccess = () => {
+        console.log('[IDB] File retrieved:', request.result);
         db.close();
         resolve(request.result || null);
       };
       request.onerror = () => {
+        console.error('[IDB] Error retrieving file:', request.error);
         db.close();
         reject(request.error);
       };
     });
   } catch (error) {
-    console.error('Error getting shared file:', error);
+    console.error('[IDB] Error getting shared file:', error);
     return null;
   }
 }

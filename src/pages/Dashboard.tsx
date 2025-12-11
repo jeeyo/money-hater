@@ -58,16 +58,25 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const handleSharedFile = async () => {
       const params = new URLSearchParams(window.location.search);
+      console.log('[Dashboard] URL params:', window.location.search);
+      console.log('[Dashboard] share_target param:', params.get('share_target'));
+
       if (params.get('share_target') === 'true') {
+        console.log('[Dashboard] Share target detected, retrieving file...');
         try {
           const file = await getSharedFile();
+          console.log('[Dashboard] Retrieved file:', file);
+
           if (file) {
+            console.log('[Dashboard] File found, opening form...');
             setSharedFile(file);
             setIsFormOpen(true);
             await clearSharedFile();
+          } else {
+            console.log('[Dashboard] No file found in IndexedDB');
           }
         } catch (error) {
-          console.error('Error handling shared file:', error);
+          console.error('[Dashboard] Error handling shared file:', error);
         } finally {
           // Clean up URL
           window.history.replaceState({}, '', window.location.pathname);

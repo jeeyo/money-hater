@@ -17,49 +17,67 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 });
 
 async function handleShareTarget(request: Request): Promise<Response> {
+  console.log('[SW] handleShareTarget called');
   try {
     const formData = await request.formData();
+    console.log('[SW] FormData parsed');
     const file = formData.get('file') as File | null;
+    console.log('[SW] File from formData:', file);
 
     if (file && file.type.startsWith('image/')) {
+      console.log('[SW] Valid image file, saving to IndexedDB...');
       // Store file in IndexedDB
       await saveSharedFile(file);
+      console.log('[SW] File saved, redirecting to /?share_target=true');
 
       // Redirect to app with flag
       return Response.redirect('/?share_target=true', 303);
     }
 
+    console.log('[SW] No valid file, redirecting to /');
     // If no valid file, just redirect to app
     return Response.redirect('/', 303);
   } catch (error) {
-    console.error('Error handling share target:', error);
+    console.error('[SW] Error handling share target:', error);
     return Response.redirect('/', 303);
   }
 }
 
 async function saveSharedFile(file: File): Promise<void> {
+  console.log('[SW] saveSharedFile called with:', file.name, file.type, file.size);
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('shared-files-db', 1);
 
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      console.error('[SW] IndexedDB open error:', request.error);
+      reject(request.error);
+    };
     request.onsuccess = () => {
+      console.log('[SW] IndexedDB opened successfully');
       const db = request.result;
       const transaction = db.transaction(['files'], 'readwrite');
       const store = transaction.objectStore('files');
 
       // Store the file with a known key
+      console.log('[SW] Storing file with key "receipt"');
       store.put(file, 'receipt');
 
       transaction.oncomplete = () => {
+        console.log('[SW] File stored successfully');
         db.close();
         resolve();
       };
-      transaction.onerror = () => reject(transaction.error);
+      transaction.onerror = () => {
+        console.error('[SW] Transaction error:', transaction.error);
+        reject(transaction.error);
+      };
     };
 
     request.onupgradeneeded = (event) => {
+      console.log('[SW] IndexedDB upgrade needed');
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains('files')) {
+        console.log('[SW] Creating "files" object store');
         db.createObjectStore('files');
       }
     };
