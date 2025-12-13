@@ -380,11 +380,17 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-18" />
+                  <col className="w-6" />
+                  <col className="w-auto" />
+                  <col className="w-32" />
+                </colgroup>
                 <thead className="bg-slate-50 dark:bg-slate-700/30">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400"></th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Description</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Amount</th>
                   </tr>
@@ -396,19 +402,18 @@ const Dashboard: React.FC = () => {
                       className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors"
                       onClick={() => handleEditClick(transaction)}
                     >
-                      <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
-                        {new Date(transaction.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {new Date(transaction.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center">
+                        <div className="flex items-center justify-center">
+                          <div className="w-8 h-8 flex items-center justify-center">
                             {getCategoryIcon(transaction.category)}
                           </div>
-                          <span className="text-sm text-slate-700 dark:text-slate-300">{transaction.category}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{transaction.description}</td>
-                      <td className={`px-4 py-3 text-sm font-semibold text-right ${transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 truncate" title={transaction.description}>{transaction.description}</td>
+                      <td className={`px-4 py-3 text-sm font-semibold text-right whitespace-nowrap ${transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                         }`}>
                         {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
                       </td>
