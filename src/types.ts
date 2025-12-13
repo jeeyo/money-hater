@@ -72,3 +72,20 @@ export interface Budget {
 export interface BudgetWithStats extends Budget {
   spent: number;
 }
+
+export enum NotificationType {
+  INFO = 'info',
+  SUCCESS = 'success',
+  WARNING = 'warning',
+  ERROR = 'error'
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  timestamp: number;
+  read: boolean;
+  link?: string;
+}

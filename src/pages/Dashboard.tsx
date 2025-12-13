@@ -7,7 +7,7 @@ import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } f
 import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from '../services/api';
 import Layout from '../components/Layout';
 import { getCategoryIcon } from '../utils/categoryIcons';
-import { getSharedFile, clearSharedFile } from '../utils/idb';
+
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
@@ -52,33 +52,7 @@ const Dashboard: React.FC = () => {
     };
 
     initData();
-  }, [selectedAccount]);
-
-  // Handle shared files from Web Share Target API
-  useEffect(() => {
-    const handleSharedFile = async () => {
-      console.log('[Dashboard] Checking for shared file in IndexedDB...');
-      try {
-        const file = await getSharedFile();
-        console.log('[Dashboard] Retrieved file:', file);
-
-        if (file) {
-          console.log('[Dashboard] File found, opening form...');
-          setSharedFile(file);
-          setIsFormOpen(true);
-          await clearSharedFile();
-        } else {
-          console.log('[Dashboard] No file found in IndexedDB');
-        }
-      } catch (error) {
-        console.error('[Dashboard] Error handling shared file:', error);
-      }
-    };
-
-    // Small delay to ensure Dashboard is fully mounted
-    const timer = setTimeout(handleSharedFile, 100);
-    return () => clearTimeout(timer);
-  }, []);
+  }, [selectedAccount, isFormOpen]); // Refresh when form closes (which might happen after auto-add in background, though context usually handles this better. background add won't trigger isFormOpen change... wait, we need a way to refresh expenses if they change)
 
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {

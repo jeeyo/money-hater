@@ -107,12 +107,16 @@ const AppRoutes: React.FC = () => {
   );
 };
 
+import { NotificationProvider } from './context/NotificationContext';
+
 const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
         <AccountProvider>
-          <AppRoutes />
+          <NotificationProvider>
+            <AppRoutes />
+          </NotificationProvider>
         </AccountProvider>
       </AuthProvider>
     </BrowserRouter>

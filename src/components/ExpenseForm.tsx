@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
+import { analyzeReceipt } from '../services/analysisService';
 import Toast, { type ToastType } from './Toast';
 
 
@@ -36,7 +37,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
   // Process shared file on mount
   useEffect(() => {
     if (initialFile) {
-      analyzeFile(initialFile);
+      handleAnalyzeFile(initialFile);
     }
   }, [initialFile]);
 
@@ -135,7 +136,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
   };
 
   // Analyze a file (shared or uploaded)
-  const analyzeFile = async (file: File) => {
+  const handleAnalyzeFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       setToast({ message: 'Please upload an image file', type: 'warning' });
@@ -143,25 +144,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
     }
 
     setIsAnalyzing(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/analyze-receipt', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setToast({ message: data.error || 'Failed to analyze receipt', type: 'error' });
-        return;
-      }
+      const data = await analyzeReceipt(file);
 
       // Auto-fill form with extracted data
       if (data.description) setDescription(data.description);
@@ -169,23 +153,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
       if (data.date) setDate(data.date);
       if (data.category) setCategory(data.category);
       if (data.tags && data.tags.length > 0) setTags(data.tags);
-
-      // Also upload the file for attachment
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadFormData
-      });
-
-      if (uploadRes.ok) {
-        const uploadData = await uploadRes.json();
-        setAttachmentUrl(uploadData.key);
-      }
+      if (data.attachmentUrl) setAttachmentUrl(data.attachmentUrl);
 
       // Show success message with extracted details
       const amountText = data.amount ? `฿${data.amount.toLocaleString()}` : '';
@@ -196,9 +164,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
         : 'Receipt analyzed successfully!';
 
       setToast({ message, type: 'success' });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Receipt analysis error:', err);
-      setToast({ message: 'Failed to analyze receipt', type: 'error' });
+      setToast({ message: err.message || 'Failed to analyze receipt', type: 'error' });
     } finally {
       setIsAnalyzing(false);
     }
@@ -208,7 +176,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
     const file = e.target.files?.[0];
     if (!file) return;
 
-    await analyzeFile(file);
+    await handleAnalyzeFile(file);
 
     // Reset the input so the same file can be selected again
     e.target.value = '';
