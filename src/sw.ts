@@ -46,7 +46,7 @@ async function handleShareTarget(request: Request): Promise<Response> {
 async function saveSharedFile(file: File): Promise<void> {
   console.log('[SW] saveSharedFile called with:', file.name, file.type, file.size);
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('shared-files-db', 1);
+    const request = indexedDB.open('shared-files-db', 2); // Updated to version 2
 
     request.onerror = () => {
       console.error('[SW] IndexedDB open error:', request.error);
@@ -79,6 +79,13 @@ async function saveSharedFile(file: File): Promise<void> {
       if (!db.objectStoreNames.contains('files')) {
         console.log('[SW] Creating "files" object store');
         db.createObjectStore('files');
+      }
+      // Add notifications store (matching idb.ts)
+      if (!db.objectStoreNames.contains('notifications')) {
+        console.log('[SW] Creating "notifications" object store');
+        const store = db.createObjectStore('notifications', { keyPath: 'id' });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+        store.createIndex('read', 'read', { unique: false });
       }
     };
   });
