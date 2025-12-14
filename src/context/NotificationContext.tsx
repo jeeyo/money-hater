@@ -19,7 +19,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const { selectedAccount } = useAccount();
+  const { selectedAccount, accounts } = useAccount();
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const refreshNotifications = useCallback(async () => {
@@ -71,12 +71,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const result = await analyzeReceipt(file);
 
-      // Auto-add transaction
-      if (selectedAccount) {
+      // Auto-add transaction - use selectedAccount or fallback to first account
+      const targetAccount = selectedAccount || accounts[0];
+
+      if (targetAccount) {
         const newExpense: Expense = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
-          accountId: selectedAccount.id,
+          accountId: targetAccount.id,
           description: result.description || 'Scanned Receipt',
           amount: result.amount || 0,
           date: result.date || new Date().toISOString().split('T')[0],
@@ -102,14 +104,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         // To make it live, we would need Expenses to be in a Context. 
         // For this task, "Auto-add" means it's in the DB.
 
-      } else {
-        // No account selected?! Fallback or error.
-        console.warn("No selected account for auto-add");
-        await addSystemNotification(
-          'Analysis Complete',
-          'Receipt analyzed but no account selected. Please add manually.',
-          NotificationType.WARNING
-        );
       }
 
     } catch (error) {
@@ -122,7 +116,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setToast({ message: 'Receipt analysis failed', type: 'error' });
     }
 
-  }, [selectedAccount, addSystemNotification]);
+  }, [selectedAccount, accounts, addSystemNotification]);
 
   // Check for shared files on mount and visibility change
   useEffect(() => {

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Sparkles, Loader2, Tag as TagIcon, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Tag as TagIcon, Trash2, X, Save, Pencil, ArrowRightLeft, TrendingUp, TrendingDown, Upload, Paperclip } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
 import { analyzeReceipt } from '../services/analysisService';
@@ -208,15 +208,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
           {isEditing ? <Pencil className="w-5 h-5 text-indigo-600" /> : <Plus className="w-5 h-5 text-indigo-600" />}
           {isEditing ? 'Edit Expense' : 'New Expense'}
         </h2>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
       </div>
 
       <div className="space-y-5 flex-1">
@@ -433,24 +424,36 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
 
       </div>
 
-      <div className="flex gap-3 mt-8">
+      <div className="flex gap-3 pt-6 pb-2">
         {isEditing && onDelete && (
           <button
             type="button"
             onClick={onDelete}
-            className="flex-1 bg-red-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-md shadow-red-200 dark:shadow-none flex items-center justify-center gap-2"
+            className="px-4 bg-red-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-md shadow-red-200 dark:shadow-none flex items-center justify-center gap-2"
           >
-            <X className="w-5 h-5" />
-            Delete
+            <Trash2 className="w-5 h-5" />
           </button>
         )}
+
         <button
           type="submit"
-          className={`${isEditing && onDelete ? 'flex-1' : 'w-full'} bg-indigo-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2`}
+          className={`w-full bg-indigo-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2`}
         >
           {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           {isEditing ? 'Save Changes' : 'Add Transaction'}
         </button>
+      </div>
+
+      <div className="flex gap-3 py-2">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 text-sm p-3 rounded-xl font-semibold hover:bg-slate-100 hover:dark:bg-slate-900 transition-colors flex items-center justify-center gap-2"
+          >
+            Cancel
+          </button>
+        )}
       </div>
 
       {toast && (

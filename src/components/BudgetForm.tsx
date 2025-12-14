@@ -65,14 +65,11 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-full md:max-h-[90vh]">
       <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">
           {initialData ? 'Edit Budget' : 'Create Budget'}
         </h2>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-          <X className="w-6 h-6" />
-        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">

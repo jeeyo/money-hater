@@ -120,12 +120,12 @@ const Budgets: React.FC = () => {
 
         {/* Form Modal */}
         {isFormOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center md:p-4">
             <div
               className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
               onClick={() => setIsFormOpen(false)}
             />
-            <div className="relative w-full max-w-lg z-10">
+            <div className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-xl bg-slate-800 shadow-lg overflow-y-auto">
               <BudgetForm
                 initialData={editingBudget}
                 onSubmit={handleSubmit}

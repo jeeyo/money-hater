@@ -54,6 +54,20 @@ const Dashboard: React.FC = () => {
     initData();
   }, [selectedAccount, isFormOpen]); // Refresh when form closes (which might happen after auto-add in background, though context usually handles this better. background add won't trigger isFormOpen change... wait, we need a way to refresh expenses if they change)
 
+  // Disable body scroll when dialog is open
+  useEffect(() => {
+    if (isFormOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    // Cleanup function to restore scroll when component unmounts
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isFormOpen]);
+
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
       const updatedExpense = { ...editingExpense, ...data };
@@ -412,12 +426,12 @@ const Dashboard: React.FC = () => {
 
         {/* Modal Overlay */}
         {isFormOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center md:p-4">
             <div
               className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
               onClick={handleCloseForm}
             />
-            <div className="relative w-full max-w-lg bg-slate-800 rounded-xl shadow-lg max-h-[90vh] overflow-y-auto">
+            <div className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-xl bg-slate-800 shadow-lg overflow-y-auto">
               <ExpenseForm
                 onSubmit={handleSaveExpense}
                 onCancel={handleCloseForm}
