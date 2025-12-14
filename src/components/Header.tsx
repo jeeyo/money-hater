@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, LogOut, Menu, ChevronDown, Settings, Wallet, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const notificationButtonRef = useRef<HTMLButtonElement>(null);
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -43,19 +44,19 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     navigate('/login');
   };
 
-  const toggleNotifications = () => {
+  const toggleNotifications = useCallback(() => {
     if (!showNotificationPanel) {
       setShowAccountMenu(false);
     }
     setShowNotificationPanel(!showNotificationPanel);
-  }
+  }, [showNotificationPanel]);
 
-  const toggleAccountMenu = () => {
+  const toggleAccountMenu = useCallback(() => {
     if (!showAccountMenu) {
       setShowNotificationPanel(false);
     }
     setShowAccountMenu(!showAccountMenu);
-  }
+  }, [showAccountMenu]);
 
   return (
     <header className="h-14 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 sticky top-0 z-30">
@@ -139,6 +140,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         {/* Notification */}
         <div className="relative">
           <button
+            ref={notificationButtonRef}
             onClick={toggleNotifications}
             className="relative p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
@@ -147,7 +149,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
             )}
           </button>
-          {showNotificationPanel && <NotificationPanel onClose={() => setShowNotificationPanel(false)} />}
+          {showNotificationPanel && <NotificationPanel onClose={() => setShowNotificationPanel(false)} triggerRef={notificationButtonRef} />}
         </div>
 
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">

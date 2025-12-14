@@ -5,15 +5,20 @@ import { NotificationType } from '../types';
 
 interface NotificationPanelProps {
   onClose: () => void;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
+export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose, triggerRef }) => {
   const { notifications, markAsRead, clearAll } = useNotification();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isOutsidePanel = panelRef.current && !panelRef.current.contains(target);
+      const isOutsideTrigger = triggerRef?.current && !triggerRef.current.contains(target);
+
+      if (isOutsidePanel && isOutsideTrigger) {
         onClose();
       }
     };
@@ -22,7 +27,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose })
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   const getIcon = (type: NotificationType) => {
     switch (type) {

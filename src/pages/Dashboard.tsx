@@ -2,17 +2,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAccount } from '../context/AccountContext';
+import { useNotification } from '../context/NotificationContext';
 import ExpenseForm from '../components/ExpenseForm';
 import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } from '../types';
-import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB } from '../services/api';
+import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB, getBudgets } from '../services/api';
 import Layout from '../components/Layout';
 import { getCategoryIcon } from '../utils/categoryIcons';
+import { checkBudgetThreshold, getNotificationTypeForThreshold, formatBudgetThresholdMessage, doesTransactionAffectBudget } from '../utils/budgetNotifications';
 
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
 const Dashboard: React.FC = () => {
   const { selectedAccount } = useAccount();
+  const { addSystemNotification } = useNotification();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -95,7 +98,42 @@ const Dashboard: React.FC = () => {
       handleCloseForm();
 
       try {
+        // Add the expense to the database
         await addExpenseToDB(newExpense);
+
+        // Check budget thresholds if this is an expense
+        if (newExpense.type === 'expense' && selectedAccount) {
+          try {
+            const budgets = await getBudgets();
+
+            // Filter budgets for the current account
+            const accountBudgets = budgets.filter(
+              b => !b.accountId || b.accountId === selectedAccount.id
+            );
+
+            // Check each budget that this transaction affects
+            for (const budget of accountBudgets) {
+              if (doesTransactionAffectBudget(newExpense, budget)) {
+                // Calculate previous spent amount (before this transaction)
+                const previousSpent = budget.spent - newExpense.amount;
+
+                // Check if we crossed a threshold
+                const alert = checkBudgetThreshold(budget, previousSpent);
+
+                if (alert) {
+                  const { title, message } = formatBudgetThresholdMessage(alert);
+                  const notificationType = getNotificationTypeForThreshold(alert.threshold);
+
+                  await addSystemNotification(title, message, notificationType);
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Failed to check budget thresholds", error);
+            // Don't fail the transaction if budget check fails
+          }
+        }
+
         if (selectedAccount) {
           const reloaded = await getAllExpenses(selectedAccount.id);
           setExpenses(reloaded);

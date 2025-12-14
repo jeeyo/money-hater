@@ -218,7 +218,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              onBlur={() => { if (!isEditing && description.length > 3 && tags.length === 0) handleAutoClassify() }}
               placeholder="e.g., Starbucks Coffee"
               className="w-full p-3 pr-10 bg-slate-800 dark:bg-slate-900 text-white border-transparent rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder-slate-400"
               required
