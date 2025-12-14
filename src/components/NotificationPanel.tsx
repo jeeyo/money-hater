@@ -40,7 +40,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose })
   return (
     <div
       ref={panelRef}
-      className="absolute top-16 right-4 w-80 md:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden flex flex-col max-h-[80vh]"
+      className="fixed md:absolute top-16 left-4 right-4 md:left-auto md:right-0 w-auto md:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden flex flex-col max-h-[80vh]"
     >
       <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
         <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
