@@ -4,7 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaD1 } from '@prisma/adapter-d1';
 import { hashPassword, comparePassword, generateToken, generateResetToken, verifyTurnstile, verifyToken } from './auth';
 import { authMiddleware, getAuthUser } from './middleware';
-import { sendPasswordResetEmail, sendVerificationEmail } from './email';
+// import { sendPasswordResetEmail, sendVerificationEmail } from './email';
+import { sendPasswordResetEmail } from './email';
 import accounts from './accounts';
 import budgets from './budgets';
 
@@ -47,66 +48,66 @@ const categoriesList = Object.values(ExpenseCategory).join(', ');
 // PUBLIC ROUTES (No authentication required)
 // ============================================
 
-app.post('/api/auth/register', async (c) => {
-  try {
-    const prisma = getPrisma(c);
-    const data = await c.req.json() as any;
+// app.post('/api/auth/register', async (c) => {
+//   try {
+//     const prisma = getPrisma(c);
+//     const data = await c.req.json() as any;
 
-    // Validation
-    if (!data.username || !data.email) {
-      return c.json({ error: 'Missing required fields' }, 400);
-    }
+//     // Validation
+//     if (!data.username || !data.email) {
+//       return c.json({ error: 'Missing required fields' }, 400);
+//     }
 
-    // Verify Turnstile
-    if (c.env.TURNSTILE_SECRET_KEY) {
-      const isHuman = await verifyTurnstile(data.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
-      if (!isHuman) {
-        return c.json({ error: 'Invalid captcha' }, 400);
-      }
-    }
+//     // Verify Turnstile
+//     if (c.env.TURNSTILE_SECRET_KEY) {
+//       const isHuman = await verifyTurnstile(data.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
+//       if (!isHuman) {
+//         return c.json({ error: 'Invalid captcha' }, 400);
+//       }
+//     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { username: data.username },
-          { email: data.email }
-        ]
-      }
-    });
+//     // Check if user already exists
+//     const existingUser = await prisma.user.findFirst({
+//       where: {
+//         OR: [
+//           { username: data.username },
+//           { email: data.email }
+//         ]
+//       }
+//     });
 
-    if (existingUser) {
-      if (existingUser.email === data.email) {
-        return c.json({ error: 'Email already registered' }, 409);
-      }
-      return c.json({ error: 'Username already taken' }, 409);
-    }
+//     if (existingUser) {
+//       if (existingUser.email === data.email) {
+//         return c.json({ error: 'Email already registered' }, 409);
+//       }
+//       return c.json({ error: 'Username already taken' }, 409);
+//     }
 
-    // Generate registration token (valid for 1 hour)
-    const token = await generateToken(
-      {
-        email: data.email,
-        username: data.username
-      },
-      c.env.JWT_SECRET,
-      3600000 // 1 hour
-    );
+//     // Generate registration token (valid for 1 hour)
+//     const token = await generateToken(
+//       {
+//         email: data.email,
+//         username: data.username
+//       },
+//       c.env.JWT_SECRET,
+//       3600000 // 1 hour
+//     );
 
-    const origin = new URL(c.req.url).origin;
-    const verificationLink = `${origin}/set-password?token=${token}`;
+//     const origin = new URL(c.req.url).origin;
+//     const verificationLink = `${origin}/set-password?token=${token}`;
 
-    // Send verification email
-    await sendVerificationEmail(data.email, verificationLink, c.env.RESEND_API_KEY);
+//     // Send verification email
+//     await sendVerificationEmail(data.email, verificationLink, c.env.RESEND_API_KEY);
 
-    return c.json({
-      message: 'Verification email sent',
-      debug_link: c.env.RESEND_API_KEY ? undefined : verificationLink // Only show link if no API key (dev mode)
-    });
-  } catch (err) {
-    console.error('Registration error:', err);
-    return c.json({ error: 'Internal Server Error' }, 500);
-  }
-});
+//     return c.json({
+//       message: 'Verification email sent',
+//       debug_link: c.env.RESEND_API_KEY ? undefined : verificationLink // Only show link if no API key (dev mode)
+//     });
+//   } catch (err) {
+//     console.error('Registration error:', err);
+//     return c.json({ error: 'Internal Server Error' }, 500);
+//   }
+// });
 
 app.post('/api/auth/complete-registration', async (c) => {
   try {

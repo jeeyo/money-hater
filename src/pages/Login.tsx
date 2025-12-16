@@ -107,9 +107,9 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-slate-500 dark:text-slate-400 text-xs">
+        {/* <p className="mt-4 text-center text-slate-500 dark:text-slate-400 text-xs">
           Don't have an account? <Link to="/register" className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium">Sign up</Link>
-        </p>
+        </p> */}
       </div>
     </div>
   );
