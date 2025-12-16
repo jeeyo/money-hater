@@ -32,7 +32,7 @@
 		}
 	],
 	"observability": {
-		"enabled": false,
+		"enabled": true,
 		"head_sampling_rate": 1,
 		"logs": {
 			"enabled": true,
@@ -41,7 +41,7 @@
 			"invocation_logs": true
 		},
 		"traces": {
-			"enabled": false,
+			"enabled": true,
 			"persist": true,
 			"head_sampling_rate": 1
 		}
