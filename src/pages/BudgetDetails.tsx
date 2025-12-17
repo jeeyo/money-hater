@@ -104,34 +104,34 @@ const BudgetDetails: React.FC = () => {
       <div className="pb-20">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/budgets')} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
+            <button onClick={() => navigate('/budgets')} className="p-2 -ml-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-xl font-bold text-white">Budget Details</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Budget Details</h1>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setIsFormOpen(true)} className="p-2 text-slate-400 hover:text-indigo-400 transition-colors">
+            <button onClick={() => setIsFormOpen(true)} className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
               <Pencil className="w-5 h-5" />
             </button>
-            <button onClick={handleDelete} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
+            <button onClick={handleDelete} className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
               <Trash2 className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Main Card */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
           <div className="text-center mb-6">
-            <h2 className="text-lg font-semibold text-white mb-1">{budget.name}</h2>
-            <div className="text-3xl font-bold text-white mb-1">฿{budget.amount.toLocaleString()}</div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{budget.name}</h2>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white mb-1">฿{budget.amount.toLocaleString()}</div>
             <div className="flex justify-between items-center text-sm px-4">
               <div className="text-left">
                 <div className="text-slate-400 text-xs">Spent</div>
-                <div className={isOverBudget ? 'text-red-400' : 'text-slate-200'}>฿{budget.spent.toLocaleString()}</div>
+                <div className={isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-200'}>฿{budget.spent.toLocaleString()}</div>
               </div>
               <div className="text-right">
                 <div className="text-slate-400 text-xs">Left</div>
-                <div className="text-white">฿{Math.max(0, budget.amount - budget.spent).toLocaleString()}</div>
+                <div className="text-slate-900 dark:text-white">฿{Math.max(0, budget.amount - budget.spent).toLocaleString()}</div>
               </div>
             </div>
           </div>
@@ -159,34 +159,34 @@ const BudgetDetails: React.FC = () => {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pt-24 flex-col pointer-events-none">
-              <span className={`text-2xl font-bold ${isOverBudget ? 'text-red-500' : 'text-emerald-500'}`}>
+              <span className={`text-2xl font-bold ${isOverBudget ? 'text-red-600 dark:text-red-500' : 'text-emerald-600 dark:text-emerald-500'}`}>
                 {percent.toFixed(0)}%
               </span>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-2 mb-6">
-            <div className="bg-slate-700/50 px-3 py-1 rounded-full text-xs text-slate-400">
+            <div className="bg-slate-200/50 dark:bg-slate-700/50 px-3 py-1 rounded-full text-xs text-slate-600 dark:text-slate-400">
               {new Date(budget.startDate).toLocaleDateString()} - {new Date(budget.endDate).toLocaleDateString()}
             </div>
-            <div className="bg-slate-700/50 px-3 py-1 rounded-full text-xs text-slate-400">
+            <div className="bg-slate-200/50 dark:bg-slate-700/50 px-3 py-1 rounded-full text-xs text-slate-600 dark:text-slate-400">
               {Math.max(0, daysLeft)} days left
             </div>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 gap-4 border-t border-slate-700 pt-6">
+          <div className="grid grid-cols-1 gap-4 border-t border-slate-200 dark:border-slate-700 pt-6">
             <div className="flex justify-between items-center">
-              <span className="text-slate-400 text-sm">Daily Recommended</span>
-              <span className="text-white font-medium">฿{idealDaily.toFixed(2)}</span>
+              <span className="text-slate-600 dark:text-slate-400 text-sm">Daily Recommended</span>
+              <span className="text-slate-900 dark:text-white font-medium">฿{idealDaily.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400 text-sm">Actual Daily Avg</span>
-              <span className="text-white font-medium">฿{actualDaily.toFixed(2)}</span>
+              <span className="text-slate-600 dark:text-slate-400 text-sm">Actual Daily Avg</span>
+              <span className="text-slate-900 dark:text-white font-medium">฿{actualDaily.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400 text-sm">Projected Spending</span>
-              <span className={`font-medium ${projectedSpending > budget.amount ? 'text-red-400' : 'text-emerald-400'}`}>
+              <span className="text-slate-600 dark:text-slate-400 text-sm">Projected Spending</span>
+              <span className={`font-medium ${projectedSpending > budget.amount ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 ฿{projectedSpending.toFixed(2)}
               </span>
             </div>
@@ -194,24 +194,24 @@ const BudgetDetails: React.FC = () => {
         </div>
 
         {/* Transactions List */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <h3 className="font-semibold text-white">Transactions</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+            <h3 className="font-semibold text-slate-900 dark:text-white">Transactions</h3>
           </div>
           {budget.transactions && budget.transactions.length > 0 ? (
-            <div className="divide-y divide-slate-700">
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
               {budget.transactions.map(t => (
-                <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-700/30 transition-colors">
+                <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xl">
                       {getCategoryIcon(t.category)}
                     </div>
                     <div>
-                      <div className="text-white font-medium text-sm">{t.description}</div>
-                      <div className="text-slate-400 text-xs">{new Date(t.date).toLocaleDateString()} • {t.category}</div>
+                      <div className="text-slate-900 dark:text-white font-medium text-sm">{t.description}</div>
+                      <div className="text-slate-600 dark:text-slate-400 text-xs">{new Date(t.date).toLocaleDateString()} • {t.category}</div>
                     </div>
                   </div>
-                  <div className="text-white font-semibold">
+                  <div className="text-slate-900 dark:text-white font-semibold">
                     -฿{t.amount.toLocaleString()}
                   </div>
                 </div>

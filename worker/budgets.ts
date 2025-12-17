@@ -134,12 +134,11 @@ app.get('/:id', authMiddleware, async (c) => {
       };
     }
 
-    // Fetch expenses that match base criteria
+    // Fetch expenses that match base criteria - get all fields for display
     const expenses = await prisma.expense.findMany({
       where: whereClause,
-      select: {
-        amount: true,
-        tags: true
+      orderBy: {
+        date: 'desc'
       }
     });
 
@@ -158,11 +157,18 @@ app.get('/:id', authMiddleware, async (c) => {
 
     const spent = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
+    // Parse tags for each transaction before returning
+    const transactions = filteredExpenses.map(exp => ({
+      ...exp,
+      tags: JSON.parse(exp.tags)
+    }));
+
     return c.json({
       ...budget,
       categories,
       tags,
-      spent
+      spent,
+      transactions
     });
   } catch (err) {
     console.error('Get budget error:', err);
