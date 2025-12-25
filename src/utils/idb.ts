@@ -2,7 +2,6 @@
 
 const DB_NAME = 'shared-files-db';
 const STORE_NAME = 'files';
-const FILE_KEY = 'receipt';
 
 const NOTIFICATION_STORE_NAME = 'notifications';
 
@@ -27,40 +26,44 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function getSharedFile(): Promise<File | null> {
-  // console.log('[IDB] getSharedFile called');
+export async function getSharedFiles(): Promise<Array<{ id: IDBValidKey; file: File }>> {
   try {
     const db = await openDB();
-    // console.log('[IDB] Database opened');
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.get(FILE_KEY);
+      const request = store.openCursor();
+      const files: Array<{ id: IDBValidKey; file: File }> = [];
 
       request.onsuccess = () => {
-        // console.log('[IDB] File retrieved:', request.result);
-        db.close();
-        resolve(request.result || null);
+        const cursor = request.result;
+        if (cursor) {
+          files.push({ id: cursor.key, file: cursor.value });
+          cursor.continue();
+        } else {
+          db.close();
+          resolve(files);
+        }
       };
       request.onerror = () => {
-        console.error('[IDB] Error retrieving file:', request.error);
+        console.error('[IDB] Error retrieving files:', request.error);
         db.close();
         reject(request.error);
       };
     });
   } catch (error) {
-    console.error('[IDB] Error getting shared file:', error);
-    return null;
+    console.error('[IDB] Error getting shared files:', error);
+    return [];
   }
 }
 
-export async function clearSharedFile(): Promise<void> {
+export async function removeSharedFile(id: IDBValidKey): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
-      store.delete(FILE_KEY);
+      store.delete(id);
 
       transaction.oncomplete = () => {
         db.close();
@@ -72,7 +75,7 @@ export async function clearSharedFile(): Promise<void> {
       };
     });
   } catch (error) {
-    console.error('Error clearing shared file:', error);
+    console.error('Error removing shared file:', error);
   }
 }
 

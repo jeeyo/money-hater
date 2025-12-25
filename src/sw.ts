@@ -21,21 +21,20 @@ async function handleShareTarget(request: Request): Promise<Response> {
   try {
     const formData = await request.formData();
     console.log('[SW] FormData parsed');
-    const file = formData.get('file') as File | null;
-    console.log('[SW] File from formData:', file);
+    const files = formData.getAll('file') as File[];
+    console.log('[SW] Files from formData:', files.length);
 
-    if (file && file.type.startsWith('image/')) {
-      console.log('[SW] Valid image file, saving to IndexedDB...');
-      // Store file in IndexedDB
-      await saveSharedFile(file);
-      console.log('[SW] File saved, redirecting to /');
-
-      // Redirect to app (Dashboard will check IndexedDB on mount)
-      return Response.redirect('/', 303);
+    let savedCount = 0;
+    for (const file of files) {
+      if (file && file.type.startsWith('image/')) {
+        console.log('[SW] Valid image file, saving to IndexedDB...');
+        await saveSharedFile(file);
+        savedCount++;
+      }
     }
 
-    console.log('[SW] No valid file, redirecting to /');
-    // If no valid file, just redirect to app
+    console.log(`[SW] ${savedCount} file(s) saved, redirecting to /`);
+    // Redirect to app (NotificationContext will check IndexedDB on mount)
     return Response.redirect('/', 303);
   } catch (error) {
     console.error('[SW] Error handling share target:', error);
@@ -46,7 +45,7 @@ async function handleShareTarget(request: Request): Promise<Response> {
 async function saveSharedFile(file: File): Promise<void> {
   console.log('[SW] saveSharedFile called with:', file.name, file.type, file.size);
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('shared-files-db', 2); // Updated to version 2
+    const request = indexedDB.open('shared-files-db', 2);
 
     request.onerror = () => {
       console.error('[SW] IndexedDB open error:', request.error);
@@ -58,9 +57,10 @@ async function saveSharedFile(file: File): Promise<void> {
       const transaction = db.transaction(['files'], 'readwrite');
       const store = transaction.objectStore('files');
 
-      // Store the file with a known key
-      console.log('[SW] Storing file with key "receipt"');
-      store.put(file, 'receipt');
+      // Store the file with a unique key (timestamp + random)
+      const uniqueKey = `receipt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.log('[SW] Storing file with key:', uniqueKey);
+      store.put(file, uniqueKey);
 
       transaction.oncomplete = () => {
         console.log('[SW] File stored successfully');

@@ -71,6 +71,19 @@ const Dashboard: React.FC = () => {
     };
   }, [isFormOpen]);
 
+  // Listen for expense-added events from background receipt processing
+  useEffect(() => {
+    const handleExpenseAdded = async () => {
+      if (selectedAccount) {
+        const reloaded = await getAllExpenses(selectedAccount.id);
+        setExpenses(reloaded);
+      }
+    };
+
+    window.addEventListener('expense-added', handleExpenseAdded);
+    return () => window.removeEventListener('expense-added', handleExpenseAdded);
+  }, [selectedAccount]);
+
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
       const updatedExpense = { ...editingExpense, ...data };
