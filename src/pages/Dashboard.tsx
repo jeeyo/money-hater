@@ -14,17 +14,18 @@ import { checkBudgetThreshold, getNotificationTypeForThreshold, formatBudgetThre
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
 const Dashboard: React.FC = () => {
-  const { selectedAccount } = useAccount();
+  const { selectedAccount, isLoading: isAccountLoading } = useAccount();
   const { addSystemNotification } = useNotification();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isExpensesLoading, setIsExpensesLoading] = useState(true);
+  const isLoading = isAccountLoading || isExpensesLoading;
   const [sharedFile, setSharedFile] = useState<File | null>(null);
 
   useEffect(() => {
     const initData = async () => {
-      setIsLoading(true);
+      setIsExpensesLoading(true);
       try {
         const localData = localStorage.getItem('smartspend_expenses');
         if (localData) {
@@ -51,7 +52,7 @@ const Dashboard: React.FC = () => {
       } catch (error) {
         console.error("Failed to load expenses:", error);
       } finally {
-        setIsLoading(false);
+        setIsExpensesLoading(false);
       }
     };
 

@@ -10,11 +10,12 @@ import { getCategoryIcon } from '../utils/categoryIcons';
 type DateFilter = 'today' | 'week' | 'month' | 'all';
 
 const Transactions: React.FC = () => {
-  const { selectedAccount } = useAccount();
+  const { selectedAccount, isLoading: isAccountLoading } = useAccount();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isExpensesLoading, setIsExpensesLoading] = useState(true);
+  const isLoading = isAccountLoading || isExpensesLoading;
 
   // Filter states
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -24,7 +25,7 @@ const Transactions: React.FC = () => {
 
   useEffect(() => {
     const loadExpenses = async () => {
-      setIsLoading(true);
+      setIsExpensesLoading(true);
       try {
         if (selectedAccount) {
           const dbData = await getAllExpenses(selectedAccount.id);
@@ -35,7 +36,7 @@ const Transactions: React.FC = () => {
       } catch (error) {
         console.error("Failed to load expenses:", error);
       } finally {
-        setIsLoading(false);
+        setIsExpensesLoading(false);
       }
     };
 

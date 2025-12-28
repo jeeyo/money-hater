@@ -30,12 +30,13 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const saved = localStorage.getItem('selectedAccount');
     return saved ? JSON.parse(saved) : null;
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user && token) {
       fetchAccounts();
     } else {
+      setIsLoading(false);
       setAccounts([]);
       setSelectedAccount(null);
     }
