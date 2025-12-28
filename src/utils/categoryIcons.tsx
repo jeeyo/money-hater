@@ -1,4 +1,4 @@
-import { ShoppingBag, Coffee, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, DollarSign, Gift, TrendingUp, Utensils } from 'lucide-react';
+import { ShoppingBag, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, DollarSign, Gift, TrendingUp, Utensils } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory } from '../types';
 
 export const getCategoryIcon = (category: ExpenseCategory | IncomeCategory) => {
