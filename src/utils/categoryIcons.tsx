@@ -1,9 +1,9 @@
-import { ShoppingBag, Coffee, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, DollarSign, Gift, TrendingUp } from 'lucide-react';
+import { ShoppingBag, Coffee, Car, Home, Zap, Film, Heart, Briefcase, GraduationCap, Plane, HelpCircle, ShoppingCart, DollarSign, Gift, TrendingUp, Utensils } from 'lucide-react';
 import { ExpenseCategory, IncomeCategory } from '../types';
 
 export const getCategoryIcon = (category: ExpenseCategory | IncomeCategory) => {
   switch (category) {
-    case ExpenseCategory.FOOD: return <Coffee className="w-4 h-4 text-orange-500" />;
+    case ExpenseCategory.FOOD: return <Utensils className="w-4 h-4 text-orange-500" />;
     case ExpenseCategory.GROCERIES: return <ShoppingCart className="w-4 h-4 text-green-500" />;
     case ExpenseCategory.TRANSPORT: return <Car className="w-4 h-4 text-blue-500" />;
     case ExpenseCategory.HOUSING: return <Home className="w-4 h-4 text-indigo-500" />;
