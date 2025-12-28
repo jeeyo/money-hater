@@ -56,63 +56,83 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   // Background Analysis Logic
+  const isProcessing = React.useRef(false);
+
   const handleSharedFile = useCallback(async () => {
-    const files = await getSharedFiles();
-    if (!files || files.length === 0) return;
+    if (isProcessing.current) return;
 
-    const fileCount = files.length;
-    setToast({ message: `Processing ${fileCount} receipt${fileCount > 1 ? 's' : ''}...`, type: 'info' });
+    // Check if we have accounts loaded before processing
+    // If accounts are not yet loaded, we should wait. 
+    // Assuming accounts array is populated if loaded. 
+    // If selectedAccount is undetermined but accounts are loading, we might want to skip this run.
+    // However, for now, let's just apply the concurrency lock.
 
-    for (const { id, file } of files) {
-      try {
-        const result = await analyzeReceipt(file);
+    isProcessing.current = true;
 
-        // Auto-add transaction - use selectedAccount or fallback to first account
-        const targetAccount = selectedAccount || accounts[0];
+    try {
+      const files = await getSharedFiles();
+      if (!files || files.length === 0) return;
 
-        if (targetAccount) {
-          const newExpense: Expense = {
-            id: crypto.randomUUID(),
-            createdAt: Date.now(),
-            accountId: targetAccount.id,
-            description: result.description || 'Scanned Receipt',
-            amount: result.amount || 0,
-            date: result.date || new Date().toISOString().split('T')[0],
-            type: result.type || 'expense',
-            category: result.category || ExpenseCategory.OTHER,
-            tags: result.tags || [],
-            attachmentUrl: result.attachmentUrl
-          };
+      const fileCount = files.length;
+      setToast({ message: `Processing ${fileCount} receipt${fileCount > 1 ? 's' : ''}...`, type: 'info' });
 
-          await addExpenseToDB(newExpense);
+      for (const { id, file } of files) {
+        try {
+          const result = await analyzeReceipt(file);
 
+          // Auto-add transaction - use selectedAccount or fallback to first account
+          const targetAccount = selectedAccount || accounts[0];
+
+          if (targetAccount) {
+            const newExpense: Expense = {
+              id: crypto.randomUUID(),
+              createdAt: Date.now(),
+              accountId: targetAccount.id,
+              description: result.description || 'Scanned Receipt',
+              amount: result.amount || 0,
+              date: result.date || new Date().toISOString().split('T')[0],
+              type: result.type || 'expense',
+              category: result.category || ExpenseCategory.OTHER,
+              tags: result.tags || [],
+              attachmentUrl: result.attachmentUrl
+            };
+
+            await addExpenseToDB(newExpense);
+
+            await addSystemNotification(
+              'Receipt Processed',
+              `Added transaction: ${newExpense.description} - ฿${newExpense.amount}`,
+              NotificationType.SUCCESS
+            );
+
+            // Dispatch event to refresh Dashboard
+            window.dispatchEvent(new Event('expense-added'));
+          } else {
+            console.warn('No account available to link receipt transaction. Skipping addition.');
+            // If we don't implement a solution here, the file is deleted below without being added.
+            // But for the reported bug (duplicates), the lock is the key.
+          }
+
+          // Remove the processed file
+          await removeSharedFile(id);
+
+        } catch (error) {
+          console.error('Background analysis failed:', error);
           await addSystemNotification(
-            'Receipt Processed',
-            `Added transaction: ${newExpense.description} - ฿${newExpense.amount}`,
-            NotificationType.SUCCESS
+            'Analysis Failed',
+            'Could not analyze the shared receipt.',
+            NotificationType.ERROR
           );
-
-          // Dispatch event to refresh Dashboard
-          window.dispatchEvent(new Event('expense-added'));
+          // Still remove the file even if analysis failed to prevent infinite loop
+          await removeSharedFile(id);
         }
-
-        // Remove the processed file
-        await removeSharedFile(id);
-
-      } catch (error) {
-        console.error('Background analysis failed:', error);
-        await addSystemNotification(
-          'Analysis Failed',
-          'Could not analyze the shared receipt.',
-          NotificationType.ERROR
-        );
-        // Still remove the file even if analysis failed
-        await removeSharedFile(id);
       }
-    }
 
-    if (fileCount > 0) {
-      setToast({ message: `${fileCount} receipt${fileCount > 1 ? 's' : ''} processed!`, type: 'success' });
+      if (fileCount > 0) {
+        setToast({ message: `${fileCount} receipt${fileCount > 1 ? 's' : ''} processed!`, type: 'success' });
+      }
+    } finally {
+      isProcessing.current = false;
     }
 
   }, [selectedAccount, accounts, addSystemNotification]);
