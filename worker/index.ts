@@ -635,7 +635,7 @@ app.post('/api/analyze-receipt', authMiddleware, async (c) => {
 
     const prompt = `
       Analyze this receipt image and extract the following information:
-      1. Description: A brief description of what was purchased (e.g., "Coffee at Starbucks", "Grocery shopping")
+      1. Description: A brief description of what was purchased (e.g., "Coffee", "Grocery", "ส้มตำ")
       2. Amount: The total amount paid (as a number, without currency symbols)
       3. Date: The date of the transaction in ISO format (YYYY-MM-DD)
       4. Category: Select the most appropriate category from this list: ${categoriesList}
@@ -647,6 +647,7 @@ app.post('/api/analyze-receipt', authMiddleware, async (c) => {
       - For the description, be specific but concise
       - The amount should be a number only (no currency symbols)
       - If the date is not visible, use today's date
+      - If the receipt is in Thai, return the description in Thai
     `;
 
     const response = await ai.models.generateContent({

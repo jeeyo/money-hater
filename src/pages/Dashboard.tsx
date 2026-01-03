@@ -10,7 +10,6 @@ import Layout from '../components/Layout';
 import { getCategoryIcon } from '../utils/categoryIcons';
 import { checkBudgetThreshold, getNotificationTypeForThreshold, formatBudgetThresholdMessage, doesTransactionAffectBudget } from '../utils/budgetNotifications';
 
-
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
 const Dashboard: React.FC = () => {
