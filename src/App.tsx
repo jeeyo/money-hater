@@ -1,14 +1,22 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 import { AccountProvider } from './context/AccountContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { Login } from './pages/Login';
 
 // Lazy-loaded routes. Login stays eager because it's the entry point for
 // unauthenticated users; everything else only matters once we're past auth.
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })));
-const ResetPassword = lazy(() => import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })));
-const SetPassword = lazy(() => import('./pages/SetPassword').then((m) => ({ default: m.SetPassword })));
+const ForgotPassword = lazy(() =>
+  import('./pages/ForgotPassword').then((m) => ({ default: m.ForgotPassword })),
+);
+const ResetPassword = lazy(() =>
+  import('./pages/ResetPassword').then((m) => ({ default: m.ResetPassword })),
+);
+const SetPassword = lazy(() =>
+  import('./pages/SetPassword').then((m) => ({ default: m.SetPassword })),
+);
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Transactions = lazy(() => import('./pages/Transactions'));
 const Budgets = lazy(() => import('./pages/Budgets'));
@@ -111,8 +119,6 @@ const AppRoutes: React.FC = () => {
     </Suspense>
   );
 };
-
-import { NotificationProvider } from './context/NotificationContext';
 
 const App: React.FC = () => {
   return (

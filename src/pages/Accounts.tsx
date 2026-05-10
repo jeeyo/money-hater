@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Wallet, CreditCard, Briefcase, Home, ShoppingBag } from 'lucide-react';
-import { useAccount } from '../context/AccountContext';
-import type { Account } from '../context/AccountContext';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Wallet,
+  CreditCard,
+  Briefcase,
+  Home,
+  ShoppingBag,
+} from 'lucide-react';
+import { useAccount } from '../context/useAccount';
+import type { Account } from '../context/accountContextValue';
 import Layout from '../components/Layout';
 
 const ICON_OPTIONS = [
@@ -19,7 +28,7 @@ const Accounts: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     type: 'normal',
-    icon: 'wallet'
+    icon: 'wallet',
   });
 
   const handleOpenModal = (account?: Account) => {
@@ -28,14 +37,14 @@ const Accounts: React.FC = () => {
       setFormData({
         name: account.name,
         type: account.type,
-        icon: account.icon || 'wallet'
+        icon: account.icon || 'wallet',
       });
     } else {
       setEditingAccount(null);
       setFormData({
         name: '',
         type: 'normal',
-        icon: 'wallet'
+        icon: 'wallet',
       });
     }
     setIsModalOpen(true);
@@ -63,7 +72,11 @@ const Accounts: React.FC = () => {
       return;
     }
 
-    if (window.confirm('Are you sure you want to delete this account? All associated expenses will be deleted.')) {
+    if (
+      window.confirm(
+        'Are you sure you want to delete this account? All associated expenses will be deleted.',
+      )
+    ) {
       try {
         await deleteAccount(id);
       } catch (error) {
@@ -74,7 +87,7 @@ const Accounts: React.FC = () => {
   };
 
   const getIcon = (iconName?: string) => {
-    const option = ICON_OPTIONS.find(opt => opt.id === iconName);
+    const option = ICON_OPTIONS.find((opt) => opt.id === iconName);
     return option ? option.icon : Wallet;
   };
 
@@ -84,7 +97,9 @@ const Accounts: React.FC = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Accounts</h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your financial accounts</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">
+              Manage your financial accounts
+            </p>
           </div>
           <button
             onClick={() => handleOpenModal()}
@@ -96,10 +111,13 @@ const Accounts: React.FC = () => {
         </div>
 
         <div className="space-y-3">
-          {accounts.map(account => {
+          {accounts.map((account) => {
             const Icon = getIcon(account.icon);
             return (
-              <div key={account.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+              <div
+                key={account.id}
+                className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all"
+              >
                 <div className="flex items-center gap-4">
                   {/* Icon */}
                   <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex-shrink-0">
@@ -108,7 +126,9 @@ const Accounts: React.FC = () => {
 
                   {/* Name */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white truncate">{account.name}</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
+                      {account.name}
+                    </h3>
                   </div>
 
                   {/* Type */}
@@ -129,11 +149,16 @@ const Accounts: React.FC = () => {
                     <button
                       onClick={() => handleDelete(account.id)}
                       disabled={selectedAccount?.id === account.id}
-                      className={`p-2 rounded-lg transition-colors ${selectedAccount?.id === account.id
-                        ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                        : 'text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                        }`}
-                      title={selectedAccount?.id === account.id ? 'Cannot delete active account' : 'Delete account'}
+                      className={`p-2 rounded-lg transition-colors ${
+                        selectedAccount?.id === account.id
+                          ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                          : 'text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                      }`}
+                      title={
+                        selectedAccount?.id === account.id
+                          ? 'Cannot delete active account'
+                          : 'Delete account'
+                      }
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -156,7 +181,10 @@ const Accounts: React.FC = () => {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label htmlFor="account-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label
+                  htmlFor="account-name"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                >
                   Account Name
                 </label>
                 <input
@@ -164,20 +192,23 @@ const Accounts: React.FC = () => {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   placeholder="e.g., Personal Checking"
                 />
               </div>
 
               <div>
-                <label htmlFor="account-type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label
+                  htmlFor="account-type"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+                >
                   Type
                 </label>
                 <select
                   id="account-type"
                   value={formData.type}
-                  onChange={e => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 >
                   <option value="normal">Normal</option>
@@ -192,17 +223,18 @@ const Accounts: React.FC = () => {
                   Icon
                 </legend>
                 <div className="flex gap-4">
-                  {ICON_OPTIONS.map(option => {
+                  {ICON_OPTIONS.map((option) => {
                     const Icon = option.icon;
                     return (
                       <button
                         key={option.id}
                         type="button"
                         onClick={() => setFormData({ ...formData, icon: option.id })}
-                        className={`p-3 rounded-xl border transition-all ${formData.icon === option.id
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 text-slate-500 dark:text-slate-400'
-                          }`}
+                        className={`p-3 rounded-xl border transition-all ${
+                          formData.icon === option.id
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 text-slate-500 dark:text-slate-400'
+                        }`}
                         title={option.label}
                       >
                         <Icon className="w-5 h-5" />

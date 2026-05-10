@@ -34,13 +34,20 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
       - name: Build frontend
         run: npm run build
-
-      - name: Verify build
-        run: |
-          echo "✅ Build completed successfully"
-          echo "Deployment will happen when merged to main"
 
       - name: Check migrations
         run: |

@@ -19,13 +19,7 @@ async function hashPassword(password) {
   const data = encoder.encode(password);
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    data,
-    'PBKDF2',
-    false,
-    ['deriveBits'],
-  );
+  const keyMaterial = await crypto.subtle.importKey('raw', data, 'PBKDF2', false, ['deriveBits']);
 
   const derivedBits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },

@@ -16,7 +16,10 @@ const expensesKey = (opts?: ExpenseListOptions) => ['expenses', opts ?? null] as
  */
 export function useExpenses(
   opts?: ExpenseListOptions,
-  queryOptions?: Omit<UseQueryOptions<Expense[], Error, Expense[], readonly unknown[]>, 'queryKey' | 'queryFn'>,
+  queryOptions?: Omit<
+    UseQueryOptions<Expense[], Error, Expense[], readonly unknown[]>,
+    'queryKey' | 'queryFn'
+  >,
 ) {
   return useQuery<Expense[], Error, Expense[], readonly unknown[]>({
     queryKey: expensesKey(opts),
@@ -60,7 +63,10 @@ export function useDeleteExpense() {
       for (const [key, data] of lists) {
         if (data) {
           previous.set(key, data);
-          qc.setQueryData<Expense[]>(key, data.filter((e) => e.id !== id));
+          qc.setQueryData<Expense[]>(
+            key,
+            data.filter((e) => e.id !== id),
+          );
         }
       }
       return { previous };

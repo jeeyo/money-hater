@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { LogIn } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { getTurnstileSiteKey } from '../services/turnstile';
@@ -44,8 +44,12 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
-        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Welcome Back</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Sign in to manage your expenses</p>
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">
+          Welcome Back
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">
+          Sign in to manage your expenses
+        </p>
 
         {error && (
           <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
@@ -55,7 +59,12 @@ export const Login: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label htmlFor="login-username" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Username</label>
+            <label
+              htmlFor="login-username"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Username
+            </label>
             <input
               id="login-username"
               type="text"
@@ -68,7 +77,12 @@ export const Login: React.FC = () => {
           </div>
 
           <div className="mb-3">
-            <label htmlFor="login-password" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Password</label>
+            <label
+              htmlFor="login-password"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Password
+            </label>
             <input
               id="login-password"
               type="password"
@@ -79,7 +93,10 @@ export const Login: React.FC = () => {
               required
             />
             <div className="text-right mt-1.5">
-              <Link to="/forgot-password" className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">
+              <Link
+                to="/forgot-password"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+              >
                 Forgot Password?
               </Link>
             </div>

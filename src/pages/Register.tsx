@@ -14,7 +14,6 @@ export const Register: React.FC = () => {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -52,19 +51,30 @@ export const Register: React.FC = () => {
             <div className="mb-4 text-green-500 bg-green-50 dark:bg-green-900/20 p-3 rounded-full inline-block">
               <UserPlus size={32} />
             </div>
-            <h1 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-white">Check your email</h1>
+            <h1 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-white">
+              Check your email
+            </h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
-              We've sent a verification link to <strong>{email}</strong>. Please check your inbox to complete your registration.
+              We've sent a verification link to <strong>{email}</strong>. Please check your inbox to
+              complete your registration.
             </p>
             {debugLink && (
               <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left">
-                <p className="text-xs text-yellow-800 dark:text-yellow-200 font-medium mb-1">DEV MODE:</p>
-                <a href={debugLink} className="text-xs text-indigo-600 dark:text-indigo-400 break-all hover:underline">
+                <p className="text-xs text-yellow-800 dark:text-yellow-200 font-medium mb-1">
+                  DEV MODE:
+                </p>
+                <a
+                  href={debugLink}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 break-all hover:underline"
+                >
                   {debugLink}
                 </a>
               </div>
             )}
-            <Link to="/login" className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline font-medium">
+            <Link
+              to="/login"
+              className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline font-medium"
+            >
               Back to Sign In
             </Link>
           </div>
@@ -76,8 +86,12 @@ export const Register: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
-        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Create Account</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Start tracking your money today</p>
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">
+          Create Account
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">
+          Start tracking your money today
+        </p>
 
         {error && (
           <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
@@ -87,7 +101,12 @@ export const Register: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label htmlFor="register-username" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Username</label>
+            <label
+              htmlFor="register-username"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Username
+            </label>
             <input
               id="register-username"
               type="text"
@@ -100,7 +119,12 @@ export const Register: React.FC = () => {
           </div>
 
           <div className="mb-3">
-            <label htmlFor="register-email" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Email</label>
+            <label
+              htmlFor="register-email"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Email
+            </label>
             <input
               id="register-email"
               type="email"
@@ -111,8 +135,6 @@ export const Register: React.FC = () => {
               required
             />
           </div>
-
-
 
           <div className="mb-4 flex justify-center">
             <Turnstile
@@ -141,7 +163,13 @@ export const Register: React.FC = () => {
         </form>
 
         <p className="mt-4 text-center text-slate-500 dark:text-slate-400 text-xs">
-          Already have an account? <Link to="/login" className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium">Sign in</Link>
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium"
+          >
+            Sign in
+          </Link>
         </p>
       </div>
     </div>

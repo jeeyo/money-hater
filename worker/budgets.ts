@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { authMiddleware, getAuthUser } from './middleware';
 import { getPrisma, type DbBindings } from './db';
 import { createBudgetSchema, updateBudgetSchema } from './validation';
+import { syncBudgetTags } from './tags';
 
 const app = new Hono<{ Bindings: DbBindings }>();
 
@@ -18,10 +19,10 @@ function safeParseStringArray(value: string | null | undefined): string[] {
 
 // Get all budgets for the authenticated user with spent amount.
 //
-// Performance: previously this issued one expense query per budget (N+1).
-// We now do one query across the union of all budget date ranges and
-// partition results in memory. Tags are stored as JSON strings so they are
-// still filtered in JS — that's covered by Phase 5 normalization.
+// Performance: one query across the union of all budget date ranges with
+// in-memory partitioning. Tag filtering uses the ExpenseTag join (Phase 5):
+// we fetch matching expense ids per tag set in SQL, then check membership
+// while we partition by date range and category.
 app.get('/', authMiddleware, async (c) => {
   try {
     const prisma = getPrisma(c);
@@ -30,6 +31,9 @@ app.get('/', authMiddleware, async (c) => {
     const budgets = await prisma.budget.findMany({
       where: { userId: authUser.userId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        tagLinks: { include: { tag: { select: { name: true } } } },
+      },
     });
 
     if (budgets.length === 0) return c.json([]);
@@ -41,32 +45,53 @@ app.get('/', authMiddleware, async (c) => {
       if (b.endDate > maxEnd) maxEnd = b.endDate;
     }
 
+    // Eligibility set per budget: when a budget filters by tags, only
+    // expenses whose ExpenseTag links include at least one of those tags
+    // count. We pre-compute the eligible expense id set for each
+    // tag-filtered budget so the in-memory loop below is O(1) per check.
+    const tagFilterSets = new Map<string, Set<string>>();
+    for (const b of budgets) {
+      const tagNames = b.tagLinks.map((tl) => tl.tag.name);
+      if (tagNames.length === 0) continue;
+      const links = await prisma.expenseTag.findMany({
+        where: {
+          tag: { userId: authUser.userId, name: { in: tagNames } },
+          expense: {
+            userId: authUser.userId,
+            date: { gte: b.startDate, lte: b.endDate },
+            ...(b.accountId ? { accountId: b.accountId } : {}),
+          },
+        },
+        select: { expenseId: true },
+      });
+      tagFilterSets.set(b.id, new Set(links.map((l) => l.expenseId)));
+    }
+
     const allExpenses = await prisma.expense.findMany({
       where: {
         userId: authUser.userId,
         date: { gte: minStart, lte: maxEnd },
       },
-      select: { amount: true, category: true, tags: true, accountId: true, date: true },
+      select: { id: true, amount: true, category: true, accountId: true, date: true },
     });
 
     const budgetsWithStats = budgets.map((budget) => {
       const categories = safeParseStringArray(budget.categories);
-      const tags = safeParseStringArray(budget.tags);
+      const tagNames = budget.tagLinks.map((tl) => tl.tag.name);
       const categorySet = categories.length > 0 ? new Set(categories) : null;
+      const tagAllowList = tagFilterSets.get(budget.id) ?? null;
 
       let spent = 0;
       for (const exp of allExpenses) {
         if (exp.date < budget.startDate || exp.date > budget.endDate) continue;
         if (budget.accountId && exp.accountId !== budget.accountId) continue;
         if (categorySet && !categorySet.has(exp.category)) continue;
-        if (tags.length > 0) {
-          const expTags = safeParseStringArray(exp.tags);
-          if (!tags.some((t) => expTags.includes(t))) continue;
-        }
+        if (tagAllowList && !tagAllowList.has(exp.id)) continue;
         spent += exp.amount;
       }
 
-      return { ...budget, categories, tags, spent };
+      const { tagLinks: _tagLinks, ...rest } = budget;
+      return { ...rest, categories, tags: tagNames, spent };
     });
 
     return c.json(budgetsWithStats);
@@ -84,18 +109,22 @@ app.get('/:id', authMiddleware, async (c) => {
 
     const budget = await prisma.budget.findFirst({
       where: { id, userId: authUser.userId },
+      include: {
+        tagLinks: { include: { tag: { select: { name: true } } } },
+      },
     });
 
     if (!budget) return c.json({ error: 'Budget not found' }, 404);
 
     const categories = safeParseStringArray(budget.categories);
-    const tags = safeParseStringArray(budget.tags);
+    const tagNames = budget.tagLinks.map((tl) => tl.tag.name);
 
     const whereClause: {
       userId: string;
       date: { gte: Date; lte: Date };
       accountId?: string;
       category?: { in: string[] };
+      tagLinks?: { some: { tag: { userId: string; name: { in: string[] } } } };
     } = {
       userId: authUser.userId,
       date: { gte: budget.startDate, lte: budget.endDate },
@@ -103,25 +132,26 @@ app.get('/:id', authMiddleware, async (c) => {
 
     if (budget.accountId) whereClause.accountId = budget.accountId;
     if (categories.length > 0) whereClause.category = { in: categories };
+    if (tagNames.length > 0) {
+      whereClause.tagLinks = {
+        some: { tag: { userId: authUser.userId, name: { in: tagNames } } },
+      };
+    }
 
     const expenses = await prisma.expense.findMany({
       where: whereClause,
       orderBy: { date: 'desc' },
     });
 
-    let filtered = expenses;
-    if (tags.length > 0) {
-      filtered = expenses.filter((exp) => {
-        const expTags = safeParseStringArray(exp.tags);
-        return tags.some((t) => expTags.includes(t));
-      });
-    }
+    const spent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-    const spent = filtered.reduce((sum, exp) => sum + exp.amount, 0);
+    const transactions = expenses.map((exp) => ({
+      ...exp,
+      tags: safeParseStringArray(exp.tags),
+    }));
 
-    const transactions = filtered.map((exp) => ({ ...exp, tags: safeParseStringArray(exp.tags) }));
-
-    return c.json({ ...budget, categories, tags, spent, transactions });
+    const { tagLinks: _tagLinks, ...rest } = budget;
+    return c.json({ ...rest, categories, tags: tagNames, spent, transactions });
   } catch (err) {
     console.error('Get budget error:', err);
     return c.json({ error: 'Internal Server Error' }, 500);
@@ -155,6 +185,8 @@ app.post('/', authMiddleware, zValidator('json', createBudgetSchema), async (c) 
         createdAt: Date.now(),
       },
     });
+
+    await syncBudgetTags(prisma, authUser.userId, newBudget.id, data.tags);
 
     return c.json(
       {
@@ -204,6 +236,10 @@ app.put('/:id', authMiddleware, zValidator('json', updateBudgetSchema), async (c
         accountId: data.accountId,
       },
     });
+
+    if (data.tags) {
+      await syncBudgetTags(prisma, authUser.userId, id, data.tags);
+    }
 
     return c.json({
       ...updatedBudget,

@@ -1,72 +1,70 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "money-hater",
-	"compatibility_date": "2025-04-03",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"send_metrics": false,
-	"main": "./worker/index.ts",
-	"assets": {
-		"directory": "./dist",
-		"binding": "ASSETS",
-		"not_found_handling": "single-page-application"
-	},
-	"routes": [
-		{
-			"pattern": "hater.money",
-			"custom_domain": true
-		}
-	],
-	"d1_databases": [
-		{
-			"binding": "money_hater_db",
-			"database_name": "money-hater-db",
-			"database_id": "ee76d04c-c492-4f8a-b1e4-03bd5d58596d"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "BUCKET",
-			"bucket_name": "money-hater-storage"
-		}
-	],
-	// Rate limiting (Cloudflare Workers Rate Limiting API).
-	// Uncomment and adjust to enable. The worker code in `worker/index.ts`
-	// (rateLimit helper) already consumes a `RATE_LIMITER` binding and gates
-	// /api/auth/login, /api/auth/forgot-password, /api/classify and
-	// /api/analyze-receipt. When the binding is absent the helper short-circuits
-	// to allow, so leaving this commented does not break dev.
-	// "unsafe": {
-	// 	"bindings": [
-	// 		{
-	// 			"name": "RATE_LIMITER",
-	// 			"type": "ratelimit",
-	// 			"namespace_id": "money-hater-default",
-	// 			"simple": { "limit": 60, "period": 60 }
-	// 		}
-	// 	]
-	// },
-	"observability": {
-		"enabled": true,
-		// Lowered from 1.0 to 0.1 to control cost. Errors are always
-		// captured by Workers tail regardless of head sampling.
-		"head_sampling_rate": 0.1,
-		"logs": {
-			"enabled": true,
-			"head_sampling_rate": 0.1,
-			"persist": true,
-			"invocation_logs": true
-		},
-		"traces": {
-			"enabled": true,
-			"persist": true,
-			"head_sampling_rate": 0.1
-		}
-	},
-	// Daily R2 orphan cleanup. The scheduled handler in worker/index.ts
-	// removes R2 objects whose key is no longer referenced by any expense.
-	"triggers": {
-		"crons": ["0 3 * * *"]
-	}
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "money-hater",
+  "compatibility_date": "2025-04-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "send_metrics": false,
+  "main": "./worker/index.ts",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+  },
+  "routes": [
+    {
+      "pattern": "hater.money",
+      "custom_domain": true,
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "money_hater_db",
+      "database_name": "money-hater-db",
+      "database_id": "ee76d04c-c492-4f8a-b1e4-03bd5d58596d",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "money-hater-storage",
+    },
+  ],
+  // Rate limiting (Cloudflare Workers Rate Limiting API).
+  // Uncomment and adjust to enable. The worker code in `worker/index.ts`
+  // (rateLimit helper) already consumes a `RATE_LIMITER` binding and gates
+  // /api/auth/login, /api/auth/forgot-password, /api/classify and
+  // /api/analyze-receipt. When the binding is absent the helper short-circuits
+  // to allow, so leaving this commented does not break dev.
+  // "unsafe": {
+  // 	"bindings": [
+  // 		{
+  // 			"name": "RATE_LIMITER",
+  // 			"type": "ratelimit",
+  // 			"namespace_id": "money-hater-default",
+  // 			"simple": { "limit": 60, "period": 60 }
+  // 		}
+  // 	]
+  // },
+  "observability": {
+    "enabled": true,
+    // Lowered from 1.0 to 0.1 to control cost. Errors are always
+    // captured by Workers tail regardless of head sampling.
+    "head_sampling_rate": 0.1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "persist": true,
+      "invocation_logs": true,
+    },
+    "traces": {
+      "enabled": true,
+      "persist": true,
+      "head_sampling_rate": 0.1,
+    },
+  },
+  // Daily R2 orphan cleanup. The scheduled handler in worker/index.ts
+  // removes R2 objects whose key is no longer referenced by any expense.
+  "triggers": {
+    "crons": ["0 3 * * *"],
+  },
 }

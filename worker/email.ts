@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 export const sendPasswordResetEmail = async (
   email: string,
   resetLink: string,
-  resendApiKey: string
+  resendApiKey: string,
 ) => {
   if (!resendApiKey) {
     console.warn('RESEND_API_KEY is not set. Email not sent.');
@@ -43,7 +43,7 @@ export const sendPasswordResetEmail = async (
 export const sendVerificationEmail = async (
   email: string,
   verificationLink: string,
-  resendApiKey: string
+  resendApiKey: string,
 ) => {
   if (!resendApiKey) {
     console.warn('RESEND_API_KEY is not set. Email not sent.');

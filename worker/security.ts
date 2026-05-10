@@ -46,7 +46,9 @@ export const ALLOWED_RECEIPT_MIME_TYPES = new Set([
 export function sanitizeFilename(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? 'file';
   // Drop anything outside printable ASCII to a safe substitute, then restrict to a tight allowlist.
-  const printable = Array.from(base, (ch) => (ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f ? '' : ch)).join('');
+  const printable = Array.from(base, (ch) =>
+    ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f ? '' : ch,
+  ).join('');
   const cleaned = printable.replace(/[^A-Za-z0-9._-]/g, '_');
   const trimmed = cleaned.slice(0, 80) || 'file';
   return trimmed;

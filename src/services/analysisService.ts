@@ -19,9 +19,9 @@ export const analyzeReceipt = async (file: File): Promise<AnalysisResult> => {
   const analyzeRes = await fetch('/api/analyze-receipt', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
-    body: formData
+    body: formData,
   });
 
   const analyzeData = await analyzeRes.json();
@@ -37,9 +37,9 @@ export const analyzeReceipt = async (file: File): Promise<AnalysisResult> => {
   const uploadRes = await fetch('/api/upload', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
-    body: uploadFormData
+    body: uploadFormData,
   });
 
   let attachmentUrl: string | undefined;
@@ -55,6 +55,6 @@ export const analyzeReceipt = async (file: File): Promise<AnalysisResult> => {
     category: analyzeData.category as ExpenseCategory | IncomeCategory,
     tags: analyzeData.tags || [],
     type: analyzeData.type as TransactionType,
-    attachmentUrl
+    attachmentUrl,
   };
 };

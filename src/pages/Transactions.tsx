@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Filter } from 'lucide-react';
-import { useAccount } from '../context/AccountContext';
+import { useAccount } from '../context/useAccount';
 import ExpenseForm from '../components/ExpenseForm';
 import { type Expense } from '../types';
 import {
@@ -69,7 +69,7 @@ const Transactions: React.FC = () => {
   const allCategories = useMemo(() => {
     const categories = new Set<string>();
 
-    expenses.forEach(exp => {
+    expenses.forEach((exp) => {
       categories.add(exp.category);
     });
 
@@ -85,7 +85,7 @@ const Transactions: React.FC = () => {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-      filtered = filtered.filter(exp => {
+      filtered = filtered.filter((exp) => {
         const expDate = new Date(exp.date);
 
         switch (dateFilter) {
@@ -108,14 +108,12 @@ const Transactions: React.FC = () => {
 
     // Category filter
     if (selectedCategories.length > 0) {
-      filtered = filtered.filter(exp => selectedCategories.includes(exp.category));
+      filtered = filtered.filter((exp) => selectedCategories.includes(exp.category));
     }
 
     // Tag filter
     if (selectedTags.length > 0) {
-      filtered = filtered.filter(exp =>
-        exp.tags?.some(tag => selectedTags.includes(tag))
-      );
+      filtered = filtered.filter((exp) => exp.tags?.some((tag) => selectedTags.includes(tag)));
     }
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -125,7 +123,7 @@ const Transactions: React.FC = () => {
   const groupedTransactions = useMemo(() => {
     const groups = new Map<string, Expense[]>();
 
-    filteredExpenses.forEach(exp => {
+    filteredExpenses.forEach((exp) => {
       const dateKey = exp.date;
       if (!groups.has(dateKey)) {
         groups.set(dateKey, []);
@@ -133,16 +131,14 @@ const Transactions: React.FC = () => {
       groups.get(dateKey)!.push(exp);
     });
 
-    return Array.from(groups.entries()).sort((a, b) =>
-      new Date(b[0]).getTime() - new Date(a[0]).getTime()
+    return Array.from(groups.entries()).sort(
+      (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime(),
     );
   }, [filteredExpenses]);
 
   const toggleCategory = (category: string) => {
-    setSelectedCategories(prev =>
-      prev.includes(category)
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
+    setSelectedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category],
     );
   };
 
@@ -158,7 +154,7 @@ const Transactions: React.FC = () => {
   };
 
   const removeTag = (tagToRemove: string) => {
-    setSelectedTags(selectedTags.filter(t => t !== tagToRemove));
+    setSelectedTags(selectedTags.filter((t) => t !== tagToRemove));
   };
 
   const clearFilters = () => {
@@ -167,7 +163,8 @@ const Transactions: React.FC = () => {
     setSelectedTags([]);
   };
 
-  const hasActiveFilters = dateFilter !== 'all' || selectedCategories.length > 0 || selectedTags.length > 0;
+  const hasActiveFilters =
+    dateFilter !== 'all' || selectedCategories.length > 0 || selectedTags.length > 0;
 
   return (
     <Layout>
@@ -181,10 +178,11 @@ const Transactions: React.FC = () => {
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Transactions</h1>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${hasActiveFilters
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                hasActiveFilters
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
             >
               <Filter className="w-4 h-4" />
               <span>Filters</span>
@@ -206,16 +204,23 @@ const Transactions: React.FC = () => {
                     Date Range
                   </legend>
                   <div className="flex flex-wrap gap-2">
-                    {(['all', 'today', 'week', 'month'] as DateFilter[]).map(filter => (
+                    {(['all', 'today', 'week', 'month'] as DateFilter[]).map((filter) => (
                       <button
                         key={filter}
                         onClick={() => setDateFilter(filter)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateFilter === filter
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                          }`}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          dateFilter === filter
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                        }`}
                       >
-                        {filter === 'all' ? 'All Time' : filter === 'today' ? 'Today' : filter === 'week' ? 'This Week' : 'This Month'}
+                        {filter === 'all'
+                          ? 'All Time'
+                          : filter === 'today'
+                            ? 'Today'
+                            : filter === 'week'
+                              ? 'This Week'
+                              : 'This Month'}
                       </button>
                     ))}
                   </div>
@@ -228,14 +233,15 @@ const Transactions: React.FC = () => {
                       Categories
                     </legend>
                     <div className="flex flex-wrap gap-2">
-                      {allCategories.map(category => (
+                      {allCategories.map((category) => (
                         <button
                           key={category}
                           onClick={() => toggleCategory(category)}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedCategories.includes(category)
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                            }`}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                            selectedCategories.includes(category)
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                          }`}
                         >
                           {category}
                         </button>
@@ -246,12 +252,18 @@ const Transactions: React.FC = () => {
 
                 {/* Tag Filter */}
                 <div>
-                  <label htmlFor="tag-filter-input" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <label
+                    htmlFor="tag-filter-input"
+                    className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+                  >
                     Tags
                   </label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {selectedTags.map((tag) => (
-                      <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 transition-colors">
+                      <span
+                        key={tag}
+                        className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 transition-colors"
+                      >
                         {tag}
                         <button
                           type="button"
@@ -302,7 +314,10 @@ const Transactions: React.FC = () => {
               </div>
             ) : (
               groupedTransactions.map(([date, transactions]) => (
-                <div key={date} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div
+                  key={date}
+                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+                >
                   {/* Date Header */}
                   <div className="px-4 py-2 bg-slate-50 dark:bg-slate-700/30 border-b border-slate-200 dark:border-slate-700">
                     <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -310,14 +325,14 @@ const Transactions: React.FC = () => {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
-                        day: 'numeric'
+                        day: 'numeric',
                       })}
                     </h3>
                   </div>
 
                   {/* Transactions */}
                   <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {transactions.map(transaction => (
+                    {transactions.map((transaction) => (
                       <div
                         key={transaction.id}
                         onClick={() => handleEditClick(transaction)}
@@ -336,7 +351,7 @@ const Transactions: React.FC = () => {
                             </div>
                             {transaction.tags && transaction.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
-                                {transaction.tags.map(tag => (
+                                {transaction.tags.map((tag) => (
                                   <span
                                     key={tag}
                                     className="text-xs px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded"
@@ -349,11 +364,15 @@ const Transactions: React.FC = () => {
                           </div>
 
                           {/* Amount */}
-                          <div className={`text-sm font-semibold flex-shrink-0 ${transaction.type === 'income'
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
-                            }`}>
-                            {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
+                          <div
+                            className={`text-sm font-semibold flex-shrink-0 ${
+                              transaction.type === 'income'
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}
+                          >
+                            {transaction.type === 'income' ? '+' : '-'}฿
+                            {transaction.amount.toFixed(2)}
                           </div>
                         </div>
                       </div>
@@ -391,10 +410,14 @@ const Transactions: React.FC = () => {
                     }
                   }}
                   onCancel={handleCloseForm}
-                  onDelete={editingExpense ? () => {
-                    deleteExpense(editingExpense.id);
-                    handleCloseForm();
-                  } : undefined}
+                  onDelete={
+                    editingExpense
+                      ? () => {
+                          deleteExpense(editingExpense.id);
+                          handleCloseForm();
+                        }
+                      : undefined
+                  }
                   initialData={editingExpense}
                 />
               </div>

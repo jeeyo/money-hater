@@ -24,10 +24,7 @@ const passwordSchema = z
   .min(PASSWORD_MIN_LENGTH, PASSWORD_POLICY_MESSAGE)
   .max(200, 'Password is too long.')
   .refine((p) => /[A-Za-z]/.test(p), PASSWORD_POLICY_MESSAGE)
-  .refine(
-    (p) => /[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(p),
-    PASSWORD_POLICY_MESSAGE,
-  );
+  .refine((p) => /[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(p), PASSWORD_POLICY_MESSAGE);
 
 const usernameSchema = z
   .string()
@@ -83,10 +80,7 @@ const isoDateSchema = z
   .max(64)
   .refine((v) => !Number.isNaN(Date.parse(v)), 'Invalid date');
 
-const tagsSchema = z
-  .array(z.string().trim().min(1).max(40))
-  .max(20)
-  .default([]);
+const tagsSchema = z.array(z.string().trim().min(1).max(40)).max(20).default([]);
 
 export const createExpenseSchema = z
   .object({
@@ -136,10 +130,7 @@ export const updateAccountSchema = z
 
 // ---------- Budgets ----------
 
-const budgetCategoriesSchema = z
-  .array(ExpenseCategoryEnum)
-  .max(20)
-  .default([]);
+const budgetCategoriesSchema = z.array(ExpenseCategoryEnum).max(20).default([]);
 
 export const createBudgetSchema = z
   .object({
@@ -152,10 +143,10 @@ export const createBudgetSchema = z
     accountId: z.string().uuid().optional().nullable(),
   })
   .strict()
-  .refine(
-    (v) => Date.parse(v.endDate) >= Date.parse(v.startDate),
-    { message: 'endDate must be on or after startDate', path: ['endDate'] },
-  );
+  .refine((v) => Date.parse(v.endDate) >= Date.parse(v.startDate), {
+    message: 'endDate must be on or after startDate',
+    path: ['endDate'],
+  });
 
 export const updateBudgetSchema = z
   .object({

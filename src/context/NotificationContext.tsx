@@ -1,21 +1,19 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { AppNotification, Expense } from '../types';
 import { NotificationType, ExpenseCategory } from '../types';
-import { getAllNotifications, addNotification, markNotificationAsRead, clearAllNotifications, getSharedFiles, removeSharedFile } from '../utils/idb';
+import {
+  getAllNotifications,
+  addNotification,
+  markNotificationAsRead,
+  clearAllNotifications,
+  getSharedFiles,
+  removeSharedFile,
+} from '../utils/idb';
 import { analyzeReceipt } from '../services/analysisService';
 import { addExpenseToDB } from '../services/api';
-import { useAccount } from './AccountContext';
+import { useAccount } from './useAccount';
 import { showToast } from '../lib/toast';
-
-interface NotificationContextType {
-  notifications: AppNotification[];
-  unreadCount: number;
-  markAsRead: (id: string) => Promise<void>;
-  clearAll: () => Promise<void>;
-  addSystemNotification: (title: string, message: string, type: NotificationType) => Promise<void>;
-}
-
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+import { NotificationContext } from './notificationContextValue';
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -30,23 +28,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     refreshNotifications();
   }, [refreshNotifications]);
 
-  const addSystemNotification = useCallback(async (title: string, message: string, type: NotificationType) => {
-    const newNotification: AppNotification = {
-      id: crypto.randomUUID(),
-      title,
-      message,
-      type,
-      timestamp: Date.now(),
-      read: false
-    };
-    await addNotification(newNotification);
-    await refreshNotifications();
-  }, [refreshNotifications]);
+  const addSystemNotification = useCallback(
+    async (title: string, message: string, type: NotificationType) => {
+      const newNotification: AppNotification = {
+        id: crypto.randomUUID(),
+        title,
+        message,
+        type,
+        timestamp: Date.now(),
+        read: false,
+      };
+      await addNotification(newNotification);
+      await refreshNotifications();
+    },
+    [refreshNotifications],
+  );
 
   const markAsRead = async (id: string) => {
     await markNotificationAsRead(id);
     await refreshNotifications(); // Or just update local state for optimistic UI
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
   const clearAll = async () => {
@@ -61,8 +62,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (isProcessing.current) return;
 
     // Check if we have accounts loaded before processing
-    // If accounts are not yet loaded, we should wait. 
-    // Assuming accounts array is populated if loaded. 
+    // If accounts are not yet loaded, we should wait.
+    // Assuming accounts array is populated if loaded.
     // If selectedAccount is undetermined but accounts are loading, we might want to skip this run.
     // However, for now, let's just apply the concurrency lock.
 
@@ -93,7 +94,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               type: result.type || 'expense',
               category: result.category || ExpenseCategory.OTHER,
               tags: result.tags || [],
-              attachmentUrl: result.attachmentUrl
+              attachmentUrl: result.attachmentUrl,
             };
 
             await addExpenseToDB(newExpense);
@@ -101,7 +102,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             await addSystemNotification(
               'Receipt Processed',
               `Added transaction: ${newExpense.description} - ฿${newExpense.amount}`,
-              NotificationType.SUCCESS
+              NotificationType.SUCCESS,
             );
 
             // Dispatch event to refresh Dashboard
@@ -114,13 +115,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
           // Remove the processed file
           await removeSharedFile(id);
-
         } catch (error) {
           console.error('Background analysis failed:', error);
           await addSystemNotification(
             'Analysis Failed',
             'Could not analyze the shared receipt.',
-            NotificationType.ERROR
+            NotificationType.ERROR,
           );
           // Still remove the file even if analysis failed to prevent infinite loop
           await removeSharedFile(id);
@@ -133,7 +133,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       isProcessing.current = false;
     }
-
   }, [selectedAccount, accounts, addSystemNotification]);
 
   // Check for shared files on mount and visibility change
@@ -150,20 +149,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, [handleSharedFile]);
 
-
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, clearAll, addSystemNotification }}>
+    <NotificationContext.Provider
+      value={{ notifications, unreadCount, markAsRead, clearAll, addSystemNotification }}
+    >
       {children}
     </NotificationContext.Provider>
   );
-};
-
-export const useNotification = () => {
-  const context = useContext(NotificationContext);
-  if (context === undefined) {
-    throw new Error('useNotification must be used within a NotificationProvider');
-  }
-  return context;
 };

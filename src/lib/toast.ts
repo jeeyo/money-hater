@@ -36,7 +36,11 @@ export function subscribeToasts(fn: Listener): () => void {
   };
 }
 
-export function showToast(message: string, type: ToastType = 'info', duration = DEFAULT_DURATION_MS): void {
+export function showToast(
+  message: string,
+  type: ToastType = 'info',
+  duration = DEFAULT_DURATION_MS,
+): void {
   if (!message) return;
   const key = `${type}:${message}`;
   const now = Date.now();

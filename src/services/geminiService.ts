@@ -1,7 +1,10 @@
 import { type AIClassificationResult } from '../types';
 import { getAuthHeaders } from './api';
 
-export const classifyExpense = async (description: string, amount?: number): Promise<AIClassificationResult | null> => {
+export const classifyExpense = async (
+  description: string,
+  amount?: number,
+): Promise<AIClassificationResult | null> => {
   if (!description) return null;
 
   try {
@@ -23,11 +26,10 @@ export const classifyExpense = async (description: string, amount?: number): Pro
       throw new Error('Failed to classify expense');
     }
 
-    const data = await response.json() as AIClassificationResult;
+    const data = (await response.json()) as AIClassificationResult;
     return data;
-
   } catch (error) {
-    console.error("Error classifying expense:", error);
+    console.error('Error classifying expense:', error);
     return null;
   }
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { Lock, CheckCircle } from 'lucide-react';
 
 export const SetPassword: React.FC = () => {
@@ -23,8 +23,14 @@ export const SetPassword: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 10 || !/[A-Za-z]/.test(password) || !/[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(password)) {
-      setError('Password must be at least 10 characters and include a letter and a number or symbol.');
+    if (
+      password.length < 10 ||
+      !/[A-Za-z]/.test(password) ||
+      !/[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(password)
+    ) {
+      setError(
+        'Password must be at least 10 characters and include a letter and a number or symbol.',
+      );
       return;
     }
 
@@ -69,20 +75,26 @@ export const SetPassword: React.FC = () => {
           <div className="text-red-500 mb-4">
             <Lock size={32} className="mx-auto" />
           </div>
-          <h1 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">Invalid Link</h1>
+          <h1 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">
+            Invalid Link
+          </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
             This registration link is invalid or has expired.
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
-        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Set Password</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">At least 10 characters, including a letter and a number or symbol.</p>
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">
+          Set Password
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">
+          At least 10 characters, including a letter and a number or symbol.
+        </p>
 
         {error && (
           <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
@@ -92,7 +104,12 @@ export const SetPassword: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label htmlFor="set-password" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Password</label>
+            <label
+              htmlFor="set-password"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Password
+            </label>
             <input
               id="set-password"
               type="password"
@@ -106,7 +123,12 @@ export const SetPassword: React.FC = () => {
           </div>
 
           <div className="mb-6">
-            <label htmlFor="set-password-confirm" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Confirm Password</label>
+            <label
+              htmlFor="set-password-confirm"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Confirm Password
+            </label>
             <input
               id="set-password-confirm"
               type="password"

@@ -62,9 +62,15 @@ const Budgets: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse" aria-hidden="true">
+          <div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse"
+            aria-hidden="true"
+          >
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-40 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div
+                key={i}
+                className="h-40 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
+              >
                 <div className="h-4 w-1/2 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
                 <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded mb-2" />
                 <div className="h-3 w-2/3 bg-slate-200 dark:bg-slate-700 rounded" />
@@ -76,7 +82,9 @@ const Budgets: React.FC = () => {
             <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
               <Plus className="w-8 h-8 text-slate-400" aria-hidden="true" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">No budgets yet</h3>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+              No budgets yet
+            </h3>
             <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">
               Create a budget to track your spending and save money for your goals.
             </p>
@@ -90,7 +98,7 @@ const Budgets: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {budgets.map(budget => (
+            {budgets.map((budget) => (
               <BudgetCard
                 key={budget.id}
                 budget={budget}

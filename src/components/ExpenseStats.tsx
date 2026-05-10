@@ -8,9 +8,18 @@ interface ExpenseStatsProps {
 }
 
 const COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
-  '#eab308', '#84cc16', '#10b981', '#06b6d4', '#0ea5e9',
-  '#3b82f6', '#64748b'
+  '#6366f1',
+  '#8b5cf6',
+  '#ec4899',
+  '#f43f5e',
+  '#f97316',
+  '#eab308',
+  '#84cc16',
+  '#10b981',
+  '#06b6d4',
+  '#0ea5e9',
+  '#3b82f6',
+  '#64748b',
 ];
 
 const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
@@ -18,22 +27,25 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
   const [summaryPeriod, setSummaryPeriod] = useState<'month' | 'year'>('month');
 
   const { totalIncome, totalExpense, netBalance } = useMemo(() => {
-    return expenses.reduce((acc, item) => {
-      if (item.type === 'income') {
-        acc.totalIncome += item.amount;
-        acc.netBalance += item.amount;
-      } else {
-        acc.totalExpense += item.amount;
-        acc.netBalance -= item.amount;
-      }
-      return acc;
-    }, { totalIncome: 0, totalExpense: 0, netBalance: 0 });
+    return expenses.reduce(
+      (acc, item) => {
+        if (item.type === 'income') {
+          acc.totalIncome += item.amount;
+          acc.netBalance += item.amount;
+        } else {
+          acc.totalExpense += item.amount;
+          acc.netBalance -= item.amount;
+        }
+        return acc;
+      },
+      { totalIncome: 0, totalExpense: 0, netBalance: 0 },
+    );
   }, [expenses]);
 
   // Get unique months from expenses for the filter dropdown
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
-    expenses.forEach(exp => {
+    expenses.forEach((exp) => {
       if (exp.date && exp.date.length >= 7) {
         months.add(exp.date.substring(0, 7)); // YYYY-MM
       }
@@ -58,14 +70,14 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
     // Filter expenses based on selected month
     let filteredExpenses = expenses;
     if (selectedMonth !== 'all') {
-      filteredExpenses = expenses.filter(e => e.date.startsWith(selectedMonth));
+      filteredExpenses = expenses.filter((e) => e.date.startsWith(selectedMonth));
     }
 
     // Only show expenses in the pie chart for now
-    filteredExpenses = filteredExpenses.filter(e => e.type !== 'income');
+    filteredExpenses = filteredExpenses.filter((e) => e.type !== 'income');
 
     const map = new Map<string, number>();
-    filteredExpenses.forEach(exp => {
+    filteredExpenses.forEach((exp) => {
       map.set(exp.category, (map.get(exp.category) || 0) + exp.amount);
     });
 
@@ -80,7 +92,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
     const currentMonth = now.getMonth() + 1; // 1-12
 
     return expenses
-      .filter(e => {
+      .filter((e) => {
         if (!e.date) return false;
         const [year, month] = e.date.split('-').map(Number);
 
@@ -90,16 +102,19 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
           return year === currentYear;
         }
       })
-      .reduce((acc, e) => {
-        if (e.type === 'income') {
-          acc.income += e.amount;
-          acc.expense += 0;
-        } else {
-          acc.income += 0;
-          acc.expense += e.amount;
-        }
-        return acc;
-      }, { income: 0, expense: 0 });
+      .reduce(
+        (acc, e) => {
+          if (e.type === 'income') {
+            acc.income += e.amount;
+            acc.expense += 0;
+          } else {
+            acc.income += 0;
+            acc.expense += e.amount;
+          }
+          return acc;
+        },
+        { income: 0, expense: 0 },
+      );
   }, [expenses, summaryPeriod]);
 
   const formatMonth = (monthStr: string) => {
@@ -118,7 +133,11 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
             <span className="font-medium text-sm">Net Balance</span>
           </div>
           <div className="text-3xl font-semibold tracking-tight">
-            ฿{netBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ฿
+            {netBalance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </div>
           <div className="mt-3 text-indigo-100 text-xs flex items-center gap-3">
             <div className="flex items-center gap-1">
@@ -167,7 +186,9 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
       {/* Chart */}
       <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col transition-colors">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-semibold text-slate-800 dark:text-white">Spending by Category</h3>
+          <h3 className="text-base font-semibold text-slate-800 dark:text-white">
+            Spending by Category
+          </h3>
 
           <div className="relative">
             <select
@@ -176,7 +197,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
               className="appearance-none bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs rounded-lg focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 focus:border-transparent block w-full pl-2.5 pr-7 py-1.5 outline-none cursor-pointer font-medium transition-colors"
             >
               <option value="all">All Time</option>
-              {availableMonths.map(month => (
+              {availableMonths.map((month) => (
                 <option key={month} value={month}>
                   {formatMonth(month)}
                 </option>
@@ -205,7 +226,13 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ expenses }) => {
                 </Pie>
                 <Tooltip
                   formatter={(value: number) => [`฿${value.toFixed(2)} `, 'Amount']}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--tooltip-bg, #fff)', color: 'var(--tooltip-text, #1e293b)' }}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    backgroundColor: 'var(--tooltip-bg, #fff)',
+                    color: 'var(--tooltip-text, #1e293b)',
+                  }}
                 />
                 <Legend
                   layout={isMobile ? 'horizontal' : 'vertical'}

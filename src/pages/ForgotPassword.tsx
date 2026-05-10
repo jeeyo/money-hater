@@ -47,8 +47,12 @@ export const ForgotPassword: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
-        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Forgot Password</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Enter your email to reset your password</p>
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">
+          Forgot Password
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">
+          Enter your email to reset your password
+        </p>
 
         {error && (
           <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
@@ -64,14 +68,22 @@ export const ForgotPassword: React.FC = () => {
 
         {debugLink && (
           <div className="mt-3 p-3 bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-xs break-all border border-slate-200 dark:border-slate-700">
-            <strong>Debug Link (Dev Only):</strong><br />
-            <a href={debugLink} className="text-indigo-600 dark:text-indigo-400 hover:underline">{debugLink}</a>
+            <strong>Debug Link (Dev Only):</strong>
+            <br />
+            <a href={debugLink} className="text-indigo-600 dark:text-indigo-400 hover:underline">
+              {debugLink}
+            </a>
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label htmlFor="forgot-email" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Email</label>
+            <label
+              htmlFor="forgot-email"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Email
+            </label>
             <input
               id="forgot-email"
               type="email"
@@ -110,7 +122,13 @@ export const ForgotPassword: React.FC = () => {
         </form>
 
         <p className="mt-4 text-center text-slate-500 dark:text-slate-400 text-xs">
-          Remember your password? <Link to="/login" className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium">Sign in</Link>
+          Remember your password?{' '}
+          <Link
+            to="/login"
+            className="text-indigo-600 dark:text-indigo-400 no-underline hover:underline font-medium"
+          >
+            Sign in
+          </Link>
         </p>
       </div>
     </div>

@@ -36,6 +36,7 @@ import {
 } from './validation';
 import accounts from './accounts';
 import budgets from './budgets';
+import { syncExpenseTags } from './tags';
 
 type Bindings = {
   money_hater_db: D1Database;
@@ -52,19 +53,24 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 // ---------- Global middleware ----------
 
-app.use('*', secureHeaders({
-  // SPA shell is served from same origin; Turnstile + R2 receipts are inline-fetched same-origin.
-  // CSP is opt-in here; full lockdown belongs in a separate review of inline scripts/styles.
-  xContentTypeOptions: 'nosniff',
-  referrerPolicy: 'strict-origin-when-cross-origin',
-  strictTransportSecurity: 'max-age=31536000; includeSubDomains',
-  xFrameOptions: 'DENY',
-  crossOriginOpenerPolicy: 'same-origin',
-}));
+app.use(
+  '*',
+  secureHeaders({
+    // SPA shell is served from same origin; Turnstile + R2 receipts are inline-fetched same-origin.
+    // CSP is opt-in here; full lockdown belongs in a separate review of inline scripts/styles.
+    xContentTypeOptions: 'nosniff',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+    xFrameOptions: 'DENY',
+    crossOriginOpenerPolicy: 'same-origin',
+  }),
+);
 
 // CORS: lock to known origins. Fall back to permissive in dev when ALLOWED_ORIGINS unset.
 app.use('/api/*', (c, next) => {
-  const allowed = (c.env.ALLOWED_ORIGINS ?? 'https://hater.money,http://localhost:5173,http://localhost:5174')
+  const allowed = (
+    c.env.ALLOWED_ORIGINS ?? 'https://hater.money,http://localhost:5173,http://localhost:5174'
+  )
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
@@ -78,7 +84,13 @@ app.use('/api/*', (c, next) => {
 });
 
 // Cap request bodies (default 1 MB). Larger limits are enforced per-route for uploads.
-app.use('/api/*', bodyLimit({ maxSize: 1 * 1024 * 1024, onError: (c) => c.json({ error: 'Request body too large' }, 413) }));
+app.use(
+  '/api/*',
+  bodyLimit({
+    maxSize: 1 * 1024 * 1024,
+    onError: (c) => c.json({ error: 'Request body too large' }, 413),
+  }),
+);
 
 type AppContext = Context<{ Bindings: Bindings }>;
 
@@ -126,50 +138,54 @@ const categoriesList = Object.values(ExpenseCategory).join(', ');
 // PUBLIC ROUTES (No authentication required)
 // ============================================
 
-app.post('/api/auth/complete-registration', zValidator('json', completeRegistrationSchema), async (c) => {
-  try {
-    const prisma = getPrisma(c);
-    const data = c.req.valid('json');
+app.post(
+  '/api/auth/complete-registration',
+  zValidator('json', completeRegistrationSchema),
+  async (c) => {
+    try {
+      const prisma = getPrisma(c);
+      const data = c.req.valid('json');
 
-    const payload = await verifyToken(data.token, c.env.JWT_SECRET);
-    if (!payload || !payload.email || !payload.username) {
-      return c.json({ error: 'Invalid or expired registration token' }, 400);
+      const payload = await verifyToken(data.token, c.env.JWT_SECRET);
+      if (!payload || !payload.email || !payload.username) {
+        return c.json({ error: 'Invalid or expired registration token' }, 400);
+      }
+
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [{ username: payload.username }, { email: payload.email }],
+        },
+      });
+
+      if (existingUser) {
+        return c.json({ error: 'User already exists' }, 409);
+      }
+
+      const hashedPassword = await hashPassword(data.password);
+
+      const newUser = await prisma.user.create({
+        data: {
+          username: payload.username,
+          password: hashedPassword,
+          email: payload.email,
+          name: payload.username,
+        },
+      });
+
+      const token = await generateToken(
+        { userId: newUser.id, email: newUser.email, username: newUser.username },
+        c.env.JWT_SECRET,
+      );
+
+      const { password: _pw, ...userWithoutPassword } = newUser;
+      void _pw;
+      return c.json({ user: userWithoutPassword, token }, 201);
+    } catch (err) {
+      console.error('Complete registration error:', err);
+      return c.json({ error: 'Internal Server Error' }, 500);
     }
-
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ username: payload.username }, { email: payload.email }],
-      },
-    });
-
-    if (existingUser) {
-      return c.json({ error: 'User already exists' }, 409);
-    }
-
-    const hashedPassword = await hashPassword(data.password);
-
-    const newUser = await prisma.user.create({
-      data: {
-        username: payload.username,
-        password: hashedPassword,
-        email: payload.email,
-        name: payload.username,
-      },
-    });
-
-    const token = await generateToken(
-      { userId: newUser.id, email: newUser.email, username: newUser.username },
-      c.env.JWT_SECRET,
-    );
-
-    const { password: _pw, ...userWithoutPassword } = newUser;
-    void _pw;
-    return c.json({ user: userWithoutPassword, token }, 201);
-  } catch (err) {
-    console.error('Complete registration error:', err);
-    return c.json({ error: 'Internal Server Error' }, 500);
-  }
-});
+  },
+);
 
 app.post('/api/auth/login', zValidator('json', loginSchema), async (c) => {
   try {
@@ -424,6 +440,8 @@ app.post('/api/expenses', authMiddleware, zValidator('json', createExpenseSchema
       },
     });
 
+    await syncExpenseTags(prisma, authUser.userId, created.id, data.tags);
+
     return c.json(
       { ...created, tags: safeParseTags(created.tags), date: created.date.toISOString() },
       201,
@@ -466,7 +484,15 @@ app.put('/api/expenses/:id', authMiddleware, zValidator('json', updateExpenseSch
       },
     });
 
-    return c.json({ ...updated, tags: safeParseTags(updated.tags), date: updated.date.toISOString() });
+    if (data.tags) {
+      await syncExpenseTags(prisma, authUser.userId, id, data.tags);
+    }
+
+    return c.json({
+      ...updated,
+      tags: safeParseTags(updated.tags),
+      date: updated.date.toISOString(),
+    });
   } catch (err) {
     console.error('Update expense error:', err);
     return c.json({ error: 'Expense not found or error occurred' }, 404);
@@ -650,7 +676,10 @@ app.post('/api/analyze-receipt', authMiddleware, async (c) => {
 
     if (parsed.error) {
       return c.json(
-        { error: 'Unable to process receipt. Please ensure the image is clear and contains a valid receipt.' },
+        {
+          error:
+            'Unable to process receipt. Please ensure the image is clear and contains a valid receipt.',
+        },
         400,
       );
     }
@@ -667,9 +696,16 @@ app.post('/api/analyze-receipt', authMiddleware, async (c) => {
           .slice(0, 5)
       : [];
 
-    const description = typeof parsed.description === 'string' ? parsed.description.slice(0, MAX_DESCRIPTION_LENGTH) : '';
-    const amount = typeof parsed.amount === 'number' && Number.isFinite(parsed.amount) ? parsed.amount : 0;
-    const date = typeof parsed.date === 'string' && !Number.isNaN(Date.parse(parsed.date)) ? parsed.date : undefined;
+    const description =
+      typeof parsed.description === 'string'
+        ? parsed.description.slice(0, MAX_DESCRIPTION_LENGTH)
+        : '';
+    const amount =
+      typeof parsed.amount === 'number' && Number.isFinite(parsed.amount) ? parsed.amount : 0;
+    const date =
+      typeof parsed.date === 'string' && !Number.isNaN(Date.parse(parsed.date))
+        ? parsed.date
+        : undefined;
 
     return c.json({ error: false, description, amount, date, category, tags });
   } catch (err) {
@@ -764,19 +800,33 @@ function safeParseTags(value: string | null | undefined): string[] {
 // Daily cron sweeps R2 for objects whose key is no longer referenced by any
 // expense.attachmentUrl. Without this, deleted-expense failures and aborted
 // uploads accumulate as billable storage forever.
-async function cleanupOrphanedAttachments(env: Bindings): Promise<{ scanned: number; removed: number }> {
+async function cleanupOrphanedAttachments(
+  env: Bindings,
+): Promise<{ scanned: number; removed: number }> {
   const adapter = new PrismaD1(env.money_hater_db);
   const prisma = new PrismaClient({ adapter });
 
-  // Pull every referenced attachment key into a Set for O(1) lookup. For very
-  // large user bases this should be paginated/streamed; that's a Phase 5 item.
+  // Pull every referenced attachment key into a Set for O(1) lookup. We
+  // page over Expense.id (cursor-based) so the worker doesn't try to load
+  // millions of rows in one shot — D1 row limits and cron CPU budget would
+  // both fail us. Page size is generous because we only select two columns.
   const referenced = new Set<string>();
-  const refs = await prisma.expense.findMany({
-    where: { attachmentUrl: { not: null } },
-    select: { attachmentUrl: true },
-  });
-  for (const r of refs) {
-    if (r.attachmentUrl) referenced.add(r.attachmentUrl);
+  const PAGE_SIZE = 5000;
+  let cursorId: string | undefined;
+  for (;;) {
+    const page = await prisma.expense.findMany({
+      where: { attachmentUrl: { not: null } },
+      select: { id: true, attachmentUrl: true },
+      orderBy: { id: 'asc' },
+      take: PAGE_SIZE,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+    });
+    if (page.length === 0) break;
+    for (const r of page) {
+      if (r.attachmentUrl) referenced.add(r.attachmentUrl);
+    }
+    if (page.length < PAGE_SIZE) break;
+    cursorId = page[page.length - 1].id;
   }
 
   let scanned = 0;

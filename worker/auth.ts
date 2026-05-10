@@ -131,7 +131,10 @@ export function generateResetToken(): string {
 /**
  * Verify a Cloudflare Turnstile token against the siteverify endpoint.
  */
-export async function verifyTurnstile(token: string | undefined, secretKey: string): Promise<boolean> {
+export async function verifyTurnstile(
+  token: string | undefined,
+  secretKey: string,
+): Promise<boolean> {
   if (!token) return false;
   try {
     const formData = new FormData();

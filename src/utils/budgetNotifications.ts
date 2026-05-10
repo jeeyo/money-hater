@@ -16,7 +16,7 @@ export interface BudgetThresholdAlert {
  */
 export function checkBudgetThreshold(
   budget: BudgetWithStats,
-  previousSpent: number
+  previousSpent: number,
 ): BudgetThresholdAlert | null {
   const thresholds = [90, 75, 50]; // Check in descending order
 
@@ -32,7 +32,7 @@ export function checkBudgetThreshold(
         threshold,
         spent: budget.spent,
         amount: budget.amount,
-        percentage: currentPercentage
+        percentage: currentPercentage,
       };
     }
   }
@@ -79,18 +79,18 @@ export function formatBudgetThresholdMessage(alert: BudgetThresholdAlert): {
  */
 export function doesTransactionAffectBudget(
   transaction: Expense,
-  budget: BudgetWithStats
+  budget: BudgetWithStats,
 ): boolean {
   // Only expenses affect budgets
   if (transaction.type !== 'expense') return false;
 
   // Check if transaction matches budget categories
-  const hasMatchingCategory = budget.categories.length === 0 ||
-    budget.categories.includes(transaction.category);
+  const hasMatchingCategory =
+    budget.categories.length === 0 || budget.categories.includes(transaction.category);
 
   // Check if transaction matches budget tags
-  const hasMatchingTag = budget.tags.length === 0 ||
-    budget.tags.some(tag => transaction.tags.includes(tag));
+  const hasMatchingTag =
+    budget.tags.length === 0 || budget.tags.some((tag) => transaction.tags.includes(tag));
 
   return hasMatchingCategory && hasMatchingTag;
 }
