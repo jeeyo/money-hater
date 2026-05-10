@@ -31,6 +31,22 @@
 			"bucket_name": "money-hater-storage"
 		}
 	],
+	// Rate limiting (Cloudflare Workers Rate Limiting API).
+	// Uncomment and adjust to enable. The worker code in `worker/index.ts`
+	// (rateLimit helper) already consumes a `RATE_LIMITER` binding and gates
+	// /api/auth/login, /api/auth/forgot-password, /api/classify and
+	// /api/analyze-receipt. When the binding is absent the helper short-circuits
+	// to allow, so leaving this commented does not break dev.
+	// "unsafe": {
+	// 	"bindings": [
+	// 		{
+	// 			"name": "RATE_LIMITER",
+	// 			"type": "ratelimit",
+	// 			"namespace_id": "money-hater-default",
+	// 			"simple": { "limit": 60, "period": 60 }
+	// 		}
+	// 	]
+	// },
 	"observability": {
 		"enabled": true,
 		"head_sampling_rate": 1,

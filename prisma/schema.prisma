@@ -19,9 +19,10 @@ model User {
   expenses Expense[]
   accounts Account[]
   budgets  Budget[]
-  
+
   @@index([email])
   @@index([username])
+  @@index([resetToken])
 }
 
 model Account {

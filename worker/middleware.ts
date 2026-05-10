@@ -1,4 +1,4 @@
-import type { Context } from 'hono';
+import type { Context, Next } from 'hono';
 import { extractToken, verifyToken, type JWTPayload } from './auth';
 
 export interface AuthContext {
@@ -6,9 +6,9 @@ export interface AuthContext {
 }
 
 /**
- * Middleware to authenticate requests using JWT
+ * Middleware to authenticate requests using JWT.
  */
-export async function authMiddleware(c: Context, next: () => Promise<void>) {
+export async function authMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
   const token = extractToken(authHeader ?? null);
 
@@ -18,19 +18,17 @@ export async function authMiddleware(c: Context, next: () => Promise<void>) {
 
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
-  if (!payload) {
+  if (!payload || !payload.userId) {
     return c.json({ error: 'Unauthorized - Invalid or expired token' }, 401);
   }
 
-  // Attach user info to context
   c.set('user', payload);
-
   await next();
 }
 
 /**
- * Get authenticated user from context
+ * Get authenticated user from context. Always has a userId after authMiddleware.
  */
-export function getAuthUser(c: Context): JWTPayload {
+export function getAuthUser(c: Context): JWTPayload & { userId: string } {
   return c.get('user');
 }

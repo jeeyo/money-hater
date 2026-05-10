@@ -23,8 +23,8 @@ export const SetPassword: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (password.length < 10 || !/[A-Za-z]/.test(password) || !/[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(password)) {
+      setError('Password must be at least 10 characters and include a letter and a number or symbol.');
       return;
     }
 
@@ -82,7 +82,7 @@ export const SetPassword: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
         <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Set Password</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Create a secure password to finish setting up your account.</p>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">At least 10 characters, including a letter and a number or symbol.</p>
 
         {error && (
           <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
@@ -99,7 +99,7 @@ export const SetPassword: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
             />
           </div>
 
@@ -111,7 +111,7 @@ export const SetPassword: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
             />
           </div>
 

@@ -16,6 +16,11 @@ export const ResetPassword: React.FC = () => {
     setError('');
     setMessage('');
 
+    if (password.length < 10 || !/[A-Za-z]/.test(password) || !/[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(password)) {
+      setError('Password must be at least 10 characters and include a letter and a number or symbol.');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -86,7 +91,7 @@ export const ResetPassword: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
             />
           </div>
 
@@ -98,7 +103,7 @@ export const ResetPassword: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
             />
           </div>
 
