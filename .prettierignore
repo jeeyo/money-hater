@@ -1,0 +1,7 @@
+dist
+node_modules
+.wrangler
+package-lock.json
+prisma/migrations
+migrations
+*.md
