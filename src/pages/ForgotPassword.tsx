@@ -37,8 +37,8 @@ export const ForgotPassword: React.FC = () => {
       if (data.debug_link) {
         setDebugLink(data.debug_link);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to send reset link');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send reset link');
     } finally {
       setIsLoading(false);
     }
@@ -71,9 +71,11 @@ export const ForgotPassword: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Email</label>
+            <label htmlFor="forgot-email" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Email</label>
             <input
+              id="forgot-email"
               type="email"
+              autoComplete="email"
               className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

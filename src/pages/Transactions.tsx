@@ -3,7 +3,12 @@ import { Filter } from 'lucide-react';
 import { useAccount } from '../context/AccountContext';
 import ExpenseForm from '../components/ExpenseForm';
 import { type Expense } from '../types';
-import { getAllExpenses, deleteExpenseFromDB } from '../services/api';
+import {
+  useExpenses,
+  useDeleteExpense,
+  useAddExpense,
+  useUpdateExpense,
+} from '../hooks/useExpenses';
 import Layout from '../components/Layout';
 import { getCategoryIcon } from '../utils/categoryIcons';
 
@@ -11,11 +16,8 @@ type DateFilter = 'today' | 'week' | 'month' | 'all';
 
 const Transactions: React.FC = () => {
   const { selectedAccount, isLoading: isAccountLoading } = useAccount();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [isExpensesLoading, setIsExpensesLoading] = useState(true);
-  const isLoading = isAccountLoading || isExpensesLoading;
 
   // Filter states
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -23,25 +25,16 @@ const Transactions: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    const loadExpenses = async () => {
-      setIsExpensesLoading(true);
-      try {
-        if (selectedAccount) {
-          const dbData = await getAllExpenses(selectedAccount.id);
-          setExpenses(dbData);
-        } else {
-          setExpenses([]);
-        }
-      } catch (error) {
-        console.error("Failed to load expenses:", error);
-      } finally {
-        setIsExpensesLoading(false);
-      }
-    };
+  const expensesQuery = useExpenses(
+    selectedAccount ? { accountId: selectedAccount.id } : undefined,
+    { enabled: !!selectedAccount },
+  );
+  const expenses = expensesQuery.data ?? [];
+  const isLoading = isAccountLoading || (!!selectedAccount && expensesQuery.isLoading);
 
-    loadExpenses();
-  }, [selectedAccount]);
+  const deleteExpenseMutation = useDeleteExpense();
+  const addExpenseMutation = useAddExpense();
+  const updateExpenseMutation = useUpdateExpense();
 
   // Disable body scroll when dialog is open
   useEffect(() => {
@@ -68,16 +61,8 @@ const Transactions: React.FC = () => {
     }, 200);
   };
 
-  const deleteExpense = async (id: string) => {
-    const previousExpenses = [...expenses];
-    setExpenses(prev => prev.filter(e => e.id !== id));
-
-    try {
-      await deleteExpenseFromDB(id);
-    } catch (error) {
-      console.error("Failed to delete expense", error);
-      setExpenses(previousExpenses);
-    }
+  const deleteExpense = (id: string) => {
+    deleteExpenseMutation.mutate(id);
   };
 
   // Get all unique categories from expenses
@@ -216,10 +201,10 @@ const Transactions: React.FC = () => {
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-6">
               <div className="space-y-4">
                 {/* Date Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <fieldset>
+                  <legend className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Date Range
-                  </label>
+                  </legend>
                   <div className="flex flex-wrap gap-2">
                     {(['all', 'today', 'week', 'month'] as DateFilter[]).map(filter => (
                       <button
@@ -234,14 +219,14 @@ const Transactions: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                </div>
+                </fieldset>
 
                 {/* Category Filter */}
                 {allCategories.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <fieldset>
+                    <legend className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Categories
-                    </label>
+                    </legend>
                     <div className="flex flex-wrap gap-2">
                       {allCategories.map(category => (
                         <button
@@ -256,23 +241,31 @@ const Transactions: React.FC = () => {
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </fieldset>
                 )}
 
                 {/* Tag Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <label htmlFor="tag-filter-input" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Tags
                   </label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {selectedTags.map((tag) => (
                       <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 transition-colors">
                         {tag}
-                        <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-indigo-900">×</button>
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          aria-label={`Remove tag ${tag}`}
+                          className="ml-1 hover:text-indigo-900"
+                        >
+                          ×
+                        </button>
                       </span>
                     ))}
                   </div>
                   <input
+                    id="tag-filter-input"
                     type="text"
                     onKeyDown={handleTagInput}
                     placeholder="Add tag & press Enter"
@@ -380,12 +373,21 @@ const Transactions: React.FC = () => {
               />
               <div className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-xl bg-slate-800 shadow-lg overflow-y-auto">
                 <ExpenseForm
-                  onSubmit={async () => {
+                  onSubmit={async (data) => {
                     handleCloseForm();
-                    // Reload expenses
-                    if (selectedAccount) {
-                      const dbData = await getAllExpenses(selectedAccount.id);
-                      setExpenses(dbData);
+                    try {
+                      if (editingExpense) {
+                        await updateExpenseMutation.mutateAsync({ ...editingExpense, ...data });
+                      } else {
+                        await addExpenseMutation.mutateAsync({
+                          id: crypto.randomUUID(),
+                          createdAt: Date.now(),
+                          accountId: selectedAccount?.id,
+                          ...data,
+                        });
+                      }
+                    } catch {
+                      // toast already raised by global error handler
                     }
                   }}
                   onCancel={handleCloseForm}

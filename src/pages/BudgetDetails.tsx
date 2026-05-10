@@ -1,67 +1,60 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
 import BudgetForm from '../components/BudgetForm';
-import Toast, { type ToastType } from '../components/Toast';
-import { getBudgetDetails, deleteBudget, updateBudget } from '../services/api';
-import type { BudgetWithStats, Expense, Budget } from '../types';
+import { useBudgetDetails, useUpdateBudget, useDeleteBudget } from '../hooks/useBudgets';
+import { showToast } from '../lib/toast';
+import type { Budget } from '../types';
 import { getCategoryIcon } from '../utils/categoryIcons';
 
 const BudgetDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [budget, setBudget] = useState<(BudgetWithStats & { transactions: Expense[] }) | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
+  const budgetQuery = useBudgetDetails(id);
+  const updateBudgetMutation = useUpdateBudget();
+  const deleteBudgetMutation = useDeleteBudget();
+  const budget = budgetQuery.data;
+  const isLoading = budgetQuery.isLoading;
+  // Captured once on mount. The projection numbers don't need to update mid-view.
+  const [now] = useState(() => Date.now());
 
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      if (id) {
-        const data = await getBudgetDetails(id);
-        setBudget(data);
-      }
-    } catch (error) {
-      console.error("Failed to load budget details:", error);
-      setToast({ message: 'Failed to load budget details', type: 'error' });
-    } finally {
-      setIsLoading(false);
+  // All hooks must run before any early return.
+  const projection = useMemo(() => {
+    if (!budget) {
+      return { percent: 0, isOverBudget: false, daysLeft: 0, idealDaily: 0, actualDaily: 0, projectedSpending: 0 };
     }
-  };
+    const day = 1000 * 60 * 60 * 24;
+    const percent = Math.min((budget.spent / budget.amount) * 100, 100);
+    const isOverBudget = budget.spent > budget.amount;
+    const daysLeft = Math.ceil((new Date(budget.endDate).getTime() - now) / day);
+    const totalDays = Math.ceil((new Date(budget.endDate).getTime() - new Date(budget.startDate).getTime()) / day);
+    const daysPassed = Math.ceil((now - new Date(budget.startDate).getTime()) / day);
+    const idealDaily = budget.amount / totalDays;
+    const actualDaily = daysPassed > 0 ? budget.spent / daysPassed : 0;
+    const projectedSpending = actualDaily * totalDays;
+    return { percent, isOverBudget, daysLeft, idealDaily, actualDaily, projectedSpending };
+  }, [budget, now]);
 
-  const handleDelete = async () => {
-    if (confirm('Are you sure you want to delete this budget?')) {
-      try {
-        if (id) await deleteBudget(id);
-        setToast({ message: 'Budget deleted successfully', type: 'success' });
-        setTimeout(() => navigate('/budgets'), 1000);
-      } catch (error) {
-        console.error('Failed to delete budget:', error);
-        setToast({ message: 'Failed to delete budget', type: 'error' });
-      }
-    }
+  const handleDelete = () => {
+    if (!id) return;
+    if (!confirm('Are you sure you want to delete this budget?')) return;
+    deleteBudgetMutation.mutate(id, {
+      onSuccess: () => {
+        showToast('Budget deleted', 'success');
+        setTimeout(() => navigate('/budgets'), 600);
+      },
+    });
   };
 
   const handleUpdate = async (data: Omit<Budget, 'id' | 'createdAt' | 'userId'>) => {
-    try {
-      if (budget) {
-        await updateBudget(budget.id, data);
-        setToast({ message: 'Budget updated successfully', type: 'success' });
-        setIsFormOpen(false);
-        loadData();
-      }
-    } catch (error) {
-      console.error('Failed to update budget:', error);
-      setToast({ message: 'Failed to update budget', type: 'error' });
-      throw error;
-    }
+    if (!budget) return;
+    await updateBudgetMutation.mutateAsync({ id: budget.id, budget: data });
+    showToast('Budget updated', 'success');
+    setIsFormOpen(false);
   };
 
   if (isLoading) {
@@ -82,16 +75,7 @@ const BudgetDetails: React.FC = () => {
     );
   }
 
-  const percent = Math.min((budget.spent / budget.amount) * 100, 100);
-  const isOverBudget = budget.spent > budget.amount;
-  const daysLeft = Math.ceil((new Date(budget.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
-  // Projection logic
-  const totalDays = Math.ceil((new Date(budget.endDate).getTime() - new Date(budget.startDate).getTime()) / (1000 * 60 * 60 * 24));
-  const daysPassed = Math.ceil((Date.now() - new Date(budget.startDate).getTime()) / (1000 * 60 * 60 * 24));
-  const idealDaily = budget.amount / totalDays;
-  const actualDaily = daysPassed > 0 ? budget.spent / daysPassed : 0;
-  const projectedSpending = actualDaily * totalDays;
+  const { percent, isOverBudget, daysLeft, idealDaily, actualDaily, projectedSpending } = projection;
 
   const gaugeData = [
     { name: 'Spent', value: budget.spent },
@@ -241,14 +225,6 @@ const BudgetDetails: React.FC = () => {
           </div>
         )}
 
-        {/* Toast */}
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        )}
       </div>
     </Layout>
   );

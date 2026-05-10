@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAccount } from '../context/AccountContext';
 import { useNotification } from '../context/NotificationContext';
 import ExpenseForm from '../components/ExpenseForm';
 import { type Expense, ExpenseCategory, IncomeCategory, type TransactionType } from '../types';
-import { getAllExpenses, addExpenseToDB, updateExpenseInDB, deleteExpenseFromDB, getBudgets } from '../services/api';
+import { addExpenseToDB, getBudgets } from '../services/api';
+import { useExpenses, useDeleteExpense, useUpdateExpense, useInvalidateExpenses } from '../hooks/useExpenses';
 import Layout from '../components/Layout';
 import { getCategoryIcon } from '../utils/categoryIcons';
 import { checkBudgetThreshold, getNotificationTypeForThreshold, formatBudgetThresholdMessage, doesTransactionAffectBudget } from '../utils/budgetNotifications';
+import { showToast } from '../lib/toast';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
@@ -23,53 +25,53 @@ function dashboardFromDate(): string {
 const Dashboard: React.FC = () => {
   const { selectedAccount, isLoading: isAccountLoading } = useAccount();
   const { addSystemNotification } = useNotification();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [isExpensesLoading, setIsExpensesLoading] = useState(true);
-  const isLoading = isAccountLoading || isExpensesLoading;
-  const [sharedFile, setSharedFile] = useState<File | null>(null);
+  const [sharedFile] = useState<File | null>(null);
 
+  // Fetch expenses for the selected account, bounded to the chart window.
+  const fromDate = useMemo(() => dashboardFromDate(), []);
+  const expensesQuery = useExpenses(
+    selectedAccount ? { accountId: selectedAccount.id, from: fromDate } : undefined,
+    { enabled: !!selectedAccount },
+  );
+  const expenses = expensesQuery.data ?? [];
+
+  const deleteExpenseMutation = useDeleteExpense();
+  const updateExpenseMutation = useUpdateExpense();
+  const invalidateExpenses = useInvalidateExpenses();
+
+  // One-time migration of any local-storage expenses left behind by older
+  // versions of the app. Runs once per mount so we don't re-trigger on
+  // every account change.
+  const migrationRan = useRef(false);
   useEffect(() => {
-    const initData = async () => {
-      setIsExpensesLoading(true);
+    if (migrationRan.current) return;
+    migrationRan.current = true;
+
+    const localData = localStorage.getItem('smartspend_expenses');
+    if (!localData) return;
+
+    (async () => {
       try {
-        const localData = localStorage.getItem('smartspend_expenses');
-        if (localData) {
-          const parsedData: Expense[] = JSON.parse(localData);
-          if (parsedData.length > 0) {
-            for (const expense of parsedData) {
-              try {
-                if (!expense.type) expense.type = 'expense';
-                await addExpenseToDB(expense);
-              } catch (e) {
-                // Ignore duplicate key errors
-              }
-            }
-            localStorage.removeItem('smartspend_expenses');
+        const parsed: Expense[] = JSON.parse(localData);
+        for (const expense of parsed) {
+          if (!expense.type) expense.type = 'expense';
+          try {
+            await addExpenseToDB(expense);
+          } catch {
+            // ignore duplicate-key
           }
         }
-
-        if (selectedAccount) {
-          // Dashboard only renders the last 5 months + recent transactions,
-          // so bound the fetch to the last 6 months to keep payloads bounded.
-          const dbData = await getAllExpenses({
-            accountId: selectedAccount.id,
-            from: dashboardFromDate(),
-          });
-          setExpenses(dbData);
-        } else {
-          setExpenses([]);
-        }
-      } catch (error) {
-        console.error("Failed to load expenses:", error);
-      } finally {
-        setIsExpensesLoading(false);
+        localStorage.removeItem('smartspend_expenses');
+        await invalidateExpenses();
+      } catch (err) {
+        console.error('Failed to migrate local expenses', err);
       }
-    };
+    })();
+  }, [invalidateExpenses]);
 
-    initData();
-  }, [selectedAccount, isFormOpen]); // Refresh when form closes (which might happen after auto-add in background, though context usually handles this better. background add won't trigger isFormOpen change... wait, we need a way to refresh expenses if they change)
+  const isLoading = isAccountLoading || (selectedAccount && expensesQuery.isLoading);
 
   // Disable body scroll when dialog is open
   useEffect(() => {
@@ -78,112 +80,70 @@ const Dashboard: React.FC = () => {
     } else {
       document.body.style.overflow = '';
     }
-
-    // Cleanup function to restore scroll when component unmounts
     return () => {
       document.body.style.overflow = '';
     };
   }, [isFormOpen]);
 
-  // Listen for expense-added events from background receipt processing
+  // Background receipt processing dispatches this event when it adds an expense.
   useEffect(() => {
-    const handleExpenseAdded = async () => {
-      if (selectedAccount) {
-        const reloaded = await getAllExpenses({
-          accountId: selectedAccount.id,
-          from: dashboardFromDate(),
-        });
-        setExpenses(reloaded);
-      }
-    };
-
-    window.addEventListener('expense-added', handleExpenseAdded);
-    return () => window.removeEventListener('expense-added', handleExpenseAdded);
-  }, [selectedAccount]);
+    const handler = () => invalidateExpenses();
+    window.addEventListener('expense-added', handler);
+    return () => window.removeEventListener('expense-added', handler);
+  }, [invalidateExpenses]);
 
   const handleSaveExpense = async (data: { description: string; amount: number; date: string; category: ExpenseCategory | IncomeCategory; type: TransactionType; tags: string[] }) => {
     if (editingExpense) {
       const updatedExpense = { ...editingExpense, ...data };
-      setExpenses(prev => prev.map(e => e.id === editingExpense.id ? updatedExpense : e));
       handleCloseForm();
-
       try {
-        await updateExpenseInDB(updatedExpense);
-        if (selectedAccount) {
-          const reloaded = await getAllExpenses(selectedAccount.id);
-          setExpenses(reloaded);
-        }
-      } catch (error) {
-        console.error("Failed to update expense", error);
+        await updateExpenseMutation.mutateAsync(updatedExpense);
+      } catch {
+        // toast already raised by global error handler
       }
-    } else {
-      const newExpense: Expense = {
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        accountId: selectedAccount?.id,
-        ...data
-      };
+      return;
+    }
 
-      setExpenses(prev => [newExpense, ...prev]);
-      handleCloseForm();
+    const newExpense: Expense = {
+      id: crypto.randomUUID(),
+      // eslint-disable-next-line react-hooks/purity
+      createdAt: Date.now(),
+      accountId: selectedAccount?.id,
+      ...data,
+    };
+    handleCloseForm();
 
-      try {
-        // Add the expense to the database
-        await addExpenseToDB(newExpense);
+    try {
+      await addExpenseToDB(newExpense);
+      await invalidateExpenses();
+    } catch (err) {
+      console.error('Failed to add expense', err);
+      showToast('Failed to add expense', 'error');
+      return;
+    }
 
-        // Check budget thresholds if this is an expense
-        if (newExpense.type === 'expense' && selectedAccount) {
-          try {
-            const budgets = await getBudgets();
-
-            // Filter budgets for the current account
-            const accountBudgets = budgets.filter(
-              b => !b.accountId || b.accountId === selectedAccount.id
-            );
-
-            // Check each budget that this transaction affects
-            for (const budget of accountBudgets) {
-              if (doesTransactionAffectBudget(newExpense, budget)) {
-                // Calculate previous spent amount (before this transaction)
-                const previousSpent = budget.spent - newExpense.amount;
-
-                // Check if we crossed a threshold
-                const alert = checkBudgetThreshold(budget, previousSpent);
-
-                if (alert) {
-                  const { title, message } = formatBudgetThresholdMessage(alert);
-                  const notificationType = getNotificationTypeForThreshold(alert.threshold);
-
-                  await addSystemNotification(title, message, notificationType);
-                }
-              }
-            }
-          } catch (error) {
-            console.error("Failed to check budget thresholds", error);
-            // Don't fail the transaction if budget check fails
-          }
-        }
-
-        if (selectedAccount) {
-          const reloaded = await getAllExpenses(selectedAccount.id);
-          setExpenses(reloaded);
-        }
-      } catch (error) {
-        console.error("Failed to add expense", error);
+    // Threshold notifications run after the write. They're best-effort —
+    // don't fail the user-visible flow if budget lookup errors.
+    if (newExpense.type !== 'expense' || !selectedAccount) return;
+    try {
+      const budgets = await getBudgets();
+      const accountBudgets = budgets.filter((b) => !b.accountId || b.accountId === selectedAccount.id);
+      for (const budget of accountBudgets) {
+        if (!doesTransactionAffectBudget(newExpense, budget)) continue;
+        const previousSpent = budget.spent - newExpense.amount;
+        const alert = checkBudgetThreshold(budget, previousSpent);
+        if (!alert) continue;
+        const { title, message } = formatBudgetThresholdMessage(alert);
+        const notificationType = getNotificationTypeForThreshold(alert.threshold);
+        await addSystemNotification(title, message, notificationType);
       }
+    } catch (err) {
+      console.error('Failed to check budget thresholds', err);
     }
   };
 
-  const deleteExpense = async (id: string) => {
-    const previousExpenses = [...expenses];
-    setExpenses(prev => prev.filter(e => e.id !== id));
-
-    try {
-      await deleteExpenseFromDB(id);
-    } catch (error) {
-      console.error("Failed to delete expense", error);
-      setExpenses(previousExpenses);
-    }
+  const deleteExpense = (id: string) => {
+    deleteExpenseMutation.mutate(id);
   };
 
   const handleEditClick = (expense: Expense) => {
@@ -195,7 +155,6 @@ const Dashboard: React.FC = () => {
     setIsFormOpen(false);
     setTimeout(() => {
       setEditingExpense(null);
-      setSharedFile(null);
     }, 200);
   };
 
@@ -256,7 +215,6 @@ const Dashboard: React.FC = () => {
     const now = new Date();
     const monthsData: { label: string; key: string }[] = [];
 
-    // Generate keys and labels for the last 5 months (e.g., '2023-01', 'Jan')
     for (let i = 4; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const year = date.getFullYear();
@@ -264,10 +222,9 @@ const Dashboard: React.FC = () => {
       const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
       const monthLabel = date.toLocaleString('en-US', { month: 'short' });
       monthsData.push({ label: monthLabel, key: monthKey });
-      dataMap.set(monthKey, { income: 0, expense: 0 }); // Initialize with zero values
+      dataMap.set(monthKey, { income: 0, expense: 0 });
     }
 
-    // Aggregate expenses into the map
     expenses.forEach(exp => {
       if (!exp.date) return;
       const expenseDate = new Date(exp.date);
@@ -286,7 +243,6 @@ const Dashboard: React.FC = () => {
       }
     });
 
-    // Convert map data to the desired array format, ensuring correct month order
     return monthsData.map(m => ({
       month: m.label,
       income: dataMap.get(m.key)?.income || 0,
@@ -304,9 +260,7 @@ const Dashboard: React.FC = () => {
   return (
     <Layout>
       {isLoading ? (
-        <div className="flex items-center justify-center min-h-[80vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        </div>
+        <DashboardSkeleton />
       ) : (
         <div className="pb-16">
           {/* Top Stats Grid */}
@@ -314,7 +268,7 @@ const Dashboard: React.FC = () => {
             {/* Net Balance Card with Chart */}
             <div className="md:col-span-2 lg:col-span-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm mb-2">
-                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded" aria-hidden="true"></div>
                 <span>Net Balance</span>
               </div>
               <div className="text-3xl font-bold mb-1 text-slate-900 dark:text-white">฿{netBalance.toFixed(2)}</div>
@@ -332,36 +286,14 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Monthly Budget Card */}
-            {/* <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-400">Monthly Budget</span>
-              <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1">
-                <option>All Time</option>
-                <option>This Month</option>
-              </select>
-            </div>
-            <div className="text-2xl font-bold mb-1">฿5,000 <span className="text-sm text-slate-400">/ ฿10,000</span></div>
-            <div className="w-full bg-slate-700 rounded-full h-2 mb-3">
-              <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '50%' }}></div>
-            </div>
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Income</span>
-                <span>฿5,000 / ฿10,000</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Transport</span>
-                <span>฿5,000 / ฿10,000</span>
-              </div>
-            </div>
-          </div> */}
-
             {/* Spending by Category */}
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-slate-600 dark:text-slate-400">Spending by Category</span>
-                <select className="text-xs bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-900 dark:text-white">
+                <select
+                  aria-label="Spending by category time range"
+                  className="text-xs bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 text-slate-900 dark:text-white"
+                >
                   <option>All Time</option>
                 </select>
               </div>
@@ -390,7 +322,7 @@ const Dashboard: React.FC = () => {
                 {categoryData.slice(0, 3).map((cat, idx) => (
                   <div key={cat.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }}></div>
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }} aria-hidden="true"></div>
                       <span className="text-slate-600 dark:text-slate-400">{cat.name}:</span>
                     </div>
                     <span className="text-slate-900 dark:text-white">฿{cat.value.toFixed(0)}</span>
@@ -402,21 +334,21 @@ const Dashboard: React.FC = () => {
             {/* This Month Card */}
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded" aria-hidden="true"></div>
                 <span className="text-sm text-slate-600 dark:text-slate-400">This Month</span>
               </div>
               <div className="space-y-3">
                 <div>
                   <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Income</div>
                   <div className="text-green-600 dark:text-green-400 text-xl font-semibold flex items-center gap-1">
-                    <TrendingUp className="w-4 h-4" />
+                    <TrendingUp className="w-4 h-4" aria-hidden="true" />
                     +฿{currentMonthStats.income.toFixed(0)}
                   </div>
                 </div>
                 <div>
                   <div className="text-slate-600 dark:text-slate-400 text-xs mb-1">Expense</div>
                   <div className="text-red-600 dark:text-red-400 text-xl font-semibold flex items-center gap-1">
-                    <TrendingDown className="w-4 h-4" />
+                    <TrendingDown className="w-4 h-4" aria-hidden="true" />
                     -฿{currentMonthStats.expense.toFixed(0)}
                   </div>
                 </div>
@@ -427,15 +359,11 @@ const Dashboard: React.FC = () => {
           {/* Recent Transactions Table */}
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-              <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded"></div>
+              <div className="w-4 h-4 bg-slate-200 dark:bg-slate-700 rounded" aria-hidden="true"></div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
             </div>
 
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              </div>
-            ) : recentTransactions.length === 0 ? (
+            {recentTransactions.length === 0 ? (
               <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                 <p>No transactions yet</p>
               </div>
@@ -451,7 +379,9 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-slate-50 dark:bg-slate-700/30">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400"></th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">
+                        <span className="sr-only">Category</span>
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400">Description</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400">Amount</th>
                     </tr>
@@ -468,7 +398,7 @@ const Dashboard: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center">
-                            <div className="w-8 h-8 flex items-center justify-center">
+                            <div className="w-8 h-8 flex items-center justify-center" aria-hidden="true">
                               {getCategoryIcon(transaction.category)}
                             </div>
                           </div>
@@ -488,13 +418,15 @@ const Dashboard: React.FC = () => {
 
           {/* Floating Action Button */}
           <button
+            type="button"
             onClick={() => {
               setEditingExpense(null);
               setIsFormOpen(true);
             }}
+            aria-label="Add new transaction"
             className="fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg transition-all hover:scale-105 z-40 flex items-center gap-2 group"
           >
-            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" aria-hidden="true" />
           </button>
 
           {/* Modal Overlay */}
@@ -503,8 +435,14 @@ const Dashboard: React.FC = () => {
               <div
                 className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
                 onClick={handleCloseForm}
+                aria-hidden="true"
               />
-              <div className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-xl bg-slate-800 shadow-lg overflow-y-auto">
+              <div
+                className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-xl bg-slate-800 shadow-lg overflow-y-auto"
+                role="dialog"
+                aria-modal="true"
+                aria-label={editingExpense ? 'Edit transaction' : 'Add transaction'}
+              >
                 <ExpenseForm
                   onSubmit={handleSaveExpense}
                   onCancel={handleCloseForm}
@@ -523,5 +461,36 @@ const Dashboard: React.FC = () => {
     </Layout>
   );
 };
+
+const DashboardSkeleton: React.FC = () => (
+  <div className="pb-16 animate-pulse" aria-hidden="true">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+      <div className="md:col-span-2 lg:col-span-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 h-44">
+        <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
+        <div className="h-8 w-32 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
+        <div className="h-16 bg-slate-100 dark:bg-slate-700/50 rounded" />
+      </div>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 h-44">
+        <div className="h-3 w-32 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
+        <div className="h-24 w-24 mx-auto bg-slate-200 dark:bg-slate-700 rounded-full" />
+      </div>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 h-44">
+        <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
+        <div className="h-6 w-32 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
+        <div className="h-6 w-32 bg-slate-200 dark:bg-slate-700 rounded" />
+      </div>
+    </div>
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+      <div className="h-4 w-40 bg-slate-200 dark:bg-slate-700 rounded mb-4" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 py-3">
+          <div className="h-8 w-8 bg-slate-200 dark:bg-slate-700 rounded" />
+          <div className="flex-1 h-3 bg-slate-200 dark:bg-slate-700 rounded" />
+          <div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default Dashboard;

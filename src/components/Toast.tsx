@@ -34,13 +34,18 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 5000 }
   };
 
   return (
-    <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors[type]} animate-slide-in-right max-w-md`}>
-      <div className="flex-shrink-0">
+    <div
+      role="status"
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors[type]} animate-slide-in-right max-w-md`}
+    >
+      <div className="flex-shrink-0" aria-hidden="true">
         {icons[type]}
       </div>
       <p className="flex-1 text-sm font-medium">{message}</p>
       <button
+        type="button"
         onClick={onClose}
+        aria-label="Dismiss notification"
         className="flex-shrink-0 hover:opacity-70 transition-opacity"
       >
         <X className="w-4 h-4" />

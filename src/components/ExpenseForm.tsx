@@ -3,7 +3,7 @@ import { Plus, Sparkles, Loader2, Tag as TagIcon, Trash2, X, Save, Pencil, Arrow
 import { ExpenseCategory, IncomeCategory, type Expense, type TransactionType, type AIClassificationResult } from '../types';
 import { classifyExpense } from '../services/geminiService';
 import { analyzeReceipt } from '../services/analysisService';
-import Toast, { type ToastType } from './Toast';
+import { showToast } from '../lib/toast';
 
 
 interface ExpenseFormProps {
@@ -29,8 +29,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
   const [isThinking, setIsThinking] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAIEnabled, setIsAIEnabled] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
-
 
   const isEditing = !!initialData;
 
@@ -129,7 +127,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
       setAttachmentUrl(data.key);
     } catch (err) {
       console.error('Upload error:', err);
-      setToast({ message: 'Failed to upload file', type: 'error' });
+      showToast('Failed to upload file', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -139,7 +137,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
   const handleAnalyzeFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setToast({ message: 'Please upload an image file', type: 'warning' });
+      showToast('Please upload an image file', 'warning');
       return;
     }
 
@@ -163,10 +161,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
         ? `Receipt analyzed: ${details}`
         : 'Receipt analyzed successfully!';
 
-      setToast({ message, type: 'success' });
-    } catch (err: any) {
+      showToast(message, 'success');
+    } catch (err: unknown) {
       console.error('Receipt analysis error:', err);
-      setToast({ message: err.message || 'Failed to analyze receipt', type: 'error' });
+      const msg = err instanceof Error ? err.message : 'Failed to analyze receipt';
+      showToast(msg || 'Failed to analyze receipt', 'error');
     } finally {
       setIsAnalyzing(false);
     }
@@ -196,7 +195,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
       window.open(url, '_blank');
     } catch (err) {
       console.error('Error viewing attachment:', err);
-      setToast({ message: 'Failed to view attachment', type: 'error' });
+      showToast('Failed to view attachment', 'error');
     }
   };
 
@@ -455,13 +454,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, onCancel, onDelete,
         )}
       </div>
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </form>
   );
 };

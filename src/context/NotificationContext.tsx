@@ -3,9 +3,9 @@ import type { AppNotification, Expense } from '../types';
 import { NotificationType, ExpenseCategory } from '../types';
 import { getAllNotifications, addNotification, markNotificationAsRead, clearAllNotifications, getSharedFiles, removeSharedFile } from '../utils/idb';
 import { analyzeReceipt } from '../services/analysisService';
-import { addExpenseToDB } from '../services/api'; // We might need to refresh expenses context if we could, but here we just add to DB
+import { addExpenseToDB } from '../services/api';
 import { useAccount } from './AccountContext';
-import Toast, { type ToastType } from '../components/Toast';
+import { showToast } from '../lib/toast';
 
 interface NotificationContextType {
   notifications: AppNotification[];
@@ -20,7 +20,6 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const { selectedAccount, accounts } = useAccount();
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const refreshNotifications = useCallback(async () => {
     const notifs = await getAllNotifications();
@@ -74,7 +73,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (!files || files.length === 0) return;
 
       const fileCount = files.length;
-      setToast({ message: `Processing ${fileCount} receipt${fileCount > 1 ? 's' : ''}...`, type: 'info' });
+      showToast(`Processing ${fileCount} receipt${fileCount > 1 ? 's' : ''}...`, 'info');
 
       for (const { id, file } of files) {
         try {
@@ -129,7 +128,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
 
       if (fileCount > 0) {
-        setToast({ message: `${fileCount} receipt${fileCount > 1 ? 's' : ''} processed!`, type: 'success' });
+        showToast(`${fileCount} receipt${fileCount > 1 ? 's' : ''} processed!`, 'success');
       }
     } finally {
       isProcessing.current = false;
@@ -157,13 +156,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   return (
     <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, clearAll, addSystemNotification }}>
       {children}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </NotificationContext.Provider>
   );
 };

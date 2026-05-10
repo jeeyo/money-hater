@@ -46,8 +46,8 @@ export const ResetPassword: React.FC = () => {
 
       setMessage(data.message);
       setTimeout(() => navigate('/login'), 2000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password');
     }
   };
 
@@ -84,9 +84,11 @@ export const ResetPassword: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">New Password</label>
+            <label htmlFor="reset-password" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">New Password</label>
             <input
+              id="reset-password"
               type="password"
+              autoComplete="new-password"
               className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -96,9 +98,11 @@ export const ResetPassword: React.FC = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Confirm Password</label>
+            <label htmlFor="reset-password-confirm" className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Confirm Password</label>
             <input
+              id="reset-password-confirm"
               type="password"
+              autoComplete="new-password"
               className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
