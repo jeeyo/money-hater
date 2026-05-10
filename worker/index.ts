@@ -4,6 +4,8 @@ import { secureHeaders } from 'hono/secure-headers';
 import { bodyLimit } from 'hono/body-limit';
 import { zValidator } from '@hono/zod-validator';
 import { GoogleGenAI, Type } from '@google/genai';
+import { PrismaClient } from '@prisma/client';
+import { PrismaD1 } from '@prisma/adapter-d1';
 import {
   hashPassword,
   comparePassword,
@@ -322,13 +324,63 @@ app.get('/api/expenses', authMiddleware, async (c) => {
     const authUser = getAuthUser(c);
 
     const accountId = c.req.query('accountId');
-    const whereClause: { userId: string; accountId?: string } = { userId: authUser.userId };
-    if (accountId) whereClause.accountId = accountId;
+    const fromRaw = c.req.query('from');
+    const toRaw = c.req.query('to');
+    const cursor = c.req.query('cursor');
+    const limitRaw = c.req.query('limit');
 
-    const expenses = await prisma.expense.findMany({
+    const dateRange: { gte?: Date; lte?: Date } = {};
+    if (fromRaw && !Number.isNaN(Date.parse(fromRaw))) dateRange.gte = new Date(fromRaw);
+    if (toRaw && !Number.isNaN(Date.parse(toRaw))) dateRange.lte = new Date(toRaw);
+
+    const whereClause: {
+      userId: string;
+      accountId?: string;
+      date?: { gte?: Date; lte?: Date };
+    } = { userId: authUser.userId };
+    if (accountId) whereClause.accountId = accountId;
+    if (dateRange.gte || dateRange.lte) whereClause.date = dateRange;
+
+    const findManyArgs: {
+      where: typeof whereClause;
+      orderBy: Array<{ date: 'desc' } | { id: 'desc' }>;
+      take?: number;
+      skip?: number;
+      cursor?: { id: string };
+    } = {
       where: whereClause,
-      orderBy: { date: 'desc' },
-    });
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+    };
+
+    // Pagination is opt-in. When `limit` is omitted the endpoint returns the
+    // full filtered set as before.
+    if (limitRaw !== undefined) {
+      const parsed = Number.parseInt(limitRaw, 10);
+      const limit = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 200) : 50;
+      // Fetch one extra to know whether there's a next page.
+      findManyArgs.take = limit + 1;
+      if (cursor) {
+        findManyArgs.cursor = { id: cursor };
+        findManyArgs.skip = 1;
+      }
+
+      const expenses = await prisma.expense.findMany(findManyArgs);
+      const hasMore = expenses.length > limit;
+      const slice = hasMore ? expenses.slice(0, limit) : expenses;
+
+      const formatted = slice.map((e) => ({
+        ...e,
+        tags: safeParseTags(e.tags),
+        date: e.date.toISOString(),
+      }));
+
+      return c.json({
+        items: formatted,
+        nextCursor: hasMore ? slice[slice.length - 1].id : null,
+      });
+    }
+
+    const expenses = await prisma.expense.findMany(findManyArgs);
 
     const formatted = expenses.map((e) => ({
       ...e,
@@ -707,4 +759,64 @@ function safeParseTags(value: string | null | undefined): string[] {
   }
 }
 
-export default app;
+// ---------- Scheduled handler ----------
+//
+// Daily cron sweeps R2 for objects whose key is no longer referenced by any
+// expense.attachmentUrl. Without this, deleted-expense failures and aborted
+// uploads accumulate as billable storage forever.
+async function cleanupOrphanedAttachments(env: Bindings): Promise<{ scanned: number; removed: number }> {
+  const adapter = new PrismaD1(env.money_hater_db);
+  const prisma = new PrismaClient({ adapter });
+
+  // Pull every referenced attachment key into a Set for O(1) lookup. For very
+  // large user bases this should be paginated/streamed; that's a Phase 5 item.
+  const referenced = new Set<string>();
+  const refs = await prisma.expense.findMany({
+    where: { attachmentUrl: { not: null } },
+    select: { attachmentUrl: true },
+  });
+  for (const r of refs) {
+    if (r.attachmentUrl) referenced.add(r.attachmentUrl);
+  }
+
+  let scanned = 0;
+  let removed = 0;
+  let cursor: string | undefined;
+
+  // Walk the bucket in pages and delete any key not referenced. We cap each
+  // run at a few thousand entries to stay within the cron CPU budget.
+  for (let i = 0; i < 20; i++) {
+    const list = await env.BUCKET.list({ limit: 1000, cursor });
+    for (const obj of list.objects) {
+      scanned++;
+      if (!referenced.has(obj.key)) {
+        try {
+          await env.BUCKET.delete(obj.key);
+          removed++;
+        } catch (err) {
+          console.error('Failed to delete orphan', obj.key, err);
+        }
+      }
+    }
+    if (!list.truncated) break;
+    cursor = list.cursor;
+  }
+
+  return { scanned, removed };
+}
+
+export default {
+  fetch: app.fetch.bind(app),
+  async scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const result = await cleanupOrphanedAttachments(env);
+          console.log(`R2 cleanup: scanned=${result.scanned} removed=${result.removed}`);
+        } catch (err) {
+          console.error('R2 cleanup failed:', err);
+        }
+      })(),
+    );
+  },
+};

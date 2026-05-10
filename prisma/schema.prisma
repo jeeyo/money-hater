@@ -53,12 +53,14 @@ model Expense {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId   String?
   account     Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
   @@index([date])
   @@index([type])
   @@index([userId, date])
   @@index([accountId])
+  @@index([userId, category])
+  @@index([userId, accountId, date])
 }
 
 model Budget {
@@ -74,7 +76,8 @@ model Budget {
   accountId String?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   createdAt Float
-  
+
   @@index([userId])
   @@index([accountId])
+  @@index([userId, startDate, endDate])
 }

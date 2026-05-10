@@ -17,6 +17,11 @@ function safeParseStringArray(value: string | null | undefined): string[] {
 }
 
 // Get all budgets for the authenticated user with spent amount.
+//
+// Performance: previously this issued one expense query per budget (N+1).
+// We now do one query across the union of all budget date ranges and
+// partition results in memory. Tags are stored as JSON strings so they are
+// still filtered in JS — that's covered by Phase 5 normalization.
 app.get('/', authMiddleware, async (c) => {
   try {
     const prisma = getPrisma(c);
@@ -27,41 +32,42 @@ app.get('/', authMiddleware, async (c) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    const budgetsWithStats = await Promise.all(
-      budgets.map(async (budget) => {
-        const categories = safeParseStringArray(budget.categories);
-        const tags = safeParseStringArray(budget.tags);
+    if (budgets.length === 0) return c.json([]);
 
-        const whereClause: {
-          userId: string;
-          date: { gte: Date; lte: Date };
-          accountId?: string;
-          category?: { in: string[] };
-        } = {
-          userId: authUser.userId,
-          date: { gte: budget.startDate, lte: budget.endDate },
-        };
+    let minStart = budgets[0].startDate;
+    let maxEnd = budgets[0].endDate;
+    for (const b of budgets) {
+      if (b.startDate < minStart) minStart = b.startDate;
+      if (b.endDate > maxEnd) maxEnd = b.endDate;
+    }
 
-        if (budget.accountId) whereClause.accountId = budget.accountId;
-        if (categories.length > 0) whereClause.category = { in: categories };
+    const allExpenses = await prisma.expense.findMany({
+      where: {
+        userId: authUser.userId,
+        date: { gte: minStart, lte: maxEnd },
+      },
+      select: { amount: true, category: true, tags: true, accountId: true, date: true },
+    });
 
-        const expenses = await prisma.expense.findMany({
-          where: whereClause,
-          select: { amount: true, tags: true },
-        });
+    const budgetsWithStats = budgets.map((budget) => {
+      const categories = safeParseStringArray(budget.categories);
+      const tags = safeParseStringArray(budget.tags);
+      const categorySet = categories.length > 0 ? new Set(categories) : null;
 
-        let filtered = expenses;
+      let spent = 0;
+      for (const exp of allExpenses) {
+        if (exp.date < budget.startDate || exp.date > budget.endDate) continue;
+        if (budget.accountId && exp.accountId !== budget.accountId) continue;
+        if (categorySet && !categorySet.has(exp.category)) continue;
         if (tags.length > 0) {
-          filtered = expenses.filter((exp) => {
-            const expTags = safeParseStringArray(exp.tags);
-            return tags.some((t) => expTags.includes(t));
-          });
+          const expTags = safeParseStringArray(exp.tags);
+          if (!tags.some((t) => expTags.includes(t))) continue;
         }
+        spent += exp.amount;
+      }
 
-        const spent = filtered.reduce((sum, exp) => sum + exp.amount, 0);
-        return { ...budget, categories, tags, spent };
-      }),
-    );
+      return { ...budget, categories, tags, spent };
+    });
 
     return c.json(budgetsWithStats);
   } catch (err) {

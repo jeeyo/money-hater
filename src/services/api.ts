@@ -13,8 +13,32 @@ export function getAuthHeaders(): HeadersInit {
   };
 }
 
-export const getAllExpenses = async (accountId?: string): Promise<Expense[]> => {
-  const url = accountId ? `${API_BASE}?accountId=${accountId}` : API_BASE;
+export interface ExpenseListOptions {
+  accountId?: string;
+  /** ISO date (YYYY-MM-DD or full ISO). Inclusive. */
+  from?: string;
+  /** ISO date. Inclusive. */
+  to?: string;
+}
+
+export const getAllExpenses = async (
+  accountIdOrOpts?: string | ExpenseListOptions,
+  fromOpt?: string,
+): Promise<Expense[]> => {
+  // Backwards compatible: `getAllExpenses(accountId)` and
+  // `getAllExpenses(accountId, fromIso)` still work; a single options
+  // object is preferred for new code.
+  const opts: ExpenseListOptions =
+    typeof accountIdOrOpts === 'string' || accountIdOrOpts === undefined
+      ? { accountId: accountIdOrOpts, from: fromOpt }
+      : accountIdOrOpts;
+
+  const params = new URLSearchParams();
+  if (opts.accountId) params.set('accountId', opts.accountId);
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+
+  const url = params.toString() ? `${API_BASE}?${params.toString()}` : API_BASE;
   const response = await fetch(url, {
     headers: getAuthHeaders()
   });

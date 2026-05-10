@@ -12,6 +12,14 @@ import { checkBudgetThreshold, getNotificationTypeForThreshold, formatBudgetThre
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#10b981'];
 
+function dashboardFromDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 5);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 const Dashboard: React.FC = () => {
   const { selectedAccount, isLoading: isAccountLoading } = useAccount();
   const { addSystemNotification } = useNotification();
@@ -43,7 +51,12 @@ const Dashboard: React.FC = () => {
         }
 
         if (selectedAccount) {
-          const dbData = await getAllExpenses(selectedAccount.id);
+          // Dashboard only renders the last 5 months + recent transactions,
+          // so bound the fetch to the last 6 months to keep payloads bounded.
+          const dbData = await getAllExpenses({
+            accountId: selectedAccount.id,
+            from: dashboardFromDate(),
+          });
           setExpenses(dbData);
         } else {
           setExpenses([]);
@@ -76,7 +89,10 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const handleExpenseAdded = async () => {
       if (selectedAccount) {
-        const reloaded = await getAllExpenses(selectedAccount.id);
+        const reloaded = await getAllExpenses({
+          accountId: selectedAccount.id,
+          from: dashboardFromDate(),
+        });
         setExpenses(reloaded);
       }
     };
