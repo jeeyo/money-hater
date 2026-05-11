@@ -19,9 +19,11 @@ model User {
   expenses Expense[]
   accounts Account[]
   budgets  Budget[]
-  
+  tags     Tag[]
+
   @@index([email])
   @@index([username])
+  @@index([resetToken])
 }
 
 model Account {
@@ -45,19 +47,22 @@ model Expense {
   date        DateTime
   type        String
   category    String
-  tags        String
+  tags        String   // legacy JSON cache; normalized join is ExpenseTag
   attachmentUrl String?
   createdAt   Float
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId   String?
   account     Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  
+  tagLinks    ExpenseTag[]
+
   @@index([userId])
   @@index([date])
   @@index([type])
   @@index([userId, date])
   @@index([accountId])
+  @@index([userId, category])
+  @@index([userId, accountId, date])
 }
 
 model Budget {
@@ -67,13 +72,47 @@ model Budget {
   startDate DateTime
   endDate   DateTime
   categories String // JSON string of category names
-  tags      String // JSON string of tags
+  tags      String  // legacy JSON cache; normalized join is BudgetTag
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId String?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   createdAt Float
-  
+  tagLinks  BudgetTag[]
+
   @@index([userId])
   @@index([accountId])
+  @@index([userId, startDate, endDate])
+}
+
+model Tag {
+  id     String @id
+  userId String
+  name   String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenseLinks ExpenseTag[]
+  budgetLinks  BudgetTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model ExpenseTag {
+  expenseId String
+  tagId     String
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([expenseId, tagId])
+  @@index([tagId])
+}
+
+model BudgetTag {
+  budgetId String
+  tagId    String
+  budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([budgetId, tagId])
+  @@index([tagId])
 }

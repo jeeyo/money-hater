@@ -95,7 +95,9 @@ export async function getAllNotifications(): Promise<AppNotification[]> {
       request.onsuccess = () => {
         db.close();
         // Return mostly recent first
-        const results = (request.result as AppNotification[]).sort((a, b) => b.timestamp - a.timestamp);
+        const results = (request.result as AppNotification[]).sort(
+          (a, b) => b.timestamp - a.timestamp,
+        );
         resolve(results);
       };
       request.onerror = () => {

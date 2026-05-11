@@ -10,7 +10,7 @@ export enum ExpenseCategory {
   EDUCATION = 'Education',
   BUSINESS = 'Business',
   GROCERIES = 'Groceries',
-  OTHER = 'Other'
+  OTHER = 'Other',
 }
 
 export enum IncomeCategory {
@@ -18,7 +18,7 @@ export enum IncomeCategory {
   FREELANCE = 'Freelance',
   INVESTMENT = 'Investment',
   GIFT = 'Gift',
-  OTHER = 'Other Income'
+  OTHER = 'Other Income',
 }
 
 export type TransactionType = 'income' | 'expense';
@@ -77,7 +77,7 @@ export enum NotificationType {
   INFO = 'info',
   SUCCESS = 'success',
   WARNING = 'warning',
-  ERROR = 'error'
+  ERROR = 'error',
 }
 
 export interface AppNotification {

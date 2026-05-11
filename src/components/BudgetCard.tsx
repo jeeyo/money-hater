@@ -27,7 +27,8 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete }) => 
         <div>
           <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{budget.name}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {new Date(budget.startDate).toLocaleDateString()} - {new Date(budget.endDate).toLocaleDateString()}
+            {new Date(budget.startDate).toLocaleDateString()} -{' '}
+            {new Date(budget.endDate).toLocaleDateString()}
           </p>
         </div>
         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
@@ -48,8 +49,12 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete }) => 
 
       <div className="mb-4">
         <div className="flex justify-between text-sm mb-1">
-          <span className="text-slate-600 dark:text-slate-400">Spent: ฿{budget.spent.toLocaleString()}</span>
-          <span className="font-medium text-slate-900 dark:text-white">Limit: ฿{budget.amount.toLocaleString()}</span>
+          <span className="text-slate-600 dark:text-slate-400">
+            Spent: ฿{budget.spent.toLocaleString()}
+          </span>
+          <span className="font-medium text-slate-900 dark:text-white">
+            Limit: ฿{budget.amount.toLocaleString()}
+          </span>
         </div>
         <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
           <div
@@ -69,7 +74,9 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete }) => 
 
         <div className="flex items-center gap-1">
           {isExpired ? (
-            <span className="text-slate-400 text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">Expired</span>
+            <span className="text-slate-400 text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+              Expired
+            </span>
           ) : (
             <span className="text-slate-500 dark:text-slate-400 text-xs">{daysLeft} days left</span>
           )}
@@ -78,13 +85,18 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete }) => 
 
       {/* Category/Tags Badges */}
       <div className="mt-4 flex flex-wrap gap-1">
-        {budget.categories.slice(0, 3).map(cat => (
-          <span key={cat} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] rounded-full border border-indigo-100 dark:border-indigo-800">
+        {budget.categories.slice(0, 3).map((cat) => (
+          <span
+            key={cat}
+            className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] rounded-full border border-indigo-100 dark:border-indigo-800"
+          >
             {cat}
           </span>
         ))}
         {budget.categories.length > 3 && (
-          <span className="px-2 py-0.5 bg-slate-50 dark:bg-slate-800 text-slate-500 text-[10px] rounded-full">+{budget.categories.length - 3}</span>
+          <span className="px-2 py-0.5 bg-slate-50 dark:bg-slate-800 text-slate-500 text-[10px] rounded-full">
+            +{budget.categories.length - 3}
+          </span>
         )}
       </div>
     </div>

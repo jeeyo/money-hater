@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { Lock, CheckCircle } from 'lucide-react';
 
 export const SetPassword: React.FC = () => {
@@ -23,8 +23,14 @@ export const SetPassword: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (
+      password.length < 10 ||
+      !/[A-Za-z]/.test(password) ||
+      !/[0-9!@#$%^&*()_\-+=[\]{};:'",.<>/?\\|`~]/.test(password)
+    ) {
+      setError(
+        'Password must be at least 10 characters and include a letter and a number or symbol.',
+      );
       return;
     }
 
@@ -55,8 +61,8 @@ export const SetPassword: React.FC = () => {
       const data = await response.json();
       login(data);
       navigate('/');
-    } catch (err: any) {
-      setError(err.message || 'Failed to set password');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to set password');
     } finally {
       setIsSubmitting(false);
     }
@@ -69,20 +75,26 @@ export const SetPassword: React.FC = () => {
           <div className="text-red-500 mb-4">
             <Lock size={32} className="mx-auto" />
           </div>
-          <h1 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">Invalid Link</h1>
+          <h1 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">
+            Invalid Link
+          </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
             This registration link is invalid or has expired.
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 p-6 rounded-xl w-full max-w-[380px] shadow-sm border border-slate-200 dark:border-slate-700">
-        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">Set Password</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">Create a secure password to finish setting up your account.</p>
+        <h1 className="text-2xl font-semibold mb-1 text-center text-slate-900 dark:text-white">
+          Set Password
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6">
+          At least 10 characters, including a letter and a number or symbol.
+        </p>
 
         {error && (
           <div className="text-red-600 dark:text-red-400 mb-4 text-center text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
@@ -92,26 +104,40 @@ export const SetPassword: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Password</label>
+            <label
+              htmlFor="set-password"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Password
+            </label>
             <input
+              id="set-password"
               type="password"
+              autoComplete="new-password"
               className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
             />
           </div>
 
           <div className="mb-6">
-            <label className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium">Confirm Password</label>
+            <label
+              htmlFor="set-password-confirm"
+              className="block mb-1.5 text-slate-600 dark:text-slate-400 text-xs font-medium"
+            >
+              Confirm Password
+            </label>
             <input
+              id="set-password-confirm"
               type="password"
+              autoComplete="new-password"
               className="w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-50 transition-colors focus:border-indigo-400 dark:focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
             />
           </div>
 

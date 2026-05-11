@@ -1,6 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ArrowLeftRight, Wallet, BarChart3, CreditCard, Settings } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  Wallet,
+  BarChart3,
+  CreditCard,
+  Settings,
+} from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,8 +45,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'
-          } lg:translate-x-0`}
+        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 z-50 transition-transform duration-300 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
       >
         {/* Logo */}
         <div className="h-14 flex items-center gap-2 px-4 border-b border-slate-200 dark:border-slate-700">
@@ -60,10 +68,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active
-                  ? 'bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-white'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50'
-                  }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                }`}
               >
                 <Icon className="w-5 h-5" />
                 <span>{item.label}</span>

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Bell, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
-import { useNotification } from '../context/NotificationContext';
+import { useNotification } from '../context/useNotification';
 import { NotificationType } from '../types';
 
 interface NotificationPanelProps {
@@ -73,23 +73,27 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose, t
           notifications.map((notif) => (
             <div
               key={notif.id}
-              className={`p-3 rounded-lg border transition-all ${notif.read
-                ? 'bg-white dark:bg-slate-800 border-transparent opacity-75'
-                : 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/30'
-                }`}
+              className={`p-3 rounded-lg border transition-all ${
+                notif.read
+                  ? 'bg-white dark:bg-slate-800 border-transparent opacity-75'
+                  : 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/30'
+              }`}
               onClick={() => !notif.read && markAsRead(notif.id)}
             >
               <div className="flex gap-3">
-                <div className="mt-0.5 shrink-0">
-                  {getIcon(notif.type)}
-                </div>
+                <div className="mt-0.5 shrink-0">{getIcon(notif.type)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-2">
-                    <p className={`text-sm font-medium ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
+                    <p
+                      className={`text-sm font-medium ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}
+                    >
                       {notif.title}
                     </p>
                     <span className="text-[10px] text-slate-400 shrink-0 whitespace-nowrap">
-                      {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(notif.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">

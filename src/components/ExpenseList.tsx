@@ -17,7 +17,9 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit })
           <ShoppingBag className="w-6 h-6 text-slate-300 dark:text-slate-500" />
         </div>
         <h3 className="text-base font-medium text-slate-900 dark:text-white">No expenses yet</h3>
-        <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Add your first transaction to get started.</p>
+        <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+          Add your first transaction to get started.
+        </p>
       </div>
     );
   }
@@ -26,14 +28,19 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit })
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-colors">
       <div className="divide-y divide-slate-100 dark:divide-slate-700">
         {expenses.map((expense) => (
-          <div key={expense.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-3 group">
+          <div
+            key={expense.id}
+            className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-3 group"
+          >
             <div className="w-9 h-9 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-600 transition-colors">
               {getCategoryIcon(expense.category)}
             </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <h4 className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate">{expense.description}</h4>
+                <h4 className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate">
+                  {expense.description}
+                </h4>
                 <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hidden sm:inline-block">
                   {expense.category}
                 </span>
@@ -44,8 +51,10 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit })
                   <>
                     <span>•</span>
                     <div className="flex gap-1 overflow-hidden">
-                      {expense.tags.map(tag => (
-                        <span key={tag} className="text-slate-400 italic">#{tag}</span>
+                      {expense.tags.map((tag) => (
+                        <span key={tag} className="text-slate-400 italic">
+                          #{tag}
+                        </span>
                       ))}
                     </div>
                   </>
@@ -54,7 +63,9 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onEdit })
             </div>
 
             <div className="text-right flex flex-col items-end">
-              <div className={`font-semibold text-sm ${expense.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-slate-900 dark:text-white'}`}>
+              <div
+                className={`font-semibold text-sm ${expense.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-slate-900 dark:text-white'}`}
+              >
                 {expense.type === 'income' ? '+' : '-'}฿{expense.amount.toFixed(2)}
               </div>
               <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -9,14 +9,38 @@ export function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
+    ...(token && { Authorization: `Bearer ${token}` }),
   };
 }
 
-export const getAllExpenses = async (accountId?: string): Promise<Expense[]> => {
-  const url = accountId ? `${API_BASE}?accountId=${accountId}` : API_BASE;
+export interface ExpenseListOptions {
+  accountId?: string;
+  /** ISO date (YYYY-MM-DD or full ISO). Inclusive. */
+  from?: string;
+  /** ISO date. Inclusive. */
+  to?: string;
+}
+
+export const getAllExpenses = async (
+  accountIdOrOpts?: string | ExpenseListOptions,
+  fromOpt?: string,
+): Promise<Expense[]> => {
+  // Backwards compatible: `getAllExpenses(accountId)` and
+  // `getAllExpenses(accountId, fromIso)` still work; a single options
+  // object is preferred for new code.
+  const opts: ExpenseListOptions =
+    typeof accountIdOrOpts === 'string' || accountIdOrOpts === undefined
+      ? { accountId: accountIdOrOpts, from: fromOpt }
+      : accountIdOrOpts;
+
+  const params = new URLSearchParams();
+  if (opts.accountId) params.set('accountId', opts.accountId);
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+
+  const url = params.toString() ? `${API_BASE}?${params.toString()}` : API_BASE;
   const response = await fetch(url, {
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(),
   });
 
   if (response.status === 401) {
@@ -29,9 +53,11 @@ export const getAllExpenses = async (accountId?: string): Promise<Expense[]> => 
 
   if (!response.ok) throw new Error('Failed to fetch expenses');
 
-  const data = await response.json() as Expense[];
+  const data = (await response.json()) as Expense[];
   // Sort by date (newest first), then by creation time
-  return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt);
+  return data.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt,
+  );
 };
 
 export const addExpenseToDB = async (expense: Expense): Promise<void> => {
@@ -89,21 +115,25 @@ const BUDGETS_API_BASE = '/api/budgets';
 
 export const getBudgets = async (): Promise<BudgetWithStats[]> => {
   const response = await fetch(BUDGETS_API_BASE, {
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error('Failed to fetch budgets');
   return response.json();
 };
 
-export const getBudgetDetails = async (id: string): Promise<BudgetWithStats & { transactions: Expense[] }> => {
+export const getBudgetDetails = async (
+  id: string,
+): Promise<BudgetWithStats & { transactions: Expense[] }> => {
   const response = await fetch(`${BUDGETS_API_BASE}/${id}`, {
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error('Failed to fetch budget details');
   return response.json();
 };
 
-export const createBudget = async (budget: Omit<Budget, 'id' | 'createdAt' | 'userId'>): Promise<Budget> => {
+export const createBudget = async (
+  budget: Omit<Budget, 'id' | 'createdAt' | 'userId'>,
+): Promise<Budget> => {
   const response = await fetch(BUDGETS_API_BASE, {
     method: 'POST',
     headers: getAuthHeaders(),
