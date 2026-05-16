@@ -52,27 +52,28 @@ export const Login: React.FC = () => {
 
       <div className="relative w-full max-w-[380px] animate-scale-in">
         {/* Glass card */}
-        <div className="bg-[#1e293b]/80 backdrop-blur-xl rounded-2xl p-8
-          border border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.5)]">
-
+        <div
+          className="bg-[#1e293b]/80 backdrop-blur-xl rounded-2xl p-8
+          border border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.5)]"
+        >
           {/* Brand mark */}
           <div className="flex justify-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500
-              flex items-center justify-center shadow-xl shadow-violet-600/30">
+            <div
+              className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500
+              flex items-center justify-center shadow-xl shadow-violet-600/30"
+            >
               <img src="/icon-192.png" alt="Money Hater" className="w-9 h-9" />
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold text-center text-white mb-1">
-            Welcome back
-          </h1>
-          <p className="text-slate-400 text-center text-sm mb-6">
-            Sign in to manage your finances
-          </p>
+          <h1 className="text-2xl font-bold text-center text-white mb-1">Welcome back</h1>
+          <p className="text-slate-400 text-center text-sm mb-6">Sign in to manage your finances</p>
 
           {error && (
-            <div className="mb-4 text-rose-400 text-center text-sm
-              bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl">
+            <div
+              className="mb-4 text-rose-400 text-center text-sm
+              bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl"
+            >
               {error}
             </div>
           )}

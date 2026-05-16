@@ -23,20 +23,20 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete, style
   const statusClass = isOverBudget
     ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
     : isWarning
-    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
 
   const progressClass = isOverBudget
     ? 'progress-danger'
     : isWarning
-    ? 'progress-warning'
-    : 'progress-gradient';
+      ? 'progress-warning'
+      : 'progress-gradient';
 
   const topBorderClass = isOverBudget
     ? 'from-rose-500 to-rose-600'
     : isWarning
-    ? 'from-amber-400 to-orange-500'
-    : 'from-violet-600 to-indigo-500';
+      ? 'from-amber-400 to-orange-500'
+      : 'from-violet-600 to-indigo-500';
 
   return (
     <div
@@ -83,11 +83,12 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete, style
         <div className="mb-4">
           <div className="flex justify-between text-xs mb-2">
             <span className="text-slate-400">
-              Spent: <span className="text-white font-medium tabular-nums">฿{budget.spent.toLocaleString()}</span>
+              Spent:{' '}
+              <span className="text-white font-medium tabular-nums">
+                ฿{budget.spent.toLocaleString()}
+              </span>
             </span>
-            <span className="text-slate-500 tabular-nums">
-              / ฿{budget.amount.toLocaleString()}
-            </span>
+            <span className="text-slate-500 tabular-nums">/ ฿{budget.amount.toLocaleString()}</span>
           </div>
           <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
             <div
@@ -101,14 +102,20 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onEdit, onDelete, style
         <div className="flex justify-between items-center text-sm mt-auto">
           <div>
             <span className="text-[11px] text-slate-500 block">Remaining</span>
-            <span className={`font-semibold tabular-nums ${isOverBudget ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <span
+              className={`font-semibold tabular-nums ${isOverBudget ? 'text-rose-400' : 'text-emerald-400'}`}
+            >
               {isOverBudget ? '-' : ''}฿{Math.abs(budget.amount - budget.spent).toLocaleString()}
             </span>
           </div>
           <div>
-            {isExpired
-              ? <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 text-slate-500">Expired</span>
-              : <span className="text-[11px] text-slate-500">{daysLeft}d left</span>}
+            {isExpired ? (
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 text-slate-500">
+                Expired
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-500">{daysLeft}d left</span>
+            )}
           </div>
         </div>
 

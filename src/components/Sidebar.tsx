@@ -82,9 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
             hover:bg-violet-500 transition-colors"
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {isCollapsed
-            ? <ChevronRight className="w-3 h-3" />
-            : <ChevronLeft className="w-3 h-3" />}
+          {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
         </button>
 
         {/* Nav */}
@@ -100,9 +98,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
                 title={isCollapsed ? item.label : undefined}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                   transition-all duration-150 overflow-hidden
-                  ${active
-                    ? 'bg-violet-500/10 text-violet-300'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  ${
+                    active
+                      ? 'bg-violet-500/10 text-violet-300'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
               >
                 {active && (
@@ -122,9 +121,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
 
         {/* User avatar at bottom */}
         <div className="p-3 border-t border-white/5 flex items-center gap-3 overflow-hidden shrink-0">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500
+          <div
+            className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500
             ring-2 ring-violet-500/30 shrink-0 flex items-center justify-center
-            text-white text-xs font-semibold">
+            text-white text-xs font-semibold"
+          >
             {initial}
           </div>
           <span
@@ -161,9 +162,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
                 to={item.path}
                 onClick={onClose}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  ${active
-                    ? 'bg-violet-500/10 text-violet-300'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  ${
+                    active
+                      ? 'bg-violet-500/10 text-violet-300'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
               >
                 {active && (
@@ -177,8 +179,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
         </nav>
 
         <div className="p-3 border-t border-white/5 flex items-center gap-3 shrink-0">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500
-            ring-2 ring-violet-500/30 flex items-center justify-center text-white text-xs font-semibold">
+          <div
+            className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500
+            ring-2 ring-violet-500/30 flex items-center justify-center text-white text-xs font-semibold"
+          >
             {initial}
           </div>
           <span className="text-xs text-slate-400">{displayName}</span>
@@ -186,9 +190,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
       </aside>
 
       {/* ── Mobile Bottom Nav ── */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 md:hidden z-50
+      <nav
+        className="fixed bottom-0 left-0 right-0 h-16 md:hidden z-50
         bg-[#1e293b]/98 backdrop-blur-xl border-t border-white/5
-        flex items-center justify-around px-2">
+        flex items-center justify-around px-2"
+      >
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);

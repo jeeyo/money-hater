@@ -59,9 +59,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const initial = (user?.name?.[0] || user?.username?.[0] || 'U').toUpperCase();
 
   return (
-    <header className="h-14 bg-[#1e293b]/80 dark:bg-[#1e293b]/80 backdrop-blur-xl
-      border-b border-white/5 flex items-center justify-between px-4 sticky top-0 z-30">
-
+    <header
+      className="h-14 bg-[#1e293b]/80 dark:bg-[#1e293b]/80 backdrop-blur-xl
+      border-b border-white/5 flex items-center justify-between px-4 sticky top-0 z-30"
+    >
       <div className="flex items-center gap-3 flex-1">
         {/* Mobile menu button */}
         <button
@@ -95,8 +96,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           {showAccountMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)} />
-              <div className="absolute top-full right-0 mt-2 w-56 rounded-2xl shadow-2xl border border-white/10
-                bg-[#1e293b] z-50 overflow-hidden animate-slide-down">
+              <div
+                className="absolute top-full right-0 mt-2 w-56 rounded-2xl shadow-2xl border border-white/10
+                bg-[#1e293b] z-50 overflow-hidden animate-slide-down"
+              >
                 <div className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-white/5">
                   Switch Account
                 </div>
@@ -108,9 +111,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                       setShowAccountMenu(false);
                     }}
                     className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors
-                      ${selectedAccount?.id === account.id
-                        ? 'bg-violet-500/10 text-violet-300'
-                        : 'text-slate-300 hover:bg-white/5'
+                      ${
+                        selectedAccount?.id === account.id
+                          ? 'bg-violet-500/10 text-violet-300'
+                          : 'text-slate-300 hover:bg-white/5'
                       }`}
                   >
                     <span>{account.name}</span>
@@ -121,7 +125,10 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 ))}
                 <div className="border-t border-white/5">
                   <button
-                    onClick={() => { navigate('/accounts'); setShowAccountMenu(false); }}
+                    onClick={() => {
+                      navigate('/accounts');
+                      setShowAccountMenu(false);
+                    }}
                     className="w-full text-left px-4 py-2.5 text-sm text-slate-400 hover:bg-white/5 flex items-center gap-2 transition-colors"
                   >
                     <Settings className="w-4 h-4" />
@@ -155,11 +162,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         </div>
 
         {/* User chip */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5
-          bg-white/5 border border-white/10 rounded-full">
-          <div className="w-6 h-6 bg-gradient-to-br from-violet-500 to-indigo-500
+        <div
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5
+          bg-white/5 border border-white/10 rounded-full"
+        >
+          <div
+            className="w-6 h-6 bg-gradient-to-br from-violet-500 to-indigo-500
             rounded-full ring-2 ring-violet-500/30 flex items-center justify-center
-            text-xs font-semibold text-white">
+            text-xs font-semibold text-white"
+          >
             {initial}
           </div>
           <span className="text-sm font-medium text-slate-300 max-w-[100px] truncate">
@@ -173,9 +184,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           className="p-2 hover:bg-white/10 rounded-xl transition-colors"
           aria-label="Toggle theme"
         >
-          {darkMode
-            ? <Sun className="w-5 h-5 text-slate-300" />
-            : <Moon className="w-5 h-5 text-slate-700" />}
+          {darkMode ? (
+            <Sun className="w-5 h-5 text-slate-300" />
+          ) : (
+            <Moon className="w-5 h-5 text-slate-700" />
+          )}
         </button>
 
         {/* Logout */}

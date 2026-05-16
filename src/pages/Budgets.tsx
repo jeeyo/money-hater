@@ -69,7 +69,10 @@ const Budgets: React.FC = () => {
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-hidden="true">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-[#1e293b] rounded-2xl border border-white/5 overflow-hidden">
+              <div
+                key={i}
+                className="bg-[#1e293b] rounded-2xl border border-white/5 overflow-hidden"
+              >
                 <div className="skeleton h-1" />
                 <div className="p-5">
                   <div className="skeleton h-4 w-1/2 rounded mb-3" />

@@ -72,9 +72,10 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose, t
             <div
               key={notif.id}
               className={`p-3 rounded-xl border transition-all cursor-pointer
-                ${notif.read
-                  ? 'bg-transparent border-transparent opacity-55 hover:opacity-75'
-                  : 'bg-violet-500/5 border border-violet-500/20 hover:bg-violet-500/10'
+                ${
+                  notif.read
+                    ? 'bg-transparent border-transparent opacity-55 hover:opacity-75'
+                    : 'bg-violet-500/5 border border-violet-500/20 hover:bg-violet-500/10'
                 }`}
               onClick={() => !notif.read && markAsRead(notif.id)}
             >
@@ -82,16 +83,19 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose, t
                 <div className="mt-0.5 shrink-0">{getIcon(notif.type)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-2">
-                    <p className={`text-sm font-medium ${notif.read ? 'text-slate-400' : 'text-white'}`}>
+                    <p
+                      className={`text-sm font-medium ${notif.read ? 'text-slate-400' : 'text-white'}`}
+                    >
                       {notif.title}
                     </p>
                     <span className="text-[10px] text-slate-600 shrink-0 whitespace-nowrap">
-                      {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(notif.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                    {notif.message}
-                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{notif.message}</p>
                 </div>
                 {!notif.read && (
                   <div className="shrink-0 self-center">

@@ -23,29 +23,54 @@ import type { Expense } from '../types';
 type Preset = '30d' | '90d' | 'ytd' | '12m' | 'custom';
 
 const COLORS = [
-  '#7c3aed', '#6366f1', '#22d3ee', '#10b981',
-  '#f59e0b', '#f43f5e', '#8b5cf6', '#ec4899',
+  '#7c3aed',
+  '#6366f1',
+  '#22d3ee',
+  '#10b981',
+  '#f59e0b',
+  '#f43f5e',
+  '#8b5cf6',
+  '#ec4899',
 ];
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
-const isoNDaysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-const isoStartOfYear = () => { const d = new Date(); return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10); };
-const isoNMonthsAgo = (n: number) => { const d = new Date(); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 10); };
+const isoNDaysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+};
+const isoStartOfYear = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
+};
+const isoNMonthsAgo = (n: number) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 10);
+};
 
 const presetRange = (preset: Preset): { from: string; to: string } | null => {
   switch (preset) {
-    case '30d': return { from: isoNDaysAgo(30), to: todayIso() };
-    case '90d': return { from: isoNDaysAgo(90), to: todayIso() };
-    case 'ytd': return { from: isoStartOfYear(), to: todayIso() };
-    case '12m': return { from: isoNMonthsAgo(12), to: todayIso() };
-    case 'custom': return null;
+    case '30d':
+      return { from: isoNDaysAgo(30), to: todayIso() };
+    case '90d':
+      return { from: isoNDaysAgo(90), to: todayIso() };
+    case 'ytd':
+      return { from: isoStartOfYear(), to: todayIso() };
+    case '12m':
+      return { from: isoNMonthsAgo(12), to: todayIso() };
+    case 'custom':
+      return null;
   }
 };
 
 const monthKey = (iso: string) => iso.slice(0, 7);
 const monthLabel = (key: string) => {
   const [y, m] = key.split('-');
-  return new Date(Number(y), Number(m) - 1, 1).toLocaleString(undefined, { month: 'short', year: '2-digit' });
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleString(undefined, {
+    month: 'short',
+    year: '2-digit',
+  });
 };
 
 const csvEscape = (v: string | number) => {
@@ -56,7 +81,9 @@ const csvEscape = (v: string | number) => {
 const exportCsv = (rows: Expense[]) => {
   const header = ['date', 'description', 'amount', 'type', 'category', 'tags'];
   const body = rows.map((r) =>
-    [r.date, r.description, r.amount, r.type, r.category, (r.tags ?? []).join('|')].map(csvEscape).join(','),
+    [r.date, r.description, r.amount, r.type, r.category, (r.tags ?? []).join('|')]
+      .map(csvEscape)
+      .join(','),
   );
   const csv = [header.join(','), ...body].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -83,9 +110,10 @@ const Reports: React.FC = () => {
   const [customFrom, setCustomFrom] = useState(isoNDaysAgo(30));
   const [customTo, setCustomTo] = useState(todayIso());
 
-  const range = preset === 'custom'
-    ? { from: customFrom, to: customTo }
-    : (presetRange(preset) as { from: string; to: string });
+  const range =
+    preset === 'custom'
+      ? { from: customFrom, to: customTo }
+      : (presetRange(preset) as { from: string; to: string });
 
   const expensesQuery = useExpenses(
     selectedAccount ? { accountId: selectedAccount.id, from: range.from, to: range.to } : undefined,
@@ -95,7 +123,8 @@ const Reports: React.FC = () => {
   const isLoading = isAccountLoading || (!!selectedAccount && expensesQuery.isLoading);
 
   const stats = useMemo(() => {
-    let income = 0; let expense = 0;
+    let income = 0;
+    let expense = 0;
     for (const e of expenses) {
       if (e.type === 'income') income += e.amount;
       else expense += e.amount;
@@ -125,7 +154,9 @@ const Reports: React.FC = () => {
       if (e.type !== 'expense') continue;
       byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount);
     }
-    return Array.from(byCat.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    return Array.from(byCat.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
   }, [expenses]);
 
   const topTags = useMemo(() => {
@@ -134,11 +165,18 @@ const Reports: React.FC = () => {
       if (e.type !== 'expense') continue;
       for (const t of e.tags ?? []) byTag.set(t, (byTag.get(t) ?? 0) + e.amount);
     }
-    return Array.from(byTag.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8);
+    return Array.from(byTag.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
   }, [expenses]);
 
   const topExpenses = useMemo(
-    () => [...expenses].filter((e) => e.type === 'expense').sort((a, b) => b.amount - a.amount).slice(0, 10),
+    () =>
+      [...expenses]
+        .filter((e) => e.type === 'expense')
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10),
     [expenses],
   );
 
@@ -225,34 +263,80 @@ const Reports: React.FC = () => {
         {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-28 bg-[#1e293b] rounded-2xl border border-white/5 skeleton" />
+              <div
+                key={i}
+                className="h-28 bg-[#1e293b] rounded-2xl border border-white/5 skeleton"
+              />
             ))}
           </div>
         ) : (
           <>
             {/* KPI tiles */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <KpiTile label="Income" value={`฿${stats.income.toFixed(0)}`} icon={<TrendingUp className="w-4 h-4 text-emerald-400" />} tone="positive" delay={0} />
-              <KpiTile label="Expense" value={`฿${stats.expense.toFixed(0)}`} icon={<TrendingDown className="w-4 h-4 text-rose-400" />} tone="negative" delay={75} />
-              <KpiTile label="Net" value={`฿${stats.net.toFixed(0)}`} icon={<Wallet className="w-4 h-4 text-violet-400" />} tone={stats.net >= 0 ? 'positive' : 'negative'} delay={150} />
-              <KpiTile label="Savings rate" value={`${stats.savingsRate.toFixed(1)}%`} icon={<PiggyBank className="w-4 h-4 text-cyan-400" />} tone={stats.savingsRate >= 0 ? 'positive' : 'negative'} delay={225} />
+              <KpiTile
+                label="Income"
+                value={`฿${stats.income.toFixed(0)}`}
+                icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}
+                tone="positive"
+                delay={0}
+              />
+              <KpiTile
+                label="Expense"
+                value={`฿${stats.expense.toFixed(0)}`}
+                icon={<TrendingDown className="w-4 h-4 text-rose-400" />}
+                tone="negative"
+                delay={75}
+              />
+              <KpiTile
+                label="Net"
+                value={`฿${stats.net.toFixed(0)}`}
+                icon={<Wallet className="w-4 h-4 text-violet-400" />}
+                tone={stats.net >= 0 ? 'positive' : 'negative'}
+                delay={150}
+              />
+              <KpiTile
+                label="Savings rate"
+                value={`${stats.savingsRate.toFixed(1)}%`}
+                icon={<PiggyBank className="w-4 h-4 text-cyan-400" />}
+                tone={stats.savingsRate >= 0 ? 'positive' : 'negative'}
+                delay={225}
+              />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
               {/* Income vs Expense */}
               <div className="bg-[#1e293b] rounded-2xl border border-white/5 p-5">
                 <h2 className="text-sm font-medium text-slate-400 mb-4">Income vs Expense</h2>
-                {monthlySeries.length === 0 ? <EmptyChart /> : (
+                {monthlySeries.length === 0 ? (
+                  <EmptyChart />
+                ) : (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={monthlySeries}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.8} />
                         <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} />
                         <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
-                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `฿${v.toFixed(0)}`} />
+                        <Tooltip
+                          contentStyle={tooltipStyle}
+                          formatter={(v: number) => `฿${v.toFixed(0)}`}
+                        />
                         <Legend />
-                        <Line type="monotone" dataKey="income" name="Income" stroke="#10b981" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="expense" name="Expense" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                        <Line
+                          type="monotone"
+                          dataKey="income"
+                          name="Income"
+                          stroke="#10b981"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="expense"
+                          name="Expense"
+                          stroke="#f43f5e"
+                          strokeWidth={2}
+                          dot={false}
+                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -262,17 +346,29 @@ const Reports: React.FC = () => {
               {/* Category Pie */}
               <div className="bg-[#1e293b] rounded-2xl border border-white/5 p-5">
                 <h2 className="text-sm font-medium text-slate-400 mb-4">Spending by Category</h2>
-                {categoryBreakdown.length === 0 ? <EmptyChart /> : (
+                {categoryBreakdown.length === 0 ? (
+                  <EmptyChart />
+                ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                     <div className="h-48">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={categoryBreakdown} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                          <Pie
+                            data={categoryBreakdown}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={45}
+                            outerRadius={75}
+                            paddingAngle={2}
+                          >
                             {categoryBreakdown.map((_, i) => (
                               <Cell key={i} fill={COLORS[i % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `฿${v.toFixed(0)}`} />
+                          <Tooltip
+                            contentStyle={tooltipStyle}
+                            formatter={(v: number) => `฿${v.toFixed(0)}`}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -281,7 +377,10 @@ const Reports: React.FC = () => {
                         const pct = stats.expense > 0 ? (c.value / stats.expense) * 100 : 0;
                         return (
                           <li key={c.name} className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                            <span
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                            />
                             <span className="flex-1 truncate text-slate-300">{c.name}</span>
                             <span className="text-slate-500 tabular-nums">{pct.toFixed(0)}%</span>
                           </li>
@@ -297,14 +396,24 @@ const Reports: React.FC = () => {
               {/* Top tags */}
               <div className="bg-[#1e293b] rounded-2xl border border-white/5 p-5">
                 <h2 className="text-sm font-medium text-slate-400 mb-4">Top tags by spend</h2>
-                {topTags.length === 0 ? <EmptyChart /> : (
+                {topTags.length === 0 ? (
+                  <EmptyChart />
+                ) : (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={topTags} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.8} />
                         <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} width={100} />
-                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `฿${v.toFixed(0)}`} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{ fontSize: 11, fill: '#64748b' }}
+                          width={100}
+                        />
+                        <Tooltip
+                          contentStyle={tooltipStyle}
+                          formatter={(v: number) => `฿${v.toFixed(0)}`}
+                        />
                         <Bar dataKey="value" fill="url(#barGradient)" radius={[0, 4, 4, 0]}>
                           <defs>
                             <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
@@ -322,17 +431,23 @@ const Reports: React.FC = () => {
               {/* Top 10 expenses */}
               <div className="bg-[#1e293b] rounded-2xl border border-white/5 p-5">
                 <h2 className="text-sm font-medium text-slate-400 mb-4">Top 10 expenses</h2>
-                {topExpenses.length === 0 ? <EmptyChart /> : (
+                {topExpenses.length === 0 ? (
+                  <EmptyChart />
+                ) : (
                   <ol className="space-y-0">
                     {topExpenses.map((e, i) => (
                       <li
                         key={e.id}
                         className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0"
                       >
-                        <span className="w-5 text-right text-xs text-slate-600 tabular-nums flex-shrink-0">{i + 1}</span>
+                        <span className="w-5 text-right text-xs text-slate-600 tabular-nums flex-shrink-0">
+                          {i + 1}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <div className="truncate text-sm text-white">{e.description}</div>
-                          <div className="text-[11px] text-slate-500">{e.date} · {e.category}</div>
+                          <div className="text-[11px] text-slate-500">
+                            {e.date} · {e.category}
+                          </div>
                         </div>
                         <div className="text-rose-400 tabular-nums text-sm font-medium flex-shrink-0">
                           ฿{e.amount.toFixed(0)}
@@ -365,10 +480,15 @@ const KpiTile: React.FC<{
       <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</span>
       <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">{icon}</div>
     </div>
-    <div className={`text-3xl font-bold tabular-nums ${
-      tone === 'positive' ? 'text-emerald-400' :
-      tone === 'negative' ? 'text-rose-400' : 'text-white'
-    }`}>
+    <div
+      className={`text-3xl font-bold tabular-nums ${
+        tone === 'positive'
+          ? 'text-emerald-400'
+          : tone === 'negative'
+            ? 'text-rose-400'
+            : 'text-white'
+      }`}
+    >
       {value}
     </div>
   </div>

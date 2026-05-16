@@ -12,16 +12,16 @@ interface ToastProps {
 
 const borderColors: Record<ToastType, string> = {
   success: 'border-l-emerald-500',
-  error:   'border-l-rose-500',
+  error: 'border-l-rose-500',
   warning: 'border-l-amber-500',
-  info:    'border-l-cyan-400',
+  info: 'border-l-cyan-400',
 };
 
 const iconColors: Record<ToastType, string> = {
   success: 'text-emerald-400',
-  error:   'text-rose-400',
+  error: 'text-rose-400',
   warning: 'text-amber-400',
-  info:    'text-cyan-400',
+  info: 'text-cyan-400',
 };
 
 const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 5000 }) => {
@@ -32,9 +32,9 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 5000 }
 
   const icons = {
     success: <CheckCircle className="w-5 h-5" />,
-    error:   <XCircle className="w-5 h-5" />,
+    error: <XCircle className="w-5 h-5" />,
     warning: <AlertTriangle className="w-5 h-5" />,
-    info:    <Info className="w-5 h-5" />,
+    info: <Info className="w-5 h-5" />,
   };
 
   return (

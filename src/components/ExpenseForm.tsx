@@ -70,7 +70,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     initialData?.category || ExpenseCategory.OTHER,
   );
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
-  const [attachmentUrl, setAttachmentUrl] = useState<string | undefined>(initialData?.attachmentUrl);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | undefined>(
+    initialData?.attachmentUrl,
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -227,11 +229,15 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white flex items-center gap-3">
-          <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-500
-            flex items-center justify-center shadow-lg shadow-violet-600/20">
-            {isEditing
-              ? <Pencil className="w-4 h-4 text-white" />
-              : <Plus className="w-4 h-4 text-white" />}
+          <span
+            className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-500
+            flex items-center justify-center shadow-lg shadow-violet-600/20"
+          >
+            {isEditing ? (
+              <Pencil className="w-4 h-4 text-white" />
+            ) : (
+              <Plus className="w-4 h-4 text-white" />
+            )}
           </span>
           {isEditing ? 'Edit Transaction' : 'New Transaction'}
         </h2>
@@ -263,38 +269,54 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                 hover:text-violet-300 disabled:opacity-40 transition-colors"
               title="Auto-categorize with AI"
             >
-              {isThinking
-                ? <Loader2 className="w-5 h-5 animate-spin" />
-                : <Sparkles className="w-5 h-5" />}
+              {isThinking ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Sparkles className="w-5 h-5" />
+              )}
             </button>
           </div>
-          {errors.description
-            ? <p id="description-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.description}</p>
-            : !isEditing
-              ? <p className="text-xs text-slate-600 mt-1">Type a description then let AI fill the rest.</p>
-              : null}
+          {errors.description ? (
+            <p id="description-error" role="alert" className="text-xs text-rose-400 mt-1">
+              {errors.description}
+            </p>
+          ) : !isEditing ? (
+            <p className="text-xs text-slate-600 mt-1">
+              Type a description then let AI fill the rest.
+            </p>
+          ) : null}
         </div>
 
         {/* Type Toggle */}
         <div className="flex p-1 bg-white/5 rounded-xl">
           <button
             type="button"
-            onClick={() => { setType('expense'); setCategory(ExpenseCategory.OTHER); }}
+            onClick={() => {
+              setType('expense');
+              setCategory(ExpenseCategory.OTHER);
+            }}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${type === 'expense'
-                ? 'bg-[#1e293b] text-rose-400 shadow-sm'
-                : 'text-slate-500 hover:text-slate-300'}`}
+              ${
+                type === 'expense'
+                  ? 'bg-[#1e293b] text-rose-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
           >
             <TrendingDown className="w-4 h-4" />
             Expense
           </button>
           <button
             type="button"
-            onClick={() => { setType('income'); setCategory(IncomeCategory.OTHER); }}
+            onClick={() => {
+              setType('income');
+              setCategory(IncomeCategory.OTHER);
+            }}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${type === 'income'
-                ? 'bg-[#1e293b] text-emerald-400 shadow-sm'
-                : 'text-slate-500 hover:text-slate-300'}`}
+              ${
+                type === 'income'
+                  ? 'bg-[#1e293b] text-emerald-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
           >
             <TrendingUp className="w-4 h-4" />
             Income
@@ -305,9 +327,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           {/* Amount */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Amount</label>
-            <div className={`flex rounded-xl bg-white/5 overflow-hidden border transition-all
+            <div
+              className={`flex rounded-xl bg-white/5 overflow-hidden border transition-all
               focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20
-              ${errors.amount ? 'border-rose-500' : 'border-white/10'}`}>
+              ${errors.amount ? 'border-rose-500' : 'border-white/10'}`}
+            >
               <input
                 type="number"
                 step="0.01"
@@ -327,24 +351,40 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                   onChange={(e) => setCurrency(e.target.value as 'THB' | 'USD')}
                   className="h-full pl-2 pr-6 bg-transparent text-slate-300 text-sm font-medium outline-none cursor-pointer appearance-none hover:text-white transition-colors"
                 >
-                  <option value="THB" className="bg-[#1e293b]">THB</option>
-                  <option value="USD" className="bg-[#1e293b]">USD</option>
+                  <option value="THB" className="bg-[#1e293b]">
+                    THB
+                  </option>
+                  <option value="USD" className="bg-[#1e293b]">
+                    USD
+                  </option>
                 </select>
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  <svg
+                    className="w-3 h-3 text-slate-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </div>
               </div>
             </div>
-            {errors.amount
-              ? <p id="amount-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.amount}</p>
-              : currency === 'USD' && amount
-                ? <div className="flex items-center gap-1 mt-1 text-xs text-slate-600">
-                    <ArrowRightLeft className="w-3 h-3" />
-                    <span>≈ ฿{(parseFloat(amount) * EXCHANGE_RATE).toLocaleString()}</span>
-                  </div>
-                : null}
+            {errors.amount ? (
+              <p id="amount-error" role="alert" className="text-xs text-rose-400 mt-1">
+                {errors.amount}
+              </p>
+            ) : currency === 'USD' && amount ? (
+              <div className="flex items-center gap-1 mt-1 text-xs text-slate-600">
+                <ArrowRightLeft className="w-3 h-3" />
+                <span>≈ ฿{(parseFloat(amount) * EXCHANGE_RATE).toLocaleString()}</span>
+              </div>
+            ) : null}
           </div>
 
           {/* Date */}
@@ -362,7 +402,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               className={`${inputClass} p-3 [color-scheme:dark] ${errors.date ? 'border-rose-500' : ''}`}
             />
             {errors.date && (
-              <p id="date-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.date}</p>
+              <p id="date-error" role="alert" className="text-xs text-rose-400 mt-1">
+                {errors.date}
+              </p>
             )}
           </div>
         </div>
@@ -378,10 +420,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           >
             {type === 'expense'
               ? Object.values(ExpenseCategory).map((cat) => (
-                  <option key={cat} value={cat} className="bg-[#1e293b]">{cat}</option>
+                  <option key={cat} value={cat} className="bg-[#1e293b]">
+                    {cat}
+                  </option>
                 ))
               : Object.values(IncomeCategory).map((cat) => (
-                  <option key={cat} value={cat} className="bg-[#1e293b]">{cat}</option>
+                  <option key={cat} value={cat} className="bg-[#1e293b]">
+                    {cat}
+                  </option>
                 ))}
           </select>
         </div>
@@ -398,7 +444,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                     bg-violet-500/10 text-violet-300 border border-violet-500/20"
                 >
                   {tag}
-                  <button type="button" onClick={() => removeTag(tag)} className="ml-1.5 hover:text-white transition-colors">×</button>
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="ml-1.5 hover:text-white transition-colors"
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
             </div>
@@ -434,18 +486,24 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
             )}
 
             <label className="flex-1 cursor-pointer">
-              <div className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl transition-all duration-300 ${
-                isAIEnabled
-                  ? 'border-violet-500/50 bg-violet-500/5 text-violet-300 shadow-[0_0_15px_rgba(124,58,237,0.15)]'
-                  : 'border-white/10 hover:border-violet-500/40 bg-white/3 text-slate-500 hover:text-slate-300'
-              }`}>
+              <div
+                className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl transition-all duration-300 ${
+                  isAIEnabled
+                    ? 'border-violet-500/50 bg-violet-500/5 text-violet-300 shadow-[0_0_15px_rgba(124,58,237,0.15)]'
+                    : 'border-white/10 hover:border-violet-500/40 bg-white/3 text-slate-500 hover:text-slate-300'
+                }`}
+              >
                 {isUploading || isAnalyzing ? (
                   <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
                 ) : attachmentUrl ? (
                   <>
                     <button
                       type="button"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleViewAttachment(attachmentUrl); }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleViewAttachment(attachmentUrl);
+                      }}
                       className="p-1 hover:bg-violet-500/10 rounded-full transition-colors z-10"
                       title="View Attachment"
                     >
@@ -455,9 +513,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                   </>
                 ) : (
                   <>
-                    {isAIEnabled
-                      ? <Sparkles className="w-5 h-5 text-violet-400" />
-                      : <Upload className="w-5 h-5" />}
+                    {isAIEnabled ? (
+                      <Sparkles className="w-5 h-5 text-violet-400" />
+                    ) : (
+                      <Upload className="w-5 h-5" />
+                    )}
                     <span className="text-sm">
                       {isAIEnabled ? 'Upload to AI' : 'Upload Receipt'}
                     </span>

@@ -35,9 +35,14 @@ const Transactions: React.FC = () => {
   const updateExpenseMutation = useUpdateExpense();
 
   useEffect(() => {
-    if (isFormOpen) { document.body.style.overflow = 'hidden'; }
-    else { document.body.style.overflow = ''; }
-    return () => { document.body.style.overflow = ''; };
+    if (isFormOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isFormOpen]);
 
   const handleEditClick = (expense: Expense) => {
@@ -66,7 +71,8 @@ const Transactions: React.FC = () => {
       filtered = filtered.filter((exp) => {
         const expDate = new Date(exp.date);
         switch (dateFilter) {
-          case 'today': return expDate >= today;
+          case 'today':
+            return expDate >= today;
           case 'week': {
             const weekAgo = new Date(today);
             weekAgo.setDate(weekAgo.getDate() - 7);
@@ -76,7 +82,8 @@ const Transactions: React.FC = () => {
             const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
             return expDate >= monthStart;
           }
-          default: return true;
+          default:
+            return true;
         }
       });
     }
@@ -118,7 +125,8 @@ const Transactions: React.FC = () => {
     }
   };
 
-  const removeTag = (tagToRemove: string) => setSelectedTags(selectedTags.filter((t) => t !== tagToRemove));
+  const removeTag = (tagToRemove: string) =>
+    setSelectedTags(selectedTags.filter((t) => t !== tagToRemove));
 
   const clearFilters = () => {
     setDateFilter('all');
@@ -126,11 +134,16 @@ const Transactions: React.FC = () => {
     setSelectedTags([]);
   };
 
-  const hasActiveFilters = dateFilter !== 'all' || selectedCategories.length > 0 || selectedTags.length > 0;
-  const activeFilterCount = (dateFilter !== 'all' ? 1 : 0) + selectedCategories.length + selectedTags.length;
+  const hasActiveFilters =
+    dateFilter !== 'all' || selectedCategories.length > 0 || selectedTags.length > 0;
+  const activeFilterCount =
+    (dateFilter !== 'all' ? 1 : 0) + selectedCategories.length + selectedTags.length;
 
   const dateLabels: Record<DateFilter, string> = {
-    all: 'All Time', today: 'Today', week: 'This Week', month: 'This Month',
+    all: 'All Time',
+    today: 'Today',
+    week: 'This Week',
+    month: 'This Month',
   };
 
   return (
@@ -155,7 +168,9 @@ const Transactions: React.FC = () => {
               <Filter className="w-4 h-4" />
               Filters
               {hasActiveFilters && (
-                <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{activeFilterCount}</span>
+                <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                  {activeFilterCount}
+                </span>
               )}
             </button>
           </div>
@@ -207,7 +222,10 @@ const Transactions: React.FC = () => {
 
               {/* Tags */}
               <div>
-                <label htmlFor="tag-filter-input" className="block text-sm font-medium text-slate-300 mb-3">
+                <label
+                  htmlFor="tag-filter-input"
+                  className="block text-sm font-medium text-slate-300 mb-3"
+                >
                   Tags
                 </label>
                 {selectedTags.length > 0 && (
@@ -275,7 +293,10 @@ const Transactions: React.FC = () => {
                   <div className="px-4 py-3 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-300">
                       {new Date(date).toLocaleDateString('en-US', {
-                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
                       })}
                     </h3>
                     <span className="text-xs text-slate-600 tabular-nums">
@@ -316,8 +337,10 @@ const Transactions: React.FC = () => {
                       </div>
 
                       {/* Amount */}
-                      <div className={`text-sm font-semibold flex-shrink-0 tabular-nums
-                        ${transaction.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <div
+                        className={`text-sm font-semibold flex-shrink-0 tabular-nums
+                        ${transaction.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}
+                      >
                         {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
                       </div>
                     </div>
@@ -334,8 +357,10 @@ const Transactions: React.FC = () => {
                 className="absolute inset-0 bg-[#0f172a]/80 backdrop-blur-md"
                 onClick={handleCloseForm}
               />
-              <div className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-2xl
-                bg-[#0f172a] shadow-2xl overflow-y-auto animate-scale-in">
+              <div
+                className="relative w-full max-w-lg h-full md:max-h-[90vh] md:rounded-2xl
+                bg-[#0f172a] shadow-2xl overflow-y-auto animate-scale-in"
+              >
                 <ExpenseForm
                   onSubmit={async (data) => {
                     handleCloseForm();
@@ -350,12 +375,17 @@ const Transactions: React.FC = () => {
                           ...data,
                         });
                       }
-                    } catch { /* toast raised by global handler */ }
+                    } catch {
+                      /* toast raised by global handler */
+                    }
                   }}
                   onCancel={handleCloseForm}
                   onDelete={
                     editingExpense
-                      ? () => { deleteExpense(editingExpense.id); handleCloseForm(); }
+                      ? () => {
+                          deleteExpense(editingExpense.id);
+                          handleCloseForm();
+                        }
                       : undefined
                   }
                   initialData={editingExpense}

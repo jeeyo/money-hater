@@ -120,13 +120,17 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               className={`${inputClass} ${errors.name ? 'border-rose-500' : ''}`}
             />
             {errors.name && (
-              <p id="budget-name-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.name}</p>
+              <p id="budget-name-error" role="alert" className="text-xs text-rose-400 mt-1">
+                {errors.name}
+              </p>
             )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Amount Limit</label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-medium">฿</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+                ฿
+              </span>
               <input
                 type="number"
                 value={amount}
@@ -142,7 +146,9 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               />
             </div>
             {errors.amount && (
-              <p id="budget-amount-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.amount}</p>
+              <p id="budget-amount-error" role="alert" className="text-xs text-rose-400 mt-1">
+                {errors.amount}
+              </p>
             )}
           </div>
         </div>
@@ -165,7 +171,9 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               className={`${inputClass} ${errors.startDate ? 'border-rose-500' : ''}`}
             />
             {errors.startDate && (
-              <p id="budget-start-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.startDate}</p>
+              <p id="budget-start-error" role="alert" className="text-xs text-rose-400 mt-1">
+                {errors.startDate}
+              </p>
             )}
           </div>
           <div>
@@ -185,7 +193,9 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               className={`${inputClass} ${errors.endDate ? 'border-rose-500' : ''}`}
             />
             {errors.endDate && (
-              <p id="budget-end-error" role="alert" className="text-xs text-rose-400 mt-1">{errors.endDate}</p>
+              <p id="budget-end-error" role="alert" className="text-xs text-rose-400 mt-1">
+                {errors.endDate}
+              </p>
             )}
           </div>
         </div>
@@ -201,9 +211,13 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
             className={`${inputClass}`}
             style={{ colorScheme: 'dark' }}
           >
-            <option value="" className="bg-[#1e293b]">All Accounts</option>
+            <option value="" className="bg-[#1e293b]">
+              All Accounts
+            </option>
             {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id} className="bg-[#1e293b]">{acc.name}</option>
+              <option key={acc.id} value={acc.id} className="bg-[#1e293b]">
+                {acc.name}
+              </option>
             ))}
           </select>
           <p className="text-xs text-slate-600 mt-1">Leave empty to track across all accounts.</p>
@@ -245,7 +259,11 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
                   className="bg-white/5 text-slate-300 border border-white/10 px-2.5 py-1 rounded-lg text-sm flex items-center gap-1.5"
                 >
                   #{tag}
-                  <button type="button" onClick={() => removeTag(tag)} className="hover:text-rose-400 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="hover:text-rose-400 transition-colors"
+                  >
                     <X className="w-3 h-3" />
                   </button>
                 </span>

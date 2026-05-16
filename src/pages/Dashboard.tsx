@@ -23,8 +23,14 @@ import {
 import { showToast } from '../lib/toast';
 
 const COLORS = [
-  '#7c3aed', '#6366f1', '#22d3ee', '#10b981',
-  '#f59e0b', '#f43f5e', '#8b5cf6', '#ec4899',
+  '#7c3aed',
+  '#6366f1',
+  '#22d3ee',
+  '#10b981',
+  '#f59e0b',
+  '#f43f5e',
+  '#8b5cf6',
+  '#ec4899',
 ];
 
 function dashboardFromDate(): string {
@@ -64,20 +70,31 @@ const Dashboard: React.FC = () => {
         const parsed: Expense[] = JSON.parse(localData);
         for (const expense of parsed) {
           if (!expense.type) expense.type = 'expense';
-          try { await addExpenseToDB(expense); } catch { /* ignore duplicate */ }
+          try {
+            await addExpenseToDB(expense);
+          } catch {
+            /* ignore duplicate */
+          }
         }
         localStorage.removeItem('smartspend_expenses');
         await invalidateExpenses();
-      } catch (err) { console.error('Failed to migrate local expenses', err); }
+      } catch (err) {
+        console.error('Failed to migrate local expenses', err);
+      }
     })();
   }, [invalidateExpenses]);
 
   const isLoading = isAccountLoading || (selectedAccount && expensesQuery.isLoading);
 
   useEffect(() => {
-    if (isFormOpen) { document.body.style.overflow = 'hidden'; }
-    else { document.body.style.overflow = ''; }
-    return () => { document.body.style.overflow = ''; };
+    if (isFormOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isFormOpen]);
 
   useEffect(() => {
@@ -97,7 +114,11 @@ const Dashboard: React.FC = () => {
     if (editingExpense) {
       const updatedExpense = { ...editingExpense, ...data };
       handleCloseForm();
-      try { await updateExpenseMutation.mutateAsync(updatedExpense); } catch { /* toast handled */ }
+      try {
+        await updateExpenseMutation.mutateAsync(updatedExpense);
+      } catch {
+        /* toast handled */
+      }
       return;
     }
     const newExpense: Expense = {
@@ -119,7 +140,9 @@ const Dashboard: React.FC = () => {
     if (newExpense.type !== 'expense' || !selectedAccount) return;
     try {
       const budgets = await getBudgets();
-      const accountBudgets = budgets.filter((b) => !b.accountId || b.accountId === selectedAccount.id);
+      const accountBudgets = budgets.filter(
+        (b) => !b.accountId || b.accountId === selectedAccount.id,
+      );
       for (const budget of accountBudgets) {
         if (!doesTransactionAffectBudget(newExpense, budget)) continue;
         const previousSpent = budget.spent - newExpense.amount;
@@ -129,7 +152,9 @@ const Dashboard: React.FC = () => {
         const notificationType = getNotificationTypeForThreshold(alert.threshold);
         await addSystemNotification(title, message, notificationType);
       }
-    } catch (err) { console.error('Failed to check budget thresholds', err); }
+    } catch (err) {
+      console.error('Failed to check budget thresholds', err);
+    }
   };
 
   const deleteExpense = (id: string) => deleteExpenseMutation.mutate(id);
@@ -147,8 +172,13 @@ const Dashboard: React.FC = () => {
   const { totalIncome, totalExpense, netBalance } = useMemo(() => {
     return expenses.reduce(
       (acc, item) => {
-        if (item.type === 'income') { acc.totalIncome += item.amount; acc.netBalance += item.amount; }
-        else { acc.totalExpense += item.amount; acc.netBalance -= item.amount; }
+        if (item.type === 'income') {
+          acc.totalIncome += item.amount;
+          acc.netBalance += item.amount;
+        } else {
+          acc.totalExpense += item.amount;
+          acc.netBalance -= item.amount;
+        }
         return acc;
       },
       { totalIncome: 0, totalExpense: 0, netBalance: 0 },
@@ -165,18 +195,23 @@ const Dashboard: React.FC = () => {
         const [year, month] = e.date.split('-').map(Number);
         return year === currentYear && month === currentMonth;
       })
-      .reduce((acc, e) => {
-        if (e.type === 'income') acc.income += e.amount;
-        else acc.expense += e.amount;
-        return acc;
-      }, { income: 0, expense: 0 });
+      .reduce(
+        (acc, e) => {
+          if (e.type === 'income') acc.income += e.amount;
+          else acc.expense += e.amount;
+          return acc;
+        },
+        { income: 0, expense: 0 },
+      );
   }, [expenses]);
 
   const categoryData = useMemo(() => {
     const map = new Map<string, number>();
-    expenses.filter((e) => e.type !== 'income').forEach((exp) => {
-      map.set(exp.category, (map.get(exp.category) || 0) + exp.amount);
-    });
+    expenses
+      .filter((e) => e.type !== 'income')
+      .forEach((exp) => {
+        map.set(exp.category, (map.get(exp.category) || 0) + exp.amount);
+      });
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
@@ -230,7 +265,6 @@ const Dashboard: React.FC = () => {
         <div className="pb-16 animate-fade-in-up">
           {/* Top Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-
             {/* Hero — Net Balance */}
             <div className="bg-gradient-to-br from-[#1e293b] to-[#0f172a] rounded-2xl border border-white/5 p-5 shadow-lg">
               <div className="flex items-center gap-2 text-slate-400 text-xs font-medium mb-3 uppercase tracking-wider">
@@ -238,7 +272,8 @@ const Dashboard: React.FC = () => {
                 Net Balance
               </div>
               <div className="text-4xl font-bold mb-2 text-white tabular-nums">
-                <span className="gradient-text">฿</span>{netBalance.toFixed(2)}
+                <span className="gradient-text">฿</span>
+                {netBalance.toFixed(2)}
               </div>
               <div className="flex items-center gap-4 text-xs mb-4">
                 <span className="flex items-center gap-1 text-emerald-400">
@@ -253,8 +288,20 @@ const Dashboard: React.FC = () => {
               <div className="h-20 -mx-1">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                    <Line
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="expense"
+                      stroke="#f43f5e"
+                      strokeWidth={2}
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -263,19 +310,29 @@ const Dashboard: React.FC = () => {
             {/* Spending by Category */}
             <div className="bg-[#1e293b] rounded-2xl border border-white/5 p-5">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Spending by Category</span>
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  Spending by Category
+                </span>
               </div>
               <div className="flex items-center justify-center mb-4">
                 <div className="w-32 h-32">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]}
-                        cx="50%" cy="50%"
-                        innerRadius={35} outerRadius={55}
-                        paddingAngle={3} dataKey="value"
+                        data={
+                          categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]
+                        }
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={55}
+                        paddingAngle={3}
+                        dataKey="value"
                       >
-                        {(categoryData.length > 0 ? categoryData : [{ name: 'No data', value: 1 }]).map((_, index) => (
+                        {(categoryData.length > 0
+                          ? categoryData
+                          : [{ name: 'No data', value: 1 }]
+                        ).map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -287,10 +344,16 @@ const Dashboard: React.FC = () => {
                 {categoryData.slice(0, 3).map((cat, idx) => (
                   <div key={cat.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }} aria-hidden="true" />
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: COLORS[idx] }}
+                        aria-hidden="true"
+                      />
                       <span className="text-slate-400 text-xs">{cat.name}</span>
                     </div>
-                    <span className="text-white text-xs tabular-nums font-medium">฿{cat.value.toFixed(0)}</span>
+                    <span className="text-white text-xs tabular-nums font-medium">
+                      ฿{cat.value.toFixed(0)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -299,7 +362,9 @@ const Dashboard: React.FC = () => {
             {/* This Month */}
             <div className="bg-[#1e293b] rounded-2xl border border-white/5 p-5">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">This Month</span>
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  This Month
+                </span>
               </div>
               <div className="space-y-5">
                 <div>
@@ -343,10 +408,18 @@ const Dashboard: React.FC = () => {
                   </colgroup>
                   <thead className="bg-white/[0.03]">
                     <tr>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-slate-500"><span className="sr-only">Icon</span></th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Description</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-slate-500">
+                        <span className="sr-only">Icon</span>
+                      </th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -357,19 +430,31 @@ const Dashboard: React.FC = () => {
                         onClick={() => handleEditClick(transaction)}
                       >
                         <td className="px-5 py-3.5 text-sm text-slate-400 whitespace-nowrap">
-                          {new Date(transaction.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                          {new Date(transaction.date).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                          })}
                         </td>
                         <td className="px-5 py-3.5">
-                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center" aria-hidden="true">
+                          <div
+                            className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"
+                            aria-hidden="true"
+                          >
                             {getCategoryIcon(transaction.category)}
                           </div>
                         </td>
-                        <td className="px-5 py-3.5 text-sm text-slate-300 truncate" title={transaction.description}>
+                        <td
+                          className="px-5 py-3.5 text-sm text-slate-300 truncate"
+                          title={transaction.description}
+                        >
                           {transaction.description}
                         </td>
-                        <td className={`px-5 py-3.5 text-sm font-semibold text-right whitespace-nowrap tabular-nums
-                          ${transaction.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {transaction.type === 'income' ? '+' : '-'}฿{transaction.amount.toFixed(2)}
+                        <td
+                          className={`px-5 py-3.5 text-sm font-semibold text-right whitespace-nowrap tabular-nums
+                          ${transaction.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}
+                        >
+                          {transaction.type === 'income' ? '+' : '-'}฿
+                          {transaction.amount.toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -382,7 +467,10 @@ const Dashboard: React.FC = () => {
           {/* Floating Action Button */}
           <button
             type="button"
-            onClick={() => { setEditingExpense(null); setIsFormOpen(true); }}
+            onClick={() => {
+              setEditingExpense(null);
+              setIsFormOpen(true);
+            }}
             aria-label="Add new transaction"
             className="fixed bottom-20 right-6 md:bottom-6
               bg-gradient-to-br from-violet-600 to-indigo-500
@@ -411,7 +499,14 @@ const Dashboard: React.FC = () => {
                 <ExpenseForm
                   onSubmit={handleSaveExpense}
                   onCancel={handleCloseForm}
-                  onDelete={editingExpense ? () => { deleteExpense(editingExpense.id); handleCloseForm(); } : undefined}
+                  onDelete={
+                    editingExpense
+                      ? () => {
+                          deleteExpense(editingExpense.id);
+                          handleCloseForm();
+                        }
+                      : undefined
+                  }
                   initialData={editingExpense}
                   initialFile={sharedFile}
                 />
