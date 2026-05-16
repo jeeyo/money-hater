@@ -26,8 +26,8 @@ const BudgetDetails = lazy(() => import('./pages/BudgetDetails'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 const FullPageSpinner: React.FC = () => (
-  <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+  <div className="flex items-center justify-center min-h-screen bg-[#0f172a]">
+    <div className="rounded-full h-12 w-12 border-2 border-violet-500/20 border-t-violet-500 animate-spin" />
   </div>
 );
 

@@ -11,7 +11,7 @@ const ToastContainer: React.FC = () => {
 
   return (
     <div
-      className="fixed top-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"
+      className="fixed bottom-20 right-4 md:bottom-4 z-[60] flex flex-col gap-2 pointer-events-none"
       role="region"
       aria-live="polite"
       aria-label="Notifications"

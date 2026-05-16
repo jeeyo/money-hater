@@ -8,6 +8,7 @@ import { NotificationPanel } from './NotificationPanel';
 
 interface HeaderProps {
   onMenuClick: () => void;
+  isSidebarCollapsed?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
@@ -21,13 +22,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return (
-        localStorage.getItem('theme') === 'dark' ||
-        (!localStorage.getItem('theme') &&
-          window.matchMedia('(prefers-color-scheme: dark)').matches)
-      );
+      const stored = localStorage.getItem('theme');
+      if (stored) return stored === 'dark';
+      return true; // dark-first default
     }
-    return false;
+    return true;
   });
 
   useEffect(() => {
@@ -48,38 +47,33 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   };
 
   const toggleNotifications = useCallback(() => {
-    if (!showNotificationPanel) {
-      setShowAccountMenu(false);
-    }
+    if (!showNotificationPanel) setShowAccountMenu(false);
     setShowNotificationPanel(!showNotificationPanel);
   }, [showNotificationPanel]);
 
   const toggleAccountMenu = useCallback(() => {
-    if (!showAccountMenu) {
-      setShowNotificationPanel(false);
-    }
+    if (!showAccountMenu) setShowNotificationPanel(false);
     setShowAccountMenu(!showAccountMenu);
   }, [showAccountMenu]);
 
+  const initial = (user?.name?.[0] || user?.username?.[0] || 'U').toUpperCase();
+
   return (
-    <header className="h-14 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 sticky top-0 z-30">
-      <div className="flex items-center gap-4 flex-1">
+    <header className="h-14 bg-[#1e293b]/80 dark:bg-[#1e293b]/80 backdrop-blur-xl
+      border-b border-white/5 flex items-center justify-between px-4 sticky top-0 z-30">
+
+      <div className="flex items-center gap-3 flex-1">
+        {/* Mobile menu button */}
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          className="md:hidden p-2 hover:bg-white/10 rounded-xl transition-colors"
+          aria-label="Open menu"
         >
-          <Menu className="w-5 h-5 text-slate-700 dark:text-white" />
+          <Menu className="w-5 h-5 text-slate-300" />
         </button>
 
-        {/* Search */}
-        {/* <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          />
-        </div> */}
+        {/* Mobile app name */}
+        <span className="gradient-text font-bold text-base md:hidden">Money Hater</span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -87,20 +81,23 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         <div className="relative">
           <button
             onClick={toggleAccountMenu}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5
+              bg-white/5 border border-white/10 rounded-full
+              hover:bg-white/10 transition-all text-sm font-medium text-slate-300"
           >
-            <Wallet className="w-4 h-4 text-indigo-500" />
-            <span className="text-sm font-medium text-slate-900 dark:text-white hidden sm:inline-block">
+            <Wallet className="w-4 h-4 text-violet-400" />
+            <span className="hidden sm:inline-block max-w-[120px] truncate">
               {selectedAccount?.name || 'Select Account'}
             </span>
-            <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
           </button>
 
           {showAccountMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)}></div>
-              <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
-                <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)} />
+              <div className="absolute top-full right-0 mt-2 w-56 rounded-2xl shadow-2xl border border-white/10
+                bg-[#1e293b] z-50 overflow-hidden animate-slide-down">
+                <div className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-white/5">
                   Switch Account
                 </div>
                 {accounts.map((account) => (
@@ -110,44 +107,43 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                       selectAccount(account);
                       setShowAccountMenu(false);
                     }}
-                    className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${
-                      selectedAccount?.id === account.id
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                    }`}
+                    className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors
+                      ${selectedAccount?.id === account.id
+                        ? 'bg-violet-500/10 text-violet-300'
+                        : 'text-slate-300 hover:bg-white/5'
+                      }`}
                   >
                     <span>{account.name}</span>
                     {selectedAccount?.id === account.id && (
-                      <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-violet-400" />
                     )}
                   </button>
                 ))}
-                <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
-                <button
-                  onClick={() => {
-                    navigate('/accounts');
-                    setShowAccountMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4" />
-                  Manage Accounts
-                </button>
+                <div className="border-t border-white/5">
+                  <button
+                    onClick={() => { navigate('/accounts'); setShowAccountMenu(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-slate-400 hover:bg-white/5 flex items-center gap-2 transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Manage Accounts
+                  </button>
+                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Notification */}
+        {/* Notification bell */}
         <div className="relative">
           <button
             ref={notificationButtonRef}
             onClick={toggleNotifications}
-            className="relative p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="relative p-2 hover:bg-white/10 rounded-xl transition-colors"
+            aria-label="Notifications"
           >
-            <Bell className="w-5 h-5 text-slate-700 dark:text-white" />
+            <Bell className="w-5 h-5 text-slate-300" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
             )}
           </button>
           {showNotificationPanel && (
@@ -158,32 +154,37 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           )}
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg">
-          <div className="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-xs font-semibold text-white">
-            {user?.name?.[0] || user?.username?.[0] || 'T'}
+        {/* User chip */}
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5
+          bg-white/5 border border-white/10 rounded-full">
+          <div className="w-6 h-6 bg-gradient-to-br from-violet-500 to-indigo-500
+            rounded-full ring-2 ring-violet-500/30 flex items-center justify-center
+            text-xs font-semibold text-white">
+            {initial}
           </div>
-          <span className="text-sm font-medium text-slate-900 dark:text-white">
-            {user?.name || user?.username || 'Test User'}
+          <span className="text-sm font-medium text-slate-300 max-w-[100px] truncate">
+            {user?.name || user?.username || 'User'}
           </span>
         </div>
 
+        {/* Dark mode toggle */}
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+          aria-label="Toggle theme"
         >
-          {darkMode ? (
-            <Sun className="w-5 h-5 text-white" />
-          ) : (
-            <Moon className="w-5 h-5 text-slate-700" />
-          )}
+          {darkMode
+            ? <Sun className="w-5 h-5 text-slate-300" />
+            : <Moon className="w-5 h-5 text-slate-700" />}
         </button>
 
+        {/* Logout */}
         <button
           onClick={handleLogout}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          className="p-2 hover:bg-white/10 rounded-xl transition-colors"
           title="Logout"
         >
-          <LogOut className="w-5 h-5 text-slate-700 dark:text-white" />
+          <LogOut className="w-5 h-5 text-slate-400 hover:text-rose-400 transition-colors" />
         </button>
       </div>
     </header>
