@@ -18,6 +18,9 @@ interface BudgetFormProps {
 
 const CATEGORIES = Object.values(ExpenseCategory);
 
+const inputClass =
+  'w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 outline-none transition-all focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 [color-scheme:dark]';
+
 const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel }) => {
   const { accounts } = useAccount();
   const [name, setName] = useState(initialData?.name || '');
@@ -43,7 +46,6 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const candidate = {
       name,
       amount: parseFloat(amount),
@@ -53,13 +55,11 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
       tags,
       accountId: selectedAccount || undefined,
     };
-
     const result = budgetFormSchema.safeParse(candidate);
     if (!result.success) {
       setErrors(flattenErrors<BudgetFormValues>(result.error));
       return;
     }
-
     setErrors({});
     setIsSubmitting(true);
     try {
@@ -86,32 +86,27 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
   const addTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && tagInput.trim()) {
       e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
-      }
+      if (!tags.includes(tagInput.trim())) setTags([...tags, tagInput.trim()]);
       setTagInput('');
     }
   };
 
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter((tag) => tag !== tagToRemove));
-  };
+  const removeTag = (tagToRemove: string) => setTags(tags.filter((tag) => tag !== tagToRemove));
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-full md:max-h-[90vh]">
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+    <div className="bg-[#0f172a] rounded-none md:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full md:max-h-[90vh]">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/3 sticky top-0 z-10">
+        <h2 className="text-xl font-bold gradient-text">
           {initialData ? 'Edit Budget' : 'Create Budget'}
         </h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-        {/* Name and Amount */}
+      <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
+        {/* Name + Amount */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Budget Name
-            </label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Budget Name</label>
             <input
               type="text"
               value={name}
@@ -122,22 +117,20 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               placeholder="e.g., Monthly Groceries"
               aria-invalid={!!errors.name}
               aria-describedby={errors.name ? 'budget-name-error' : undefined}
-              className={`w-full bg-white dark:bg-slate-700 border rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${
-                errors.name ? 'border-rose-500' : 'border-slate-300 dark:border-slate-600'
-              }`}
+              className={`${inputClass} ${errors.name ? 'border-rose-500' : ''}`}
             />
             {errors.name && (
-              <p id="budget-name-error" role="alert" className="text-xs text-rose-500 mt-1">
+              <p id="budget-name-error" role="alert" className="text-xs text-rose-400 mt-1">
                 {errors.name}
               </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Amount Limit
-            </label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Amount Limit</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">฿</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+                ฿
+              </span>
               <input
                 type="number"
                 value={amount}
@@ -149,13 +142,11 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
                 step="0.01"
                 aria-invalid={!!errors.amount}
                 aria-describedby={errors.amount ? 'budget-amount-error' : undefined}
-                className={`w-full bg-white dark:bg-slate-700 border rounded-lg pl-8 pr-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${
-                  errors.amount ? 'border-rose-500' : 'border-slate-300 dark:border-slate-600'
-                }`}
+                className={`${inputClass} pl-8 ${errors.amount ? 'border-rose-500' : ''}`}
               />
             </div>
             {errors.amount && (
-              <p id="budget-amount-error" role="alert" className="text-xs text-rose-500 mt-1">
+              <p id="budget-amount-error" role="alert" className="text-xs text-rose-400 mt-1">
                 {errors.amount}
               </p>
             )}
@@ -165,8 +156,8 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
         {/* Date Range */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-              <Calendar className="w-4 h-4 text-slate-400" /> Start Date
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-300 mb-1.5">
+              <Calendar className="w-4 h-4 text-slate-500" /> Start Date
             </label>
             <input
               type="date"
@@ -177,19 +168,17 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               }}
               aria-invalid={!!errors.startDate}
               aria-describedby={errors.startDate ? 'budget-start-error' : undefined}
-              className={`w-full bg-white dark:bg-slate-700 border rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none ${
-                errors.startDate ? 'border-rose-500' : 'border-slate-300 dark:border-slate-600'
-              }`}
+              className={`${inputClass} ${errors.startDate ? 'border-rose-500' : ''}`}
             />
             {errors.startDate && (
-              <p id="budget-start-error" role="alert" className="text-xs text-rose-500 mt-1">
+              <p id="budget-start-error" role="alert" className="text-xs text-rose-400 mt-1">
                 {errors.startDate}
               </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-              <Calendar className="w-4 h-4 text-slate-400" /> End Date
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-300 mb-1.5">
+              <Calendar className="w-4 h-4 text-slate-500" /> End Date
             </label>
             <input
               type="date"
@@ -201,44 +190,43 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
               min={startDate}
               aria-invalid={!!errors.endDate}
               aria-describedby={errors.endDate ? 'budget-end-error' : undefined}
-              className={`w-full bg-white dark:bg-slate-700 border rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none ${
-                errors.endDate ? 'border-rose-500' : 'border-slate-300 dark:border-slate-600'
-              }`}
+              className={`${inputClass} ${errors.endDate ? 'border-rose-500' : ''}`}
             />
             {errors.endDate && (
-              <p id="budget-end-error" role="alert" className="text-xs text-rose-500 mt-1">
+              <p id="budget-end-error" role="alert" className="text-xs text-rose-400 mt-1">
                 {errors.endDate}
               </p>
             )}
           </div>
         </div>
 
-        {/* Account Selection */}
+        {/* Account */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-            <Wallet className="w-4 h-4 text-slate-400" /> Account
+          <label className="flex items-center gap-1.5 text-sm font-medium text-slate-300 mb-1.5">
+            <Wallet className="w-4 h-4 text-slate-500" /> Account
           </label>
           <select
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
-            className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+            className={`${inputClass}`}
+            style={{ colorScheme: 'dark' }}
           >
-            <option value="">All Accounts</option>
+            <option value="" className="bg-[#1e293b]">
+              All Accounts
+            </option>
             {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
+              <option key={acc.id} value={acc.id} className="bg-[#1e293b]">
                 {acc.name}
               </option>
             ))}
           </select>
-          <p className="text-xs text-slate-500 mt-1">
-            Select an account to track or leave empty for all accounts.
-          </p>
+          <p className="text-xs text-slate-600 mt-1">Leave empty to track across all accounts.</p>
         </div>
 
         {/* Categories */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1">
-            <Layers className="w-4 h-4 text-slate-400" /> Categories (Optional)
+          <label className="flex items-center gap-1.5 text-sm font-medium text-slate-300 mb-2">
+            <Layers className="w-4 h-4 text-slate-500" /> Categories (Optional)
           </label>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
@@ -246,10 +234,10 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
                 key={cat}
                 type="button"
                 onClick={() => toggleCategory(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
                   selectedCategories.includes(cat)
-                    ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/50 dark:border-indigo-700 dark:text-indigo-300'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                    : 'bg-white/3 border-white/10 text-slate-400 hover:bg-white/8 hover:text-slate-200'
                 }`}
               >
                 {cat}
@@ -260,38 +248,45 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
 
         {/* Tags */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-            <Tag className="w-4 h-4 text-slate-400" /> Tags (Optional)
+          <label className="flex items-center gap-1.5 text-sm font-medium text-slate-300 mb-1.5">
+            <Tag className="w-4 h-4 text-slate-500" /> Tags (Optional)
           </label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded-md text-sm flex items-center gap-1"
-              >
-                #{tag}
-                <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="bg-white/5 text-slate-300 border border-white/10 px-2.5 py-1 rounded-lg text-sm flex items-center gap-1.5"
+                >
+                  #{tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="hover:text-rose-400 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <input
             type="text"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={addTag}
             placeholder="Type tag and press Enter"
-            className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+            className={inputClass}
           />
         </div>
       </form>
 
-      <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3 sticky bottom-0">
+      {/* Footer */}
+      <div className="p-5 border-t border-white/5 bg-[#0f172a] flex justify-end gap-3 sticky bottom-0">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
+          className="px-4 py-2.5 text-slate-400 hover:bg-white/5 rounded-xl transition-colors font-medium"
         >
           Cancel
         </button>
@@ -299,7 +294,11 @@ const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSubmit, onCancel
           type="submit"
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md shadow-indigo-600/20 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-6 py-2.5 rounded-xl font-semibold text-white
+            bg-gradient-to-r from-violet-600 to-indigo-500
+            hover:from-violet-500 hover:to-indigo-400
+            shadow-lg shadow-violet-600/20 transition-all
+            disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isSubmitting ? (
             <>

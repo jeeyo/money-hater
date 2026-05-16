@@ -49,6 +49,9 @@ interface ExpenseFormProps {
 
 const EXCHANGE_RATE = 34; // 1 USD = 34 THB
 
+const inputClass =
+  'w-full bg-white/5 border border-white/10 text-white rounded-xl outline-none transition-all placeholder-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20';
+
 const ExpenseForm: React.FC<ExpenseFormProps> = ({
   onSubmit,
   onCancel,
@@ -79,65 +82,41 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const isEditing = !!initialData;
   const descriptionInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus description on mount when creating a new entry. Avoids the
-  // jsx-a11y/no-autofocus rule by triggering imperatively after mount.
   useEffect(() => {
-    if (!isEditing) {
-      descriptionInputRef.current?.focus();
-    }
+    if (!isEditing) descriptionInputRef.current?.focus();
   }, [isEditing]);
 
-  // Process shared file on mount
   useEffect(() => {
-    if (initialFile) {
-      handleAnalyzeFile(initialFile);
-    }
+    if (initialFile) handleAnalyzeFile(initialFile);
   }, [initialFile]);
 
   const handleAutoClassify = useCallback(async () => {
     if (!description) return;
-
     setIsThinking(true);
     const amountNum = parseFloat(amount);
-    // Pass the amount to AI, but it doesn't strictly rely on currency for categorization
     const result: AIClassificationResult | null = await classifyExpense(
       description,
       isNaN(amountNum) ? undefined : amountNum,
     );
-
     if (result) {
       if (result.type) setType(result.type);
       setCategory(result.category);
       setTags(result.tags);
-      // If user hasn't entered an amount and AI predicted one, use it
-      if (!amount && result.predictedAmount) {
-        setAmount(result.predictedAmount.toString());
-      }
+      if (!amount && result.predictedAmount) setAmount(result.predictedAmount.toString());
     }
     setIsThinking(false);
   }, [description, amount]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     const rawAmount = parseFloat(amount);
     const finalAmount = currency === 'USD' ? rawAmount * EXCHANGE_RATE : rawAmount;
-
-    const candidate = {
-      description,
-      amount: finalAmount,
-      date,
-      type,
-      category,
-      tags,
-    };
-
+    const candidate = { description, amount: finalAmount, date, type, category, tags };
     const result = expenseFormSchema.safeParse(candidate);
     if (!result.success) {
       setErrors(flattenErrors<ExpenseFormValues>(result.error));
       return;
     }
-
     setErrors({});
     onSubmit({
       description: result.data.description,
@@ -148,8 +127,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       tags: result.data.tags,
       attachmentUrl,
     });
-
-    // If not handling close in parent immediately, reset form
     if (!isEditing) {
       setDescription('');
       setAmount('');
@@ -172,30 +149,22 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     }
   };
 
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter((t) => t !== tagToRemove));
-  };
+  const removeTag = (tagToRemove: string) => setTags(tags.filter((t) => t !== tagToRemove));
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
-
     try {
       const token = localStorage.getItem('token');
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
       if (!res.ok) throw new Error('Upload failed');
-
       const data = await res.json();
       setAttachmentUrl(data.key);
     } catch (err) {
@@ -206,33 +175,24 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     }
   };
 
-  // Analyze a file (shared or uploaded)
   const handleAnalyzeFile = async (file: File) => {
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       showToast('Please upload an image file', 'warning');
       return;
     }
-
     setIsAnalyzing(true);
     try {
       const data = await analyzeReceipt(file);
-
-      // Auto-fill form with extracted data
       if (data.description) setDescription(data.description);
       if (data.amount) setAmount(data.amount.toString());
       if (data.date) setDate(data.date);
       if (data.category) setCategory(data.category);
       if (data.tags && data.tags.length > 0) setTags(data.tags);
       if (data.attachmentUrl) setAttachmentUrl(data.attachmentUrl);
-
-      // Show success message with extracted details
       const amountText = data.amount ? `฿${data.amount.toLocaleString()}` : '';
       const categoryText = data.category || '';
       const details = [amountText, categoryText].filter(Boolean).join(' • ');
-      const message = details ? `Receipt analyzed: ${details}` : 'Receipt analyzed successfully!';
-
-      showToast(message, 'success');
+      showToast(details ? `Receipt analyzed: ${details}` : 'Receipt analyzed!', 'success');
     } catch (err: unknown) {
       console.error('Receipt analysis error:', err);
       const msg = err instanceof Error ? err.message : 'Failed to analyze receipt';
@@ -245,10 +205,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const handleAnalyzeReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     await handleAnalyzeFile(file);
-
-    // Reset the input so the same file can be selected again
     e.target.value = '';
   };
 
@@ -256,14 +213,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/attachments/${encodeURIComponent(key)}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch attachment');
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      window.open(window.URL.createObjectURL(blob), '_blank');
     } catch (err) {
       console.error('Error viewing attachment:', err);
       showToast('Failed to view attachment', 'error');
@@ -271,26 +225,28 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white dark:bg-slate-800 p-6 h-full flex flex-col transition-colors"
-    >
+    <form onSubmit={handleSubmit} className="bg-[#0f172a] p-6 h-full flex flex-col">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          {isEditing ? (
-            <Pencil className="w-5 h-5 text-indigo-600" />
-          ) : (
-            <Plus className="w-5 h-5 text-indigo-600" />
-          )}
-          {isEditing ? 'Edit Expense' : 'New Expense'}
+        <h2 className="text-xl font-bold text-white flex items-center gap-3">
+          <span
+            className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-500
+            flex items-center justify-center shadow-lg shadow-violet-600/20"
+          >
+            {isEditing ? (
+              <Pencil className="w-4 h-4 text-white" />
+            ) : (
+              <Plus className="w-4 h-4 text-white" />
+            )}
+          </span>
+          {isEditing ? 'Edit Transaction' : 'New Transaction'}
         </h2>
       </div>
 
-      <div className="space-y-5 flex-1">
+      <div className="space-y-5 flex-1 overflow-y-auto">
+        {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Description
-          </label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
           <div className="relative">
             <input
               ref={descriptionInputRef}
@@ -303,15 +259,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               placeholder="e.g., Starbucks Coffee"
               aria-invalid={!!errors.description}
               aria-describedby={errors.description ? 'description-error' : undefined}
-              className={`w-full p-3 pr-10 bg-slate-800 dark:bg-slate-900 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder-slate-400 border ${
-                errors.description ? 'border-rose-500' : 'border-transparent'
-              }`}
+              className={`${inputClass} p-3 pr-10 ${errors.description ? 'border-rose-500' : ''}`}
             />
             <button
               type="button"
               onClick={handleAutoClassify}
               disabled={isThinking || !description}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-indigo-400 hover:text-indigo-300 disabled:opacity-50 transition-colors"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-violet-400
+                hover:text-violet-300 disabled:opacity-40 transition-colors"
               title="Auto-categorize with AI"
             >
               {isThinking ? (
@@ -322,25 +277,30 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </button>
           </div>
           {errors.description ? (
-            <p id="description-error" role="alert" className="text-xs text-rose-500 mt-1">
+            <p id="description-error" role="alert" className="text-xs text-rose-400 mt-1">
               {errors.description}
             </p>
           ) : !isEditing ? (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              Type a description and let AI fill the rest.
+            <p className="text-xs text-slate-600 mt-1">
+              Type a description then let AI fill the rest.
             </p>
           ) : null}
         </div>
 
         {/* Type Toggle */}
-        <div className="flex p-1 bg-slate-100 dark:bg-slate-900/50 rounded-xl">
+        <div className="flex p-1 bg-white/5 rounded-xl">
           <button
             type="button"
             onClick={() => {
               setType('expense');
               setCategory(ExpenseCategory.OTHER);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${type === 'expense' ? 'bg-white dark:bg-slate-700 text-red-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+              ${
+                type === 'expense'
+                  ? 'bg-[#1e293b] text-rose-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
           >
             <TrendingDown className="w-4 h-4" />
             Expense
@@ -351,7 +311,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               setType('income');
               setCategory(IncomeCategory.OTHER);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${type === 'income' ? 'bg-white dark:bg-slate-700 text-green-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+              ${
+                type === 'income'
+                  ? 'bg-[#1e293b] text-emerald-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
           >
             <TrendingUp className="w-4 h-4" />
             Income
@@ -359,14 +324,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
+          {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Amount
-            </label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Amount</label>
             <div
-              className={`flex rounded-xl bg-slate-800 dark:bg-slate-900 overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 transition-colors border ${
-                errors.amount ? 'border-rose-500' : 'border-transparent'
-              }`}
+              className={`flex rounded-xl bg-white/5 overflow-hidden border transition-all
+              focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20
+              ${errors.amount ? 'border-rose-500' : 'border-white/10'}`}
             >
               <input
                 type="number"
@@ -379,21 +343,24 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                 placeholder="0.00"
                 aria-invalid={!!errors.amount}
                 aria-describedby={errors.amount ? 'amount-error' : undefined}
-                className="w-full p-3 bg-slate-800 dark:bg-slate-900 text-white border-none outline-none placeholder-slate-400 min-w-0 transition-colors"
+                className="w-full p-3 bg-transparent text-white border-none outline-none placeholder-slate-500 min-w-0"
               />
-              <div className="relative border-l border-slate-600">
+              <div className="relative border-l border-white/10">
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value as 'THB' | 'USD')}
-                  className="h-full pl-2 pr-6 bg-slate-800 dark:bg-slate-900 text-slate-200 text-sm font-medium outline-none cursor-pointer appearance-none hover:text-white transition-colors"
+                  className="h-full pl-2 pr-6 bg-transparent text-slate-300 text-sm font-medium outline-none cursor-pointer appearance-none hover:text-white transition-colors"
                 >
-                  <option value="THB">THB</option>
-                  <option value="USD">USD</option>
+                  <option value="THB" className="bg-[#1e293b]">
+                    THB
+                  </option>
+                  <option value="USD" className="bg-[#1e293b]">
+                    USD
+                  </option>
                 </select>
-                {/* Custom dropdown arrow because default one is ugly/hidden in some browsers with appearance-none */}
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
                   <svg
-                    className="w-3 h-3 text-slate-400"
+                    className="w-3 h-3 text-slate-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -403,26 +370,26 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                       strokeLinejoin="round"
                       strokeWidth="2"
                       d="M19 9l-7 7-7-7"
-                    ></path>
+                    />
                   </svg>
                 </div>
               </div>
             </div>
             {errors.amount ? (
-              <p id="amount-error" role="alert" className="text-xs text-rose-500 mt-1">
+              <p id="amount-error" role="alert" className="text-xs text-rose-400 mt-1">
                 {errors.amount}
               </p>
             ) : currency === 'USD' && amount ? (
-              <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+              <div className="flex items-center gap-1 mt-1 text-xs text-slate-600">
                 <ArrowRightLeft className="w-3 h-3" />
                 <span>≈ ฿{(parseFloat(amount) * EXCHANGE_RATE).toLocaleString()}</span>
               </div>
             ) : null}
           </div>
+
+          {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Date
-            </label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Date</label>
             <input
               type="date"
               value={date}
@@ -432,77 +399,76 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               }}
               aria-invalid={!!errors.date}
               aria-describedby={errors.date ? 'date-error' : undefined}
-              className={`w-full p-3 bg-slate-800 dark:bg-slate-900 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:dark] transition-colors border ${
-                errors.date ? 'border-rose-500' : 'border-transparent'
-              }`}
+              className={`${inputClass} p-3 [color-scheme:dark] ${errors.date ? 'border-rose-500' : ''}`}
             />
             {errors.date && (
-              <p id="date-error" role="alert" className="text-xs text-rose-500 mt-1">
+              <p id="date-error" role="alert" className="text-xs text-rose-400 mt-1">
                 {errors.date}
               </p>
             )}
           </div>
         </div>
 
+        {/* Category */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Category
-          </label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Category</label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-            className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-slate-700 text-slate-800 dark:text-white transition-colors"
+            className={`${inputClass} p-3`}
+            style={{ colorScheme: 'dark' }}
           >
             {type === 'expense'
               ? Object.values(ExpenseCategory).map((cat) => (
-                  <option key={cat} value={cat}>
+                  <option key={cat} value={cat} className="bg-[#1e293b]">
                     {cat}
                   </option>
                 ))
               : Object.values(IncomeCategory).map((cat) => (
-                  <option key={cat} value={cat}>
+                  <option key={cat} value={cat} className="bg-[#1e293b]">
                     {cat}
                   </option>
                 ))}
           </select>
         </div>
 
+        {/* Tags */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Tags
-          </label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 transition-colors"
-              >
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => removeTag(tag)}
-                  className="ml-1 hover:text-indigo-900"
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Tags</label>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium
+                    bg-violet-500/10 text-violet-300 border border-violet-500/20"
                 >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="ml-1.5 hover:text-white transition-colors"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="relative">
-            <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
             <input
               type="text"
               onKeyDown={handleTagInput}
               placeholder="Add tag & press Enter"
-              className="w-full p-2 pl-9 bg-slate-800 dark:bg-slate-900 text-white border-transparent rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none placeholder-slate-400 transition-colors"
+              className={`${inputClass} p-2.5 pl-9 text-sm`}
             />
           </div>
         </div>
 
+        {/* Attachment */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Attachment
-          </label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">Attachment</label>
           <div className="flex items-center gap-2">
             {!attachmentUrl && (
               <button
@@ -510,25 +476,25 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                 onClick={() => setIsAIEnabled(!isAIEnabled)}
                 className={`p-3 border-2 rounded-xl transition-all duration-300 ${
                   isAIEnabled
-                    ? 'border-indigo-500 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-500 dark:hover:text-indigo-400'
+                    ? 'border-violet-500 bg-violet-500/10 text-violet-400 shadow-[0_0_12px_rgba(124,58,237,0.4)]'
+                    : 'border-white/10 bg-white/5 text-slate-500 hover:border-violet-500/50 hover:text-violet-400'
                 }`}
                 title={isAIEnabled ? 'Disable AI Receipt Reading' : 'Enable AI Receipt Reading'}
               >
-                <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-indigo-400' : ''}`} />
+                <Sparkles className={`w-5 h-5 ${isAIEnabled ? 'fill-violet-400' : ''}`} />
               </button>
             )}
 
-            <label className="flex-1 cursor-pointer group">
+            <label className="flex-1 cursor-pointer">
               <div
                 className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl transition-all duration-300 ${
                   isAIEnabled
-                    ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
-                    : 'border-slate-300 dark:border-slate-600 hover:border-indigo-500 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400'
+                    ? 'border-violet-500/50 bg-violet-500/5 text-violet-300 shadow-[0_0_15px_rgba(124,58,237,0.15)]'
+                    : 'border-white/10 hover:border-violet-500/40 bg-white/3 text-slate-500 hover:text-slate-300'
                 }`}
               >
                 {isUploading || isAnalyzing ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                  <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
                 ) : attachmentUrl ? (
                   <>
                     <button
@@ -538,27 +504,21 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                         e.stopPropagation();
                         handleViewAttachment(attachmentUrl);
                       }}
-                      className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full transition-colors z-10"
+                      className="p-1 hover:bg-violet-500/10 rounded-full transition-colors z-10"
                       title="View Attachment"
                     >
-                      <Paperclip className="w-5 h-5 text-indigo-500" />
+                      <Paperclip className="w-5 h-5 text-violet-400" />
                     </button>
-                    <span className="text-indigo-500 font-medium">View</span>
+                    <span className="text-violet-400 font-medium">View</span>
                   </>
                 ) : (
                   <>
                     {isAIEnabled ? (
-                      <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
+                      <Sparkles className="w-5 h-5 text-violet-400" />
                     ) : (
-                      <Upload className="w-5 h-5 group-hover:text-indigo-500 transition-colors" />
+                      <Upload className="w-5 h-5" />
                     )}
-                    <span
-                      className={
-                        isAIEnabled
-                          ? 'text-indigo-600 dark:text-indigo-400 font-medium'
-                          : 'group-hover:text-indigo-500 transition-colors'
-                      }
-                    >
+                    <span className="text-sm">
                       {isAIEnabled ? 'Upload to AI' : 'Upload Receipt'}
                     </span>
                   </>
@@ -577,7 +537,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               <button
                 type="button"
                 onClick={() => setAttachmentUrl(undefined)}
-                className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                className="p-3 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
                 title="Remove attachment"
               >
                 <X className="w-5 h-5" />
@@ -587,37 +547,42 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         </div>
       </div>
 
+      {/* Footer actions */}
       <div className="flex gap-3 pt-6 pb-2">
         {isEditing && onDelete && (
           <button
             type="button"
             onClick={onDelete}
-            className="px-4 bg-red-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-md shadow-red-200 dark:shadow-none flex items-center justify-center gap-2"
+            className="px-4 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm p-3 rounded-xl
+              hover:bg-rose-500/20 transition-colors flex items-center justify-center"
           >
             <Trash2 className="w-5 h-5" />
           </button>
         )}
-
         <button
           type="submit"
-          className={`w-full bg-indigo-600 text-white text-sm p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2`}
+          className="w-full bg-gradient-to-r from-violet-600 to-indigo-500
+            hover:from-violet-500 hover:to-indigo-400
+            text-white text-sm p-3 rounded-xl font-semibold transition-all
+            shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2"
         >
           {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           {isEditing ? 'Save Changes' : 'Add Transaction'}
         </button>
       </div>
 
-      <div className="flex gap-3 py-2">
-        {onCancel && (
+      {onCancel && (
+        <div className="py-2">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 text-sm p-3 rounded-xl font-semibold hover:bg-slate-100 hover:dark:bg-slate-900 transition-colors flex items-center justify-center gap-2"
+            className="w-full text-sm p-3 rounded-xl font-medium text-slate-400
+              hover:bg-white/5 transition-colors"
           >
             Cancel
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </form>
   );
 };

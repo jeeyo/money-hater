@@ -10,12 +10,23 @@ interface ToastProps {
   duration?: number;
 }
 
+const borderColors: Record<ToastType, string> = {
+  success: 'border-l-emerald-500',
+  error: 'border-l-rose-500',
+  warning: 'border-l-amber-500',
+  info: 'border-l-cyan-400',
+};
+
+const iconColors: Record<ToastType, string> = {
+  success: 'text-emerald-400',
+  error: 'text-rose-400',
+  warning: 'text-amber-400',
+  info: 'text-cyan-400',
+};
+
 const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 5000 }) => {
   useEffect(() => {
-    const timer = setTimeout(() => {
-      onClose();
-    }, duration);
-
+    const timer = setTimeout(() => onClose(), duration);
     return () => clearTimeout(timer);
   }, [duration, onClose]);
 
@@ -26,30 +37,22 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 5000 }
     info: <Info className="w-5 h-5" />,
   };
 
-  const colors = {
-    success:
-      'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200',
-    error:
-      'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
-    warning:
-      'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200',
-    info: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200',
-  };
-
   return (
     <div
       role="status"
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors[type]} animate-slide-in-right max-w-md`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-2xl max-w-md
+        bg-[#1e293b] backdrop-blur-xl border border-white/10 border-l-4
+        ${borderColors[type]} shadow-2xl animate-slide-in-right`}
     >
-      <div className="flex-shrink-0" aria-hidden="true">
+      <div className={`flex-shrink-0 ${iconColors[type]}`} aria-hidden="true">
         {icons[type]}
       </div>
-      <p className="flex-1 text-sm font-medium">{message}</p>
+      <p className="flex-1 text-sm font-medium text-white">{message}</p>
       <button
         type="button"
         onClick={onClose}
         aria-label="Dismiss notification"
-        className="flex-shrink-0 hover:opacity-70 transition-opacity"
+        className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
       >
         <X className="w-4 h-4" />
       </button>
