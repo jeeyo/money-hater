@@ -20,7 +20,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] text-slate-900 dark:text-white">
+    <div className="min-h-screen bg-bg text-slate-100 aurora-bg">
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -28,19 +28,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         onToggleCollapse={handleToggleCollapse}
       />
 
-      {/* Main Content */}
       <div
-        className={`min-h-screen transition-[margin] duration-300 ease-in-out
-          pb-16 md:pb-0
+        className={`relative z-10 min-h-screen transition-[margin] duration-300 ease-in-out
+          pb-24 md:pb-0
           ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-60'}`}
       >
         <Header
           onMenuClick={() => setIsSidebarOpen(true)}
           isSidebarCollapsed={isSidebarCollapsed}
         />
-
-        {/* Page Content */}
-        <main className="p-2 sm:p-4">{children}</main>
+        <main className="p-3 sm:p-4 md:p-5">{children}</main>
       </div>
     </div>
   );
