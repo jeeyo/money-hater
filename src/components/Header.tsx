@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('theme');
       if (stored) return stored === 'dark';
-      return true; // dark-first default
+      return true;
     }
     return true;
   });
@@ -60,47 +60,49 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   return (
     <header
-      className="h-14 bg-[#1e293b]/80 dark:bg-[#1e293b]/80 backdrop-blur-xl
-      border-b border-white/5 flex items-center justify-between px-4 sticky top-0 z-30"
+      className="h-14 bg-surface/80 backdrop-blur-xl
+      border-b border-white/5 flex items-center justify-between px-3 sm:px-4 sticky top-0 z-30"
     >
-      <div className="flex items-center gap-3 flex-1">
-        {/* Mobile menu button */}
+      {/* Subtle top line */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/15 to-transparent" />
+
+      <div className="flex items-center gap-2 flex-1">
         <button
           onClick={onMenuClick}
-          className="md:hidden p-2 hover:bg-white/10 rounded-xl transition-colors"
+          className="md:hidden p-2.5 hover:bg-white/6 rounded-xl transition-colors text-slate-400 hover:text-slate-200"
           aria-label="Open menu"
         >
-          <Menu className="w-5 h-5 text-slate-300" />
+          <Menu className="w-5 h-5" />
         </button>
-
-        {/* Mobile app name */}
-        <span className="gradient-text font-bold text-base md:hidden">Money Hater</span>
+        <span className="gradient-text font-display font-bold text-base md:hidden">Money Hater</span>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         {/* Account Switcher */}
         <div className="relative">
           <button
             onClick={toggleAccountMenu}
-            className="flex items-center gap-2 px-3 py-1.5
-              bg-white/5 border border-white/10 rounded-full
-              hover:bg-white/10 transition-all text-sm font-medium text-slate-300"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5
+              bg-white/4 border border-white/8 rounded-full
+              hover:bg-white/7 hover:border-amber-500/20 transition-all text-sm font-medium text-slate-300"
           >
-            <Wallet className="w-4 h-4 text-violet-400" />
-            <span className="hidden sm:inline-block max-w-[120px] truncate">
-              {selectedAccount?.name || 'Select Account'}
+            <Wallet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="hidden sm:inline-block max-w-[100px] truncate text-xs">
+              {selectedAccount?.name || 'Account'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+            <ChevronDown className="w-3 h-3 text-slate-600 shrink-0" />
           </button>
 
           {showAccountMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)} />
               <div
-                className="absolute top-full right-0 mt-2 w-56 rounded-2xl shadow-2xl border border-white/10
-                bg-[#1e293b] z-50 overflow-hidden animate-slide-down"
+                className="absolute top-full right-0 mt-2 w-52 rounded-2xl shadow-2xl
+                bg-surface-2 border border-white/8 z-50 overflow-hidden animate-slide-down
+                shadow-black/60"
               >
-                <div className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-white/5">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
+                <div className="px-4 py-2.5 text-[10px] font-semibold text-slate-600 uppercase tracking-widest border-b border-white/5">
                   Switch Account
                 </div>
                 {accounts.map((account) => (
@@ -113,13 +115,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors
                       ${
                         selectedAccount?.id === account.id
-                          ? 'bg-violet-500/10 text-violet-300'
-                          : 'text-slate-300 hover:bg-white/5'
+                          ? 'bg-amber-500/8 text-amber-300'
+                          : 'text-slate-300 hover:bg-white/4'
                       }`}
                   >
-                    <span>{account.name}</span>
+                    <span className="text-sm">{account.name}</span>
                     {selectedAccount?.id === account.id && (
-                      <div className="w-2 h-2 rounded-full bg-violet-400" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]" />
                     )}
                   </button>
                 ))}
@@ -129,9 +131,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                       navigate('/accounts');
                       setShowAccountMenu(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-slate-400 hover:bg-white/5 flex items-center gap-2 transition-colors"
+                    className="w-full text-left px-4 py-2.5 text-xs text-slate-500 hover:bg-white/4 flex items-center gap-2 transition-colors hover:text-slate-300"
                   >
-                    <Settings className="w-4 h-4" />
+                    <Settings className="w-3.5 h-3.5" />
                     Manage Accounts
                   </button>
                 </div>
@@ -145,12 +147,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           <button
             ref={notificationButtonRef}
             onClick={toggleNotifications}
-            className="relative p-2 hover:bg-white/10 rounded-xl transition-colors"
+            className="relative p-2.5 hover:bg-white/6 rounded-xl transition-colors text-slate-400 hover:text-slate-200"
             aria-label="Notifications"
           >
-            <Bell className="w-5 h-5 text-slate-300" />
+            <Bell className="w-[18px] h-[18px]" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full shadow-[0_0_6px_rgba(245,158,11,0.8)]" />
             )}
           </button>
           {showNotificationPanel && (
@@ -161,43 +163,38 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           )}
         </div>
 
-        {/* User chip */}
+        {/* User chip - hidden on small mobile */}
         <div
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5
-          bg-white/5 border border-white/10 rounded-full"
+          className="hidden sm:flex items-center gap-2 px-2.5 py-1.5
+          bg-white/4 border border-white/8 rounded-full"
         >
           <div
-            className="w-6 h-6 bg-gradient-to-br from-violet-500 to-indigo-500
-            rounded-full ring-2 ring-violet-500/30 flex items-center justify-center
-            text-xs font-semibold text-white"
+            className="w-5 h-5 rounded-full flex items-center justify-center text-bg text-[10px] font-bold"
+            style={{ background: 'linear-gradient(135deg, #f59e0b, #14b8a6)' }}
           >
             {initial}
           </div>
-          <span className="text-sm font-medium text-slate-300 max-w-[100px] truncate">
+          <span className="text-xs font-medium text-slate-400 max-w-[80px] truncate">
             {user?.name || user?.username || 'User'}
           </span>
         </div>
 
-        {/* Dark mode toggle */}
+        {/* Theme toggle */}
         <button
           onClick={() => setDarkMode(!darkMode)}
-          className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+          className="p-2.5 hover:bg-white/6 rounded-xl transition-colors text-slate-500 hover:text-slate-300"
           aria-label="Toggle theme"
         >
-          {darkMode ? (
-            <Sun className="w-5 h-5 text-slate-300" />
-          ) : (
-            <Moon className="w-5 h-5 text-slate-700" />
-          )}
+          {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+          className="p-2.5 hover:bg-rose-500/10 rounded-xl transition-colors text-slate-600 hover:text-rose-400"
           title="Logout"
         >
-          <LogOut className="w-5 h-5 text-slate-400 hover:text-rose-400 transition-colors" />
+          <LogOut className="w-4 h-4" />
         </button>
       </div>
     </header>
