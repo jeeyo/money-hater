@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { AccountContext, type Account } from './accountContextValue';
+import { apiJson } from '../services/api';
 
 const readStoredAccount = (): Account | null => {
   const raw = localStorage.getItem('selectedAccount');
@@ -13,59 +14,41 @@ const readStoredAccount = (): Account | null => {
 };
 
 export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(readStoredAccount);
   const [isLoading, setIsLoading] = useState(true);
 
-  const createAccount = useCallback(
-    async (data: Partial<Account>) => {
-      const response = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create account');
-      }
-
-      const newAccount = (await response.json()) as Account;
-      setAccounts((prev) => [...prev, newAccount]);
-      return newAccount;
-    },
-    [token],
-  );
+  const createAccount = useCallback(async (data: Partial<Account>) => {
+    const newAccount = await apiJson<Account>('/api/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    setAccounts((prev) => [...prev, newAccount]);
+    return newAccount;
+  }, []);
 
   const fetchAccounts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/accounts', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = (await response.json()) as Account[];
-        setAccounts(data);
+      const data = await apiJson<Account[]>('/api/accounts');
+      setAccounts(data);
 
-        if (data.length > 0) {
-          setSelectedAccount((prev) => {
-            const match = prev ? data.find((a) => a.id === prev.id) : undefined;
-            return match ?? data[0];
+      if (data.length > 0) {
+        setSelectedAccount((prev) => {
+          const match = prev ? data.find((a) => a.id === prev.id) : undefined;
+          return match ?? data[0];
+        });
+      } else {
+        try {
+          const created = await createAccount({
+            name: 'Default',
+            type: 'normal',
+            icon: 'wallet',
           });
-        } else {
-          try {
-            const created = await createAccount({
-              name: 'Default',
-              type: 'normal',
-              icon: 'wallet',
-            });
-            setSelectedAccount(created);
-          } catch (e) {
-            console.error('Failed to create default account', e);
-          }
+          setSelectedAccount(created);
+        } catch (e) {
+          console.error('Failed to create default account', e);
         }
       }
     } catch (error) {
@@ -73,17 +56,17 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setIsLoading(false);
     }
-  }, [token, createAccount]);
+  }, [createAccount]);
 
   useEffect(() => {
-    if (user && token) {
+    if (user) {
       fetchAccounts();
     } else {
       setIsLoading(false);
       setAccounts([]);
       setSelectedAccount(null);
     }
-  }, [user, token, fetchAccounts]);
+  }, [user, fetchAccounts]);
 
   useEffect(() => {
     if (selectedAccount) {
@@ -94,42 +77,20 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [selectedAccount]);
 
   const updateAccount = async (id: string, data: Partial<Account>) => {
-    const response = await fetch(`/api/accounts/${id}`, {
+    const updatedAccount = await apiJson<Account>(`/api/accounts/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to update account');
-    }
-
-    const updatedAccount = (await response.json()) as Account;
     setAccounts((prev) => prev.map((a) => (a.id === id ? updatedAccount : a)));
-
     if (selectedAccount?.id === id) {
       setSelectedAccount(updatedAccount);
     }
-
     return updatedAccount;
   };
 
   const deleteAccount = async (id: string) => {
-    const response = await fetch(`/api/accounts/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) {
-      const error = (await response.json()) as { error?: string };
-      throw new Error(error.error || 'Failed to delete account');
-    }
-
+    await apiJson(`/api/accounts/${id}`, { method: 'DELETE' });
     setAccounts((prev) => prev.filter((a) => a.id !== id));
-
     if (selectedAccount?.id === id) {
       const remaining = accounts.filter((a) => a.id !== id);
       setSelectedAccount(remaining.length > 0 ? remaining[0] : null);

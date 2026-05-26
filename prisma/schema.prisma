@@ -20,10 +20,44 @@ model User {
   accounts Account[]
   budgets  Budget[]
   tags     Tag[]
+  apiTokens ApiToken[]
+  sessions  Session[]
 
   @@index([email])
   @@index([username])
   @@index([resetToken])
+}
+
+model ApiToken {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  tokenHash   String    @unique
+  prefix      String
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique
+  name             String?
+  userAgent        String?
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  revokedAt        DateTime?
+  expiresAt        DateTime
+
+  @@index([userId])
+  @@index([refreshTokenHash])
 }
 
 model Account {

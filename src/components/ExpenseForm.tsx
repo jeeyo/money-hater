@@ -23,6 +23,7 @@ import {
 } from '../types';
 import { classifyExpense } from '../services/geminiService';
 import { analyzeReceipt } from '../services/analysisService';
+import { apiFetch } from '../services/api';
 import { showToast } from '../lib/toast';
 import {
   expenseFormSchema,
@@ -158,12 +159,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+      const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json();
       setAttachmentUrl(data.key);
@@ -211,10 +207,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   const handleViewAttachment = async (key: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/attachments/${encodeURIComponent(key)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/attachments/${encodeURIComponent(key)}`);
       if (!res.ok) throw new Error('Failed to fetch attachment');
       const blob = await res.blob();
       window.open(window.URL.createObjectURL(blob), '_blank');

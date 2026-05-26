@@ -6,14 +6,17 @@
 import { sign, verify } from 'hono/jwt';
 import type { JWTPayload as HonoJWTPayload } from 'hono/utils/jwt/types';
 
-// Default JWT expiration (kept at 7 days for compatibility with existing sessions).
-// Future improvement: shorten access token to ~1h and add refresh tokens.
-const JWT_EXPIRES_IN_MS = 7 * 24 * 60 * 60 * 1000;
+// Short-lived access JWT. Refresh handled out-of-band via the Session table
+// and the refresh-token cookie (see worker/sessions.ts).
+const JWT_EXPIRES_IN_MS = 60 * 60 * 1000; // 1 hour
 
 export interface JWTPayload extends HonoJWTPayload {
   userId?: string;
   email: string;
   username: string;
+  /** Session id; required for all login-issued tokens. Absent only on the
+   *  set-password registration link, which never goes through authMiddleware. */
+  sid?: string;
 }
 
 /**
