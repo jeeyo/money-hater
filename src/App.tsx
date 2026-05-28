@@ -24,6 +24,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Accounts = lazy(() => import('./pages/Accounts'));
 const BudgetDetails = lazy(() => import('./pages/BudgetDetails'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const Assistant = lazy(() => import('./pages/Assistant'));
 
 const FullPageSpinner: React.FC = () => (
   <div className="flex items-center justify-center min-h-screen bg-[#0f172a]">
@@ -112,6 +113,14 @@ const AppRoutes: React.FC = () => {
           element={
             <PrivateRoute>
               <SettingsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/assistant"
+          element={
+            <PrivateRoute>
+              <Assistant />
             </PrivateRoute>
           }
         />

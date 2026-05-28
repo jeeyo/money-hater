@@ -13,6 +13,7 @@ import {
   TrendingDown,
   Upload,
   Paperclip,
+  MapPin,
 } from 'lucide-react';
 import {
   ExpenseCategory,
@@ -41,6 +42,10 @@ interface ExpenseFormProps {
     type: TransactionType;
     tags: string[];
     attachmentUrl?: string;
+    latitude?: number;
+    longitude?: number;
+    placeName?: string;
+    placeId?: string;
   }) => void;
   onCancel?: () => void;
   onDelete?: () => void;
@@ -79,6 +84,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAIEnabled, setIsAIEnabled] = useState(false);
   const [errors, setErrors] = useState<FieldErrors<ExpenseFormValues>>({});
+  const [latitude, setLatitude] = useState<number | undefined>(initialData?.latitude);
+  const [longitude, setLongitude] = useState<number | undefined>(initialData?.longitude);
+  const [placeName, setPlaceName] = useState<string | undefined>(initialData?.placeName);
+  const [placeId, setPlaceId] = useState<string | undefined>(initialData?.placeId);
+  const [useLocation, setUseLocation] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const isEditing = !!initialData;
   const descriptionInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +102,32 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     if (initialFile) handleAnalyzeFile(initialFile);
   }, [initialFile]);
 
+  const toggleLocation = useCallback(() => {
+    if (useLocation) {
+      setUseLocation(false);
+      return;
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      showToast('Location is not available on this device', 'warning');
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLatitude(pos.coords.latitude);
+        setLongitude(pos.coords.longitude);
+        setUseLocation(true);
+        setIsLocating(false);
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+        showToast('Could not get your location', 'warning');
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  }, [useLocation]);
+
   const handleAutoClassify = useCallback(async () => {
     if (!description) return;
     setIsThinking(true);
@@ -98,15 +135,20 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     const result: AIClassificationResult | null = await classifyExpense(
       description,
       isNaN(amountNum) ? undefined : amountNum,
+      useLocation ? { latitude, longitude } : undefined,
     );
     if (result) {
       if (result.type) setType(result.type);
       setCategory(result.category);
       setTags(result.tags);
       if (!amount && result.predictedAmount) setAmount(result.predictedAmount.toString());
+      if (result.merchantName) setPlaceName(result.merchantName);
+      if (result.placeId) setPlaceId(result.placeId);
+      if (typeof result.latitude === 'number') setLatitude(result.latitude);
+      if (typeof result.longitude === 'number') setLongitude(result.longitude);
     }
     setIsThinking(false);
-  }, [description, amount]);
+  }, [description, amount, useLocation, latitude, longitude]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +169,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       category: result.data.category as ExpenseCategory | IncomeCategory,
       tags: result.data.tags,
       attachmentUrl,
+      latitude,
+      longitude,
+      placeName,
+      placeId,
     });
     if (!isEditing) {
       setDescription('');
@@ -136,6 +182,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       setCategory(ExpenseCategory.OTHER);
       setTags([]);
       setAttachmentUrl(undefined);
+      setLatitude(undefined);
+      setLongitude(undefined);
+      setPlaceName(undefined);
+      setPlaceId(undefined);
+      setUseLocation(false);
     }
   };
 
@@ -278,6 +329,46 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               Type a description then let AI fill the rest.
             </p>
           ) : null}
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              type="button"
+              onClick={toggleLocation}
+              disabled={isLocating}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                useLocation
+                  ? 'bg-violet-500/10 text-violet-300 border border-violet-500/20'
+                  : 'bg-white/5 text-slate-500 border border-white/10 hover:text-violet-400'
+              }`}
+              title="Share your location so AI can identify the place"
+            >
+              {isLocating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <MapPin className="w-3.5 h-3.5" />
+              )}
+              {useLocation ? 'Location on' : 'Use location'}
+            </button>
+            {placeName && (
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium
+                  bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 max-w-[60%]"
+              >
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{placeName}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlaceName(undefined);
+                    setPlaceId(undefined);
+                  }}
+                  className="ml-0.5 hover:text-white transition-colors"
+                  aria-label="Clear place"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Type Toggle */}

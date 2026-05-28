@@ -34,6 +34,10 @@ export interface Expense {
   attachmentUrl?: string;
   createdAt: number;
   accountId?: string;
+  latitude?: number;
+  longitude?: number;
+  placeName?: string;
+  placeId?: string;
 }
 
 export interface AIClassificationResult {
@@ -41,6 +45,20 @@ export interface AIClassificationResult {
   category: ExpenseCategory | IncomeCategory;
   tags: string[];
   predictedAmount?: number;
+  merchantName?: string;
+  placeId?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface AssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AssistantResponse {
+  reply: string;
+  toolsUsed?: string[];
 }
 
 export interface User {

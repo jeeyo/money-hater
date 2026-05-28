@@ -83,6 +83,10 @@ model Expense {
   category    String
   tags        String   // legacy JSON cache; normalized join is ExpenseTag
   attachmentUrl String?
+  latitude    Float?
+  longitude   Float?
+  placeName   String?
+  placeId     String?
   createdAt   Float
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -97,6 +101,7 @@ model Expense {
   @@index([accountId])
   @@index([userId, category])
   @@index([userId, accountId, date])
+  @@index([userId, placeName])
 }
 
 model Budget {

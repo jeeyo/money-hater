@@ -87,6 +87,11 @@ const isoDateSchema = z
 
 const tagsSchema = z.array(z.string().trim().min(1).max(40)).max(20).default([]);
 
+const latitudeSchema = z.coerce.number().gte(-90).lte(90).optional().nullable();
+const longitudeSchema = z.coerce.number().gte(-180).lte(180).optional().nullable();
+const placeNameSchema = z.string().trim().max(200).optional().nullable();
+const placeIdSchema = z.string().trim().max(256).optional().nullable();
+
 export const createExpenseSchema = z
   .object({
     description: z.string().trim().min(1).max(500),
@@ -98,6 +103,10 @@ export const createExpenseSchema = z
     attachmentUrl: z.string().max(512).optional().nullable(),
     accountId: z.string().uuid().optional().nullable(),
     createdAt: z.coerce.number().finite().optional(),
+    latitude: latitudeSchema,
+    longitude: longitudeSchema,
+    placeName: placeNameSchema,
+    placeId: placeIdSchema,
     // Allow legacy/extra fields; we ignore the rest of payload.
   })
   .passthrough();
@@ -112,6 +121,10 @@ export const updateExpenseSchema = z
     tags: tagsSchema.optional(),
     attachmentUrl: z.string().max(512).optional().nullable(),
     accountId: z.string().uuid().optional().nullable(),
+    latitude: latitudeSchema,
+    longitude: longitudeSchema,
+    placeName: placeNameSchema,
+    placeId: placeIdSchema,
   })
   .passthrough();
 
@@ -171,5 +184,27 @@ export const classifyExpenseSchema = z
   .object({
     description: z.string().trim().min(1).max(MAX_DESCRIPTION_LENGTH),
     amount: z.coerce.number().finite().optional(),
+    // Optional device GPS captured at entry; lets the agent reverse-geocode the
+    // real coordinates instead of guessing the place from text.
+    latitude: z.coerce.number().gte(-90).lte(90).optional(),
+    longitude: z.coerce.number().gte(-180).lte(180).optional(),
+  })
+  .strict();
+
+// ---------- AI / assistant ----------
+
+export const assistantSchema = z
+  .object({
+    messages: z
+      .array(
+        z
+          .object({
+            role: z.enum(['user', 'assistant']),
+            content: z.string().trim().min(1).max(4000),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(20),
   })
   .strict();

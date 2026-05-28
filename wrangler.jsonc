@@ -29,12 +29,20 @@
       "bucket_name": "money-hater-storage",
     },
   ],
+  // Non-secret config for the agentic LLM. Secrets (LITELLM_API_KEY,
+  // GOOGLE_MAPS_API_KEY, SEARCH_API_KEY) are NOT placed here — set them with
+  // `npx wrangler secret put <NAME>`. For local dev put everything in .dev.vars.
+  "vars": {
+    "LITELLM_BASE_URL": "https://your-litellm-proxy.example.com",
+    "LITELLM_MODEL": "gpt-4o-mini",
+    "SEARCH_API_URL": "https://api.tavily.com/search",
+  },
   // Rate limiting (Cloudflare Workers Rate Limiting API).
   // Uncomment and adjust to enable. The worker code in `worker/index.ts`
   // (rateLimit helper) already consumes a `RATE_LIMITER` binding and gates
-  // /api/auth/login, /api/auth/forgot-password, /api/classify and
-  // /api/analyze-receipt. When the binding is absent the helper short-circuits
-  // to allow, so leaving this commented does not break dev.
+  // /api/auth/login, /api/auth/forgot-password, /api/classify,
+  // /api/analyze-receipt and /api/assistant. When the binding is absent the
+  // helper short-circuits to allow, so leaving this commented does not break dev.
   // "unsafe": {
   // 	"bindings": [
   // 		{

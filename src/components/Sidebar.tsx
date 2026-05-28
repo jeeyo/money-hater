@@ -7,6 +7,7 @@ import {
   BarChart3,
   CreditCard,
   Settings,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const navItems = [
   { path: '/budgets', icon: Wallet, label: 'Budgets' },
   { path: '/reports', icon: BarChart3, label: 'Reports' },
   { path: '/accounts', icon: CreditCard, label: 'Accounts' },
+  { path: '/assistant', icon: Sparkles, label: 'Assistant' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
