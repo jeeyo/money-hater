@@ -50,6 +50,7 @@ export const SetPassword: React.FC = () => {
       const response = await fetch('/api/auth/complete-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ token, password }),
       });
 

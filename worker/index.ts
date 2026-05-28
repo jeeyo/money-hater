@@ -14,7 +14,7 @@ import {
   verifyTurnstile,
   verifyToken,
 } from './auth';
-import { authMiddleware, getAuthUser } from './middleware';
+import { authMiddleware, jwtOnly, getAuthUser } from './middleware';
 import { sendPasswordResetEmail } from './email';
 import { getPrisma } from './db';
 import {
@@ -36,7 +36,16 @@ import {
 } from './validation';
 import accounts from './accounts';
 import budgets from './budgets';
+import apiTokens from './api-tokens';
 import { syncExpenseTags } from './tags';
+import {
+  createSession,
+  rotateRefreshToken,
+  revokeSession,
+  revokeAllSessions,
+  gcSessions,
+} from './sessions';
+import { setAuthCookies, clearAuthCookies, readRefreshCookie } from './cookies';
 
 type Bindings = {
   money_hater_db: D1Database;
@@ -172,14 +181,23 @@ app.post(
         },
       });
 
+      const { sessionId, refreshToken } = await createSession(prisma, newUser.id, {
+        userAgent: c.req.header('user-agent') ?? undefined,
+      });
       const token = await generateToken(
-        { userId: newUser.id, email: newUser.email, username: newUser.username },
+        {
+          userId: newUser.id,
+          email: newUser.email,
+          username: newUser.username,
+          sid: sessionId,
+        },
         c.env.JWT_SECRET,
       );
+      setAuthCookies(c, token, refreshToken);
 
       const { password: _pw, ...userWithoutPassword } = newUser;
       void _pw;
-      return c.json({ user: userWithoutPassword, token }, 201);
+      return c.json({ user: userWithoutPassword }, 201);
     } catch (err) {
       console.error('Complete registration error:', err);
       return c.json({ error: 'Internal Server Error' }, 500);
@@ -216,14 +234,18 @@ app.post('/api/auth/login', zValidator('json', loginSchema), async (c) => {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
 
+    const { sessionId, refreshToken } = await createSession(prisma, user.id, {
+      userAgent: c.req.header('user-agent') ?? undefined,
+    });
     const token = await generateToken(
-      { userId: user.id, email: user.email, username: user.username },
+      { userId: user.id, email: user.email, username: user.username, sid: sessionId },
       c.env.JWT_SECRET,
     );
+    setAuthCookies(c, token, refreshToken);
 
     const { password: _pw, ...userWithoutPassword } = user;
     void _pw;
-    return c.json({ user: userWithoutPassword, token });
+    return c.json({ user: userWithoutPassword });
   } catch (err) {
     console.error('Login error:', err);
     return c.json({ error: 'Internal Server Error' }, 500);
@@ -309,12 +331,125 @@ app.post('/api/auth/reset-password', zValidator('json', resetPasswordSchema), as
   }
 });
 
+// ---------- Session lifecycle ----------
+
+// Reads the refresh cookie, rotates it, and issues a fresh access JWT.
+// No body, no Turnstile — this is the automated renewal path. Concurrent
+// frontends share one in-flight refresh via apiFetch's serialization.
+app.post('/api/auth/refresh', async (c) => {
+  try {
+    if (!(await rateLimit(c, `refresh:${clientIp(c)}`))) {
+      return c.json({ error: 'Too many requests' }, 429);
+    }
+
+    const presented = readRefreshCookie(c);
+    if (!presented) {
+      clearAuthCookies(c);
+      return c.json({ error: 'No refresh token' }, 401);
+    }
+
+    const prisma = getPrisma(c);
+    const rotated = await rotateRefreshToken(prisma, presented);
+    if (!rotated) {
+      clearAuthCookies(c);
+      return c.json({ error: 'Invalid or expired refresh token' }, 401);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: rotated.userId },
+      select: { id: true, email: true, username: true, name: true },
+    });
+    if (!user) {
+      clearAuthCookies(c);
+      return c.json({ error: 'User not found' }, 401);
+    }
+
+    const token = await generateToken(
+      { userId: user.id, email: user.email, username: user.username, sid: rotated.sessionId },
+      c.env.JWT_SECRET,
+    );
+    setAuthCookies(c, token, rotated.refreshToken);
+
+    return c.json({ user });
+  } catch (err) {
+    console.error('Refresh error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.post('/api/auth/logout', authMiddleware, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const u = getAuthUser(c);
+    if (u.sid) await revokeSession(prisma, u.sid);
+  } catch (err) {
+    console.error('Logout error:', err);
+  } finally {
+    clearAuthCookies(c);
+  }
+  return c.body(null, 204);
+});
+
+app.post('/api/auth/logout-everywhere', jwtOnly, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const u = getAuthUser(c);
+    await revokeAllSessions(prisma, u.userId);
+  } catch (err) {
+    console.error('Logout-everywhere error:', err);
+  } finally {
+    clearAuthCookies(c);
+  }
+  return c.body(null, 204);
+});
+
+app.get('/api/auth/sessions', jwtOnly, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const u = getAuthUser(c);
+    const rows = await prisma.session.findMany({
+      where: { userId: u.userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { lastSeenAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        userAgent: true,
+        createdAt: true,
+        lastSeenAt: true,
+        expiresAt: true,
+      },
+    });
+    const current = u.sid ?? null;
+    return c.json(rows.map((r) => ({ ...r, current: r.id === current })));
+  } catch (err) {
+    console.error('List sessions error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+app.delete('/api/auth/sessions/:id', jwtOnly, async (c) => {
+  try {
+    const prisma = getPrisma(c);
+    const u = getAuthUser(c);
+    const id = c.req.param('id');
+    const owned = await prisma.session.findFirst({ where: { id, userId: u.userId } });
+    if (!owned) return c.json({ error: 'Session not found' }, 404);
+    await revokeSession(prisma, id);
+    if (u.sid === id) clearAuthCookies(c);
+    return c.body(null, 204);
+  } catch (err) {
+    console.error('Revoke session error:', err);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
 // ============================================
 // PROTECTED ROUTES (Authentication required)
 // ============================================
 
 app.route('/api/accounts', accounts);
 app.route('/api/budgets', budgets);
+app.route('/api/api-tokens', apiTokens);
 
 app.get('/api/auth/me', authMiddleware, async (c) => {
   try {
@@ -865,6 +1000,19 @@ export default {
           console.log(`R2 cleanup: scanned=${result.scanned} removed=${result.removed}`);
         } catch (err) {
           console.error('R2 cleanup failed:', err);
+        }
+      })(),
+    );
+
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const adapter = new PrismaD1(env.money_hater_db);
+          const prisma = new PrismaClient({ adapter });
+          const result = await gcSessions(prisma);
+          console.log(`Session GC: removed=${result.removed}`);
+        } catch (err) {
+          console.error('Session GC failed:', err);
         }
       })(),
     );

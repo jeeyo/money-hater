@@ -23,6 +23,7 @@ export const Login: React.FC = () => {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password, turnstileToken }),
       });
 
@@ -94,7 +95,10 @@ export const Login: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Username */}
             <div className="space-y-1.5">
-              <label htmlFor="login-username" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <label
+                htmlFor="login-username"
+                className="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+              >
                 Username
               </label>
               <input
@@ -105,11 +109,13 @@ export const Login: React.FC = () => {
                   text-white placeholder-slate-700
                   outline-none transition-all duration-200
                   focus:ring-2"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                } as any}
+                style={
+                  {
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  } as any
+                }
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(245,158,11,0.5)';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.1)';
@@ -128,7 +134,10 @@ export const Login: React.FC = () => {
             {/* Password */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor="login-password" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <label
+                  htmlFor="login-password"
+                  className="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                >
                   Password
                 </label>
                 <Link
@@ -145,10 +154,12 @@ export const Login: React.FC = () => {
                 className="w-full px-4 py-3 rounded-xl text-sm
                   text-white placeholder-slate-700
                   outline-none transition-all duration-200"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                } as React.CSSProperties}
+                style={
+                  {
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                  } as React.CSSProperties
+                }
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(245,158,11,0.5)';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.1)';
@@ -195,9 +206,7 @@ export const Login: React.FC = () => {
 
           {/* Divider line */}
           <div className="mt-8 pt-6 border-t border-white/5 text-center">
-            <p className="text-[11px] text-slate-700">
-              Secure login · End-to-end encrypted
-            </p>
+            <p className="text-[11px] text-slate-700">Secure login · End-to-end encrypted</p>
           </div>
         </div>
       </div>

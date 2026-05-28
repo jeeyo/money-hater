@@ -1,5 +1,6 @@
 import { ExpenseCategory, IncomeCategory } from '../types';
 import type { AIClassificationResult, TransactionType } from '../types';
+import { apiFetch } from './api';
 
 export interface AnalysisResult extends AIClassificationResult {
   description?: string;
@@ -9,37 +10,27 @@ export interface AnalysisResult extends AIClassificationResult {
 }
 
 export const analyzeReceipt = async (file: File): Promise<AnalysisResult> => {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found');
-
   // 1. Analyze Receipt
-  const formData = new FormData();
-  formData.append('file', file);
+  const analyzeForm = new FormData();
+  analyzeForm.append('file', file);
 
-  const analyzeRes = await fetch('/api/analyze-receipt', {
+  const analyzeRes = await apiFetch('/api/analyze-receipt', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
+    body: analyzeForm,
   });
 
   const analyzeData = await analyzeRes.json();
-
   if (!analyzeRes.ok) {
     throw new Error(analyzeData.error || 'Failed to analyze receipt');
   }
 
   // 2. Upload File (if analysis successful)
-  const uploadFormData = new FormData();
-  uploadFormData.append('file', file);
+  const uploadForm = new FormData();
+  uploadForm.append('file', file);
 
-  const uploadRes = await fetch('/api/upload', {
+  const uploadRes = await apiFetch('/api/upload', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: uploadFormData,
+    body: uploadForm,
   });
 
   let attachmentUrl: string | undefined;

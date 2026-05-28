@@ -42,8 +42,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   }, [darkMode]);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    // logout() clears local state and navigates to /login on its own.
+    void logout();
   };
 
   const toggleNotifications = useCallback(() => {
@@ -74,7 +74,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <span className="gradient-text font-display font-bold text-base md:hidden">Money Hater</span>
+        <span className="gradient-text font-display font-bold text-base md:hidden">
+          Money Hater
+        </span>
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2">
