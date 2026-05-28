@@ -16,8 +16,19 @@ const EXPENSE_CATEGORIES = [
   'Other',
 ] as const;
 
+const INCOME_CATEGORIES = [
+  'Salary',
+  'Freelance',
+  'Investment',
+  'Gift',
+  'Other Income',
+] as const;
+
+const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES] as const;
+
 export const ExpenseCategoryEnum = z.enum(EXPENSE_CATEGORIES);
 export const expenseCategoryValues = EXPENSE_CATEGORIES;
+const AllCategoryEnum = z.enum(ALL_CATEGORIES);
 
 const passwordSchema = z
   .string()
@@ -88,7 +99,7 @@ export const createExpenseSchema = z
     amount: z.coerce.number().finite().min(-1_000_000_000).max(1_000_000_000),
     date: isoDateSchema.optional(),
     type: z.enum(['expense', 'income']).default('expense'),
-    category: ExpenseCategoryEnum.default('Other'),
+    category: AllCategoryEnum.default('Other'),
     tags: tagsSchema,
     attachmentUrl: z.string().max(512).optional().nullable(),
     accountId: z.string().uuid().optional().nullable(),
@@ -103,7 +114,7 @@ export const updateExpenseSchema = z
     amount: z.coerce.number().finite().min(-1_000_000_000).max(1_000_000_000).optional(),
     date: isoDateSchema.optional(),
     type: z.enum(['expense', 'income']).optional(),
-    category: ExpenseCategoryEnum.optional(),
+    category: AllCategoryEnum.optional(),
     tags: tagsSchema.optional(),
     attachmentUrl: z.string().max(512).optional().nullable(),
     accountId: z.string().uuid().optional().nullable(),
