@@ -636,9 +636,7 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, onClick, i
         className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-105"
         style={{
           background:
-            transaction.type === 'income'
-              ? 'rgba(16, 185, 129, 0.12)'
-              : 'rgba(244, 63, 94, 0.10)',
+            transaction.type === 'income' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.10)',
         }}
       >
         {getCategoryIcon(transaction.category)}
@@ -696,7 +694,10 @@ const DashboardSkeleton: React.FC = () => (
         <div className="skeleton h-4 w-32 rounded-full" />
       </div>
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-5 py-3.5 border-b border-white/4 last:border-0">
+        <div
+          key={i}
+          className="flex items-center gap-4 px-5 py-3.5 border-b border-white/4 last:border-0"
+        >
           <div className="skeleton w-9 h-9 rounded-xl shrink-0" />
           <div className="flex-1 space-y-1.5">
             <div className="skeleton h-3 w-3/5 rounded-full" />

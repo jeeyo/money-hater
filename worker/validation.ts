@@ -16,13 +16,7 @@ const EXPENSE_CATEGORIES = [
   'Other',
 ] as const;
 
-const INCOME_CATEGORIES = [
-  'Salary',
-  'Freelance',
-  'Investment',
-  'Gift',
-  'Other Income',
-] as const;
+const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other Income'] as const;
 
 const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES] as const;
 

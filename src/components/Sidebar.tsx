@@ -44,10 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
     <>
       {/* Mobile overlay */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-bg/80 backdrop-blur-sm z-40 md:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-bg/80 backdrop-blur-sm z-40 md:hidden" onClick={onClose} />
       )}
 
       {/* ── Desktop Sidebar ── */}
@@ -199,7 +196,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
                 {active && (
                   <span className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-r bg-gradient-to-b from-amber-400 to-amber-600" />
                 )}
-                <Icon className={`w-5 h-5 shrink-0 relative z-10 ${active ? 'text-amber-400' : ''}`} />
+                <Icon
+                  className={`w-5 h-5 shrink-0 relative z-10 ${active ? 'text-amber-400' : ''}`}
+                />
                 <span className="relative z-10">{item.label}</span>
                 {active && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)] relative z-10" />
@@ -296,7 +295,9 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ navItems, isActive })
               className={`relative flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-0 flex-1 max-w-[72px]
                 ${active ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
             >
-              <Icon className={`w-5 h-5 transition-transform duration-200 ${active ? 'scale-110' : ''}`} />
+              <Icon
+                className={`w-5 h-5 transition-transform duration-200 ${active ? 'scale-110' : ''}`}
+              />
               <span className="text-[9px] font-medium leading-none tracking-wide truncate w-full text-center">
                 {item.label}
               </span>
