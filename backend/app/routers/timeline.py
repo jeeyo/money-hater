@@ -18,7 +18,7 @@ def day_window_utc(date_str: str, tz_offset_minutes: int) -> tuple[datetime, dat
         day = datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError as exc:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "date must be YYYY-MM-DD"
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "date must be YYYY-MM-DD"
         ) from exc
     start = day.replace(tzinfo=UTC) - timedelta(minutes=tz_offset_minutes)
     return start, start + timedelta(days=1)
@@ -41,6 +41,7 @@ async def get_timeline(
                 .order_by(Trip.started_at)
                 .options(
                     selectinload(Trip.visits).selectinload(Visit.place),
+                    selectinload(Trip.visits).selectinload(Visit.expenses),
                     selectinload(Trip.visits)
                     .selectinload(Visit.images)
                     .selectinload(Image.analysis),
@@ -93,4 +94,4 @@ async def get_timeline(
         .all()
     )
 
-    return timeline_day_out(date, trips, unassigned, expenses)
+    return timeline_day_out(date, trips, unassigned, expenses, user.preferred_currency)

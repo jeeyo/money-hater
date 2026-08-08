@@ -5,12 +5,12 @@ import sqlalchemy as sa
 import app.services.analysis as analysis_mod
 from app.models import Expense
 from app.services.analysis import run_image_analysis
+from app.services.money import to_minor
 from app.services.vision import (
     ReceiptData,
     ReceiptItem,
     VisionResult,
     parse_receipt_datetime,
-    to_minor_units,
 )
 from tests.conftest import register
 from tests.util import make_jpeg
@@ -33,11 +33,11 @@ RECEIPT_RESULT = VisionResult(
 )
 
 
-def test_to_minor_units():
-    assert to_minor_units(345.50, "THB") == 34550
-    assert to_minor_units(1200, "JPY") == 1200
-    assert to_minor_units(None, "USD") is None
-    assert to_minor_units(10.005, "USD") == 1001  # rounds
+def test_to_minor():
+    assert to_minor(345.50, "THB") == 34550
+    assert to_minor(1200, "JPY") == 1200
+    assert to_minor(None, "USD") is None
+    assert to_minor(10.005, "USD") == 1001  # half-up rounding
 
 
 def test_parse_receipt_datetime():
@@ -89,7 +89,9 @@ async def test_receipt_creates_expense(client, db_sessionmaker, monkeypatch):
     expenses = (await client.get("/api/expenses")).json()
     assert len(expenses) == 1
     summary = (await client.get("/api/expenses/summary")).json()
-    assert summary["totals"] == [{"currency": "THB", "total_minor": 34550}]
+    assert summary["spend"]["base_currency"] == "THB"
+    assert summary["spend"]["base_total_minor"] == 34550
+    assert summary["spend"]["by_currency"] == [{"currency": "THB", "total_minor": 34550}]
     assert summary["by_merchant"][0]["merchant"] == "Ramen Ya"
 
 
@@ -112,11 +114,14 @@ async def test_expense_manual_correction(client, db_sessionmaker, monkeypatch):
     expenses = (await client.get("/api/expenses")).json()
     response = await client.patch(
         f"/api/expenses/{expenses[0]['id']}",
-        json={"merchant": "Ramen-Ya Ekamai", "total_minor": 40000},
+        json={"merchant": "Ramen-Ya Ekamai", "total": "400.00"},
     )
     assert response.status_code == 200
-    assert response.json()["merchant"] == "Ramen-Ya Ekamai"
-    assert response.json()["total_minor"] == 40000
+    body = response.json()
+    assert body["merchant"] == "Ramen-Ya Ekamai"
+    assert body["total_minor"] == 40000
+    # Base-currency total tracks the correction
+    assert body["base_total_minor"] == 40000
 
 
 async def test_vision_skipped_without_key(client, db_sessionmaker):

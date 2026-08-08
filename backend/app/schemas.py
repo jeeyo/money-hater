@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -76,24 +77,64 @@ class ExpenseItemOut(BaseModel):
 
 class ExpenseOut(BaseModel):
     id: int
-    image_id: int
+    image_id: int | None
     visit_id: int | None
+    source: str
     merchant: str | None
     spent_at: datetime | None
     currency: str
     total_minor: int
     tax_minor: int | None
     tip_minor: int | None
+    base_currency: str
+    base_total_minor: int | None
+    fx_rate: float | None
+    fx_rate_source: str | None
+    needs_review: bool
     note: str | None
     items: list[ExpenseItemOut]
+
+
+class ExpenseItemIn(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    qty: float = 1.0
+    amount: Decimal
+
+
+class ExpenseCreate(BaseModel):
+    """Amounts are in major units — what a person types (e.g. 425.50)."""
+
+    total: Decimal = Field(gt=0)
+    currency: str = Field(min_length=3, max_length=3)
+    merchant: str | None = None
+    spent_at: datetime | None = None
+    note: str | None = None
+    tax: Decimal | None = None
+    tip: Decimal | None = None
+    fx_rate: Decimal | None = Field(default=None, gt=0)
+    items: list[ExpenseItemIn] = []
 
 
 class ExpenseUpdate(BaseModel):
     merchant: str | None = None
     spent_at: datetime | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
-    total_minor: int | None = None
+    total: Decimal | None = Field(default=None, gt=0)
+    fx_rate: Decimal | None = Field(default=None, gt=0)
     note: str | None = None
+
+
+class ExpenseConfirm(BaseModel):
+    """Accept the suggested rate (omit fx_rate) or override it."""
+
+    fx_rate: Decimal | None = Field(default=None, gt=0)
+
+
+class RateOut(BaseModel):
+    from_currency: str
+    to_currency: str
+    rate: float | None
+    converted_minor: int | None = None
 
 
 class CurrencyTotal(BaseModel):
@@ -101,16 +142,27 @@ class CurrencyTotal(BaseModel):
     total_minor: int
 
 
+class SpendOut(BaseModel):
+    """Spend rolled up into the user's base currency."""
+
+    base_currency: str
+    base_total_minor: int
+    # Original currencies, so a foreign trip still shows what was actually paid
+    by_currency: list[CurrencyTotal]
+    unconfirmed_count: int
+
+
 class MerchantTotal(BaseModel):
     merchant: str
-    currency: str
-    total_minor: int
+    base_currency: str
+    base_total_minor: int
     count: int
 
 
 class ExpenseSummaryOut(BaseModel):
-    totals: list[CurrencyTotal]
+    spend: SpendOut
     by_merchant: list[MerchantTotal]
+    needs_review_count: int
 
 
 # --- Visits / trips / timeline ---
@@ -125,7 +177,7 @@ class VisitOut(BaseModel):
     lng: float | None
     pinned: bool
     images: list[ImageOut]
-    spend: list[CurrencyTotal]
+    spend: SpendOut
 
 
 class TripOut(BaseModel):
@@ -137,7 +189,7 @@ class TripOut(BaseModel):
     pinned: bool
     visit_count: int
     image_count: int
-    spend: list[CurrencyTotal]
+    spend: SpendOut
 
 
 class TripDetailOut(TripOut):
@@ -148,7 +200,7 @@ class TimelineDayOut(BaseModel):
     date: str
     trips: list[TripDetailOut]
     unassigned_images: list[ImageOut]
-    spend: list[CurrencyTotal]
+    spend: SpendOut
 
 
 class TripUpdate(BaseModel):

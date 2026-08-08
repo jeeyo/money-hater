@@ -14,16 +14,17 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Expense, ExpenseItem, Image, ImageAnalysis, User
+from app.models import ExpenseItem, Image, ImageAnalysis, User
 from app.services import storage
 from app.services.clustering import recluster_user
 from app.services.exif import extract_exif
+from app.services.expenses import create_expense
+from app.services.money import to_minor
 from app.services.places import resolve_place
 from app.services.vision import (
     VisionResult,
     analyze_image_content,
     parse_receipt_datetime,
-    to_minor_units,
 )
 
 log = logging.getLogger(__name__)
@@ -49,26 +50,26 @@ async def _apply_receipt(
         return
     currency = (receipt.currency or user.preferred_currency).upper()
     spent_at = parse_receipt_datetime(receipt.datetime_iso)
-    expense = Expense(
-        user_id=image.user_id,
+    expense = await create_expense(
+        db,
+        user,
         image_id=image.id,
+        source="receipt",
         merchant=receipt.merchant,
         spent_at=spent_at or image.taken_at,
         currency=currency,
-        total_minor=to_minor_units(receipt.total, currency) or 0,
-        tax_minor=to_minor_units(receipt.tax, currency),
-        tip_minor=to_minor_units(receipt.tip, currency),
+        total_minor=to_minor(receipt.total, currency) or 0,
+        tax_minor=to_minor(receipt.tax, currency),
+        tip_minor=to_minor(receipt.tip, currency),
     )
-    db.add(expense)
-    await db.flush()
     for item in receipt.items:
         db.add(
             ExpenseItem(
                 expense_id=expense.id,
                 name=item.name[:255],
                 qty=item.qty,
-                unit_price_minor=to_minor_units(item.unit_price, currency),
-                amount_minor=to_minor_units(item.amount, currency) or 0,
+                unit_price_minor=to_minor(item.unit_price, currency),
+                amount_minor=to_minor(item.amount, currency) or 0,
             )
         )
     # A receipt's printed time beats the upload-time fallback for the timeline

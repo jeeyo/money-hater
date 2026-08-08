@@ -34,7 +34,10 @@ class ReceiptData(BaseModel):
         default=None,
         description="Purchase date/time printed on the receipt, ISO 8601, if legible",
     )
-    currency: str | None = Field(default=None, description="ISO 4217 code, e.g. THB, USD")
+    currency: str | None = Field(
+        default=None,
+        description="ISO 4217 code of the printed amounts, e.g. THB, JPY, USD",
+    )
     total: float | None = None
     tax: float | None = None
     tip: float | None = None
@@ -55,6 +58,7 @@ class VisionResult(BaseModel):
 
 
 INSTRUCTIONS = """You analyze a single photo from someone's personal trip log.
+
 Classify what it mainly shows:
 - place: scenery, buildings, streets, interiors, landmarks
 - food: dishes, drinks, meals
@@ -67,16 +71,6 @@ Always produce a short caption and a few lowercase labels.
 If a venue or shop name is readable in the image, set place_hint.
 If it is a receipt, extract merchant, currency (ISO 4217), totals, and line
 items exactly as printed; use the receipt's own numbers, do not invent values."""
-
-# ISO 4217 zero-decimal currencies (minor units == major units)
-ZERO_DECIMAL = {"JPY", "KRW", "VND", "CLP", "ISK", "UGX", "RWF", "XAF", "XOF", "XPF"}
-
-
-def to_minor_units(amount: float | None, currency: str) -> int | None:
-    if amount is None:
-        return None
-    factor = 1 if currency.upper() in ZERO_DECIMAL else 100
-    return round(amount * factor)
 
 
 def parse_receipt_datetime(value: str | None) -> datetime | None:

@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
@@ -19,7 +20,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(sa.String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(sa.String(255))
-    preferred_currency: Mapped[str] = mapped_column(sa.String(3), default="USD")
+    # The currency everything is rolled up into; foreign spend is converted to it
+    preferred_currency: Mapped[str] = mapped_column(sa.String(3), default="THB")
     home_lat: Mapped[float | None] = mapped_column(sa.Float)
     home_lng: Mapped[float | None] = mapped_column(sa.Float)
     home_label: Mapped[str | None] = mapped_column(sa.String(255))
@@ -85,6 +87,8 @@ class Visit(Base):
     trip: Mapped[Trip] = relationship(back_populates="visits")
     place: Mapped[Place | None] = relationship()
     images: Mapped[list["Image"]] = relationship(back_populates="visit", order_by="Image.taken_at")
+    # Linked by visit_id, so manually entered expenses count too
+    expenses: Mapped[list["Expense"]] = relationship(back_populates="visit")
 
 
 class Image(Base):
@@ -147,23 +151,51 @@ class Expense(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    image_id: Mapped[int] = mapped_column(
+    # Null for manually entered expenses (no receipt photo)
+    image_id: Mapped[int | None] = mapped_column(
         sa.ForeignKey("images.id", ondelete="CASCADE"), unique=True
     )
     visit_id: Mapped[int | None] = mapped_column(sa.ForeignKey("visits.id", ondelete="SET NULL"))
+    source: Mapped[str] = mapped_column(sa.String(16), default="receipt")  # receipt|manual
     merchant: Mapped[str | None] = mapped_column(sa.String(255))
     spent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
-    currency: Mapped[str] = mapped_column(sa.String(3), default="USD")
+    currency: Mapped[str] = mapped_column(sa.String(3), default="THB")
     total_minor: Mapped[int] = mapped_column(sa.BigInteger, default=0)
     tax_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
     tip_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    # Conversion into the user's base currency
+    base_currency: Mapped[str] = mapped_column(sa.String(3), default="THB")
+    base_total_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    fx_rate: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 10))
+    fx_rate_source: Mapped[str | None] = mapped_column(sa.String(16))  # same|api|manual
+    # Foreign-currency spend waits for the user to confirm the rate
+    needs_review: Mapped[bool] = mapped_column(sa.Boolean, default=False, index=True)
     note: Mapped[str | None] = mapped_column(sa.Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
 
-    image: Mapped[Image] = relationship(back_populates="expense")
+    image: Mapped[Image | None] = relationship(back_populates="expense")
+    visit: Mapped[Visit | None] = relationship(back_populates="expenses")
     items: Mapped[list["ExpenseItem"]] = relationship(
         back_populates="expense", cascade="all, delete-orphan"
     )
+
+
+class ExchangeRate(Base):
+    """Daily FX cache: `rate` = units of to_currency per 1 from_currency."""
+
+    __tablename__ = "exchange_rates"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "from_currency", "to_currency", "as_of_date", name="uq_exchange_rates_pair_date"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    from_currency: Mapped[str] = mapped_column(sa.String(3))
+    to_currency: Mapped[str] = mapped_column(sa.String(3))
+    rate: Mapped[Decimal] = mapped_column(sa.Numeric(20, 10))
+    as_of_date: Mapped[date] = mapped_column(sa.Date)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
 
 
 class ExpenseItem(Base):

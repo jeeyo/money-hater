@@ -236,7 +236,41 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
         trip.auto_title = await _auto_title(db, trip_visits)
         trip.kind = _trip_kind(user, trip_visits)
 
+    await _reattach_manual_expenses(db, user)
     await db.commit()
+
+
+async def _reattach_manual_expenses(db: AsyncSession, user: User) -> None:
+    """Rebuilt visits drop their expense links (ON DELETE SET NULL).
+
+    Receipt-backed expenses are re-linked with their image above; expenses
+    entered by hand have no image, so they are matched back by time.
+    """
+    orphans = (
+        (
+            await db.execute(
+                sa.select(Expense).where(
+                    Expense.user_id == user.id,
+                    Expense.image_id.is_(None),
+                    Expense.visit_id.is_(None),
+                    Expense.spent_at.isnot(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for expense in orphans:
+        expense.visit_id = await db.scalar(
+            sa.select(Visit.id)
+            .where(
+                Visit.user_id == user.id,
+                Visit.started_at <= expense.spent_at,
+                Visit.ended_at >= expense.spent_at,
+            )
+            .order_by(Visit.started_at.desc())
+            .limit(1)
+        )
 
 
 async def load_trip_detail(db: AsyncSession, trip_id: int) -> Trip | None:
@@ -245,6 +279,7 @@ async def load_trip_detail(db: AsyncSession, trip_id: int) -> Trip | None:
         .where(Trip.id == trip_id)
         .options(
             selectinload(Trip.visits).selectinload(Visit.place),
+            selectinload(Trip.visits).selectinload(Visit.expenses),
             selectinload(Trip.visits)
             .selectinload(Visit.images)
             .selectinload(Image.analysis),

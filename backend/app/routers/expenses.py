@@ -1,19 +1,25 @@
 from datetime import datetime
+from decimal import Decimal
 
 import sqlalchemy as sa
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 
 from app.deps import CurrentUser, DbSession
-from app.models import Expense
+from app.models import Expense, ExpenseItem
 from app.schemas import (
-    CurrencyTotal,
+    ExpenseConfirm,
+    ExpenseCreate,
     ExpenseOut,
     ExpenseSummaryOut,
     ExpenseUpdate,
     MerchantTotal,
+    RateOut,
 )
-from app.serialize import expense_out
+from app.serialize import expense_out, spend_out
+from app.services import fx
+from app.services.expenses import apply_conversion, attach_to_visit, create_expense
+from app.services.money import convert_minor, to_minor
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
@@ -29,20 +35,64 @@ def _range_filter(query, user_id: int, date_from: datetime | None, date_to: date
     return query
 
 
+async def _get_owned(db: DbSession, user_id: int, expense_id: int) -> Expense:
+    expense = await db.scalar(
+        sa.select(Expense)
+        .where(Expense.id == expense_id, Expense.user_id == user_id)
+        .options(selectinload(Expense.items))
+    )
+    if expense is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Expense not found")
+    return expense
+
+
 @router.get("", response_model=list[ExpenseOut])
 async def list_expenses(
     user: CurrentUser,
     db: DbSession,
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
+    needs_review: bool | None = Query(default=None),
     limit: int = Query(default=100, le=500),
     offset: int = 0,
 ):
     query = _range_filter(
         sa.select(Expense).options(selectinload(Expense.items)), user.id, date_from, date_to
     )
+    if needs_review is not None:
+        query = query.where(Expense.needs_review.is_(needs_review))
     result = await db.execute(query.order_by(_spent.desc()).limit(limit).offset(offset))
     return [expense_out(expense) for expense in result.scalars()]
+
+
+@router.post("", response_model=ExpenseOut, status_code=201)
+async def add_expense(body: ExpenseCreate, user: CurrentUser, db: DbSession):
+    """Log spending with no receipt photo — cash, a tip, a fare, a split bill."""
+    currency = body.currency.upper()
+    expense = await create_expense(
+        db,
+        user,
+        total_minor=to_minor(body.total, currency) or 0,
+        currency=currency,
+        merchant=body.merchant,
+        spent_at=body.spent_at or datetime.now(tz=None).astimezone(),
+        note=body.note,
+        tax_minor=to_minor(body.tax, currency),
+        tip_minor=to_minor(body.tip, currency),
+        source="manual",
+        fx_rate=body.fx_rate,
+    )
+    for item in body.items:
+        db.add(
+            ExpenseItem(
+                expense_id=expense.id,
+                name=item.name,
+                qty=item.qty,
+                amount_minor=to_minor(item.amount, currency) or 0,
+            )
+        )
+    await db.commit()
+    return expense_out(await _get_owned(db, user.id, expense.id))
 
 
 @router.get("/summary", response_model=ExpenseSummaryOut)
@@ -52,58 +102,115 @@ async def expense_summary(
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
 ):
-    totals_q = _range_filter(
-        sa.select(Expense.currency, sa.func.sum(Expense.total_minor)).group_by(Expense.currency),
-        user.id,
-        date_from,
-        date_to,
+    expenses = (
+        (await db.execute(_range_filter(sa.select(Expense), user.id, date_from, date_to)))
+        .scalars()
+        .all()
     )
     merchants_q = _range_filter(
         sa.select(
             Expense.merchant,
-            Expense.currency,
-            sa.func.sum(Expense.total_minor),
+            sa.func.sum(sa.func.coalesce(Expense.base_total_minor, 0)),
             sa.func.count(),
         )
         .where(Expense.merchant.isnot(None))
-        .group_by(Expense.merchant, Expense.currency)
-        .order_by(sa.func.sum(Expense.total_minor).desc())
+        .group_by(Expense.merchant)
+        .order_by(sa.func.sum(sa.func.coalesce(Expense.base_total_minor, 0)).desc())
         .limit(25),
         user.id,
         date_from,
         date_to,
     )
-    totals = [
-        CurrencyTotal(currency=row[0], total_minor=row[1] or 0)
-        for row in (await db.execute(totals_q)).all()
-    ]
     by_merchant = [
-        MerchantTotal(merchant=row[0], currency=row[1], total_minor=row[2] or 0, count=row[3])
+        MerchantTotal(
+            merchant=row[0],
+            base_currency=user.preferred_currency,
+            base_total_minor=row[1] or 0,
+            count=row[2],
+        )
         for row in (await db.execute(merchants_q)).all()
     ]
-    return ExpenseSummaryOut(totals=totals, by_merchant=by_merchant)
+    return ExpenseSummaryOut(
+        spend=spend_out(list(expenses), user.preferred_currency),
+        by_merchant=by_merchant,
+        needs_review_count=sum(1 for e in expenses if e.needs_review),
+    )
+
+
+@router.get("/rate", response_model=RateOut)
+async def quote_rate(
+    user: CurrentUser,
+    db: DbSession,
+    from_currency: str = Query(min_length=3, max_length=3),
+    amount: Decimal | None = Query(default=None, gt=0),
+):
+    """Today's rate into the user's base currency, for prefilling the UI."""
+    to_currency = user.preferred_currency.upper()
+    rate = await fx.get_rate(db, from_currency, to_currency)
+    await db.commit()
+    converted = None
+    if rate is not None and amount is not None:
+        converted = convert_minor(
+            to_minor(amount, from_currency), from_currency, to_currency, rate
+        )
+    return RateOut(
+        from_currency=from_currency.upper(),
+        to_currency=to_currency,
+        rate=float(rate) if rate is not None else None,
+        converted_minor=converted,
+    )
+
+
+@router.post("/{expense_id}/confirm", response_model=ExpenseOut)
+async def confirm_expense(
+    expense_id: int, body: ExpenseConfirm, user: CurrentUser, db: DbSession
+):
+    """Accept the suggested conversion, or override the rate the user actually got."""
+    expense = await _get_owned(db, user.id, expense_id)
+    rate = body.fx_rate if body.fx_rate is not None else expense.fx_rate
+    if rate is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "No exchange rate available — provide fx_rate",
+        )
+    await apply_conversion(
+        db, expense, user.preferred_currency, rate=rate, rate_is_manual=True
+    )
+    await db.commit()
+    return expense_out(expense)
 
 
 @router.patch("/{expense_id}", response_model=ExpenseOut)
 async def update_expense(
     expense_id: int, body: ExpenseUpdate, user: CurrentUser, db: DbSession
 ):
-    expense = await db.scalar(
-        sa.select(Expense)
-        .where(Expense.id == expense_id, Expense.user_id == user.id)
-        .options(selectinload(Expense.items))
-    )
-    if expense is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Expense not found")
+    expense = await _get_owned(db, user.id, expense_id)
     if body.merchant is not None:
         expense.merchant = body.merchant or None
     if body.spent_at is not None:
         expense.spent_at = body.spent_at
+        await attach_to_visit(db, expense)
     if body.currency is not None:
         expense.currency = body.currency.upper()
-    if body.total_minor is not None:
-        expense.total_minor = body.total_minor
+    if body.total is not None:
+        expense.total_minor = to_minor(body.total, expense.currency) or 0
     if body.note is not None:
         expense.note = body.note or None
+    # Any change to amount, currency or rate re-derives the base-currency total
+    if body.currency is not None or body.total is not None or body.fx_rate is not None:
+        await apply_conversion(
+            db,
+            expense,
+            user.preferred_currency,
+            rate=body.fx_rate if body.fx_rate is not None else expense.fx_rate,
+            rate_is_manual=body.fx_rate is not None or expense.fx_rate_source == "manual",
+        )
     await db.commit()
     return expense_out(expense)
+
+
+@router.delete("/{expense_id}", status_code=204)
+async def delete_expense(expense_id: int, user: CurrentUser, db: DbSession):
+    expense = await _get_owned(db, user.id, expense_id)
+    await db.delete(expense)
+    await db.commit()

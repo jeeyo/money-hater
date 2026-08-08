@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     daily_analysis_cap: int = 200
     max_upload_bytes: int = 25 * 1024 * 1024
 
+    # ECB reference rates via Frankfurter; no API key. Blank disables FX lookup
+    # (foreign expenses then wait for a manually entered rate).
+    exchange_rate_api_url: str = "https://api.frankfurter.dev/v1/latest"
+
     # Clustering thresholds
     visit_max_gap_minutes: int = 45
     visit_max_distance_m: int = 300

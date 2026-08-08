@@ -20,6 +20,7 @@ router = APIRouter(tags=["trips"])
 
 _TRIP_LOADS = (
     selectinload(Trip.visits).selectinload(Visit.place),
+    selectinload(Trip.visits).selectinload(Visit.expenses),
     selectinload(Trip.visits).selectinload(Visit.images).selectinload(Image.analysis),
     selectinload(Trip.visits).selectinload(Visit.images).selectinload(Image.expense),
     selectinload(Trip.visits).selectinload(Visit.images).selectinload(Image.place),
@@ -56,12 +57,12 @@ async def list_trips(
         .scalars()
         .all()
     )
-    return [trip_out(trip) for trip in trips]
+    return [trip_out(trip, user.preferred_currency) for trip in trips]
 
 
 @router.get("/trips/{trip_id}", response_model=TripDetailOut)
 async def get_trip(trip_id: int, user: CurrentUser, db: DbSession):
-    return trip_detail_out(await _get_owned_trip(db, user.id, trip_id))
+    return trip_detail_out(await _get_owned_trip(db, user.id, trip_id), user.preferred_currency)
 
 
 @router.patch("/trips/{trip_id}", response_model=TripDetailOut)
@@ -73,7 +74,7 @@ async def update_trip(trip_id: int, body: TripUpdate, user: CurrentUser, db: DbS
         trip.kind = body.kind
     trip.pinned = True
     await db.commit()
-    return trip_detail_out(trip)
+    return trip_detail_out(trip, user.preferred_currency)
 
 
 @router.post("/trips/{trip_id}/merge", response_model=TripDetailOut)
@@ -92,7 +93,7 @@ async def merge_trips(
     await db.commit()
     db.expire_all()
     refreshed = await load_trip_detail(db, trip.id)
-    return trip_detail_out(refreshed)
+    return trip_detail_out(refreshed, user.preferred_currency)
 
 
 @router.delete("/trips/{trip_id}", status_code=204)
@@ -115,6 +116,7 @@ async def update_visit(visit_id: int, body: VisitUpdate, user: CurrentUser, db: 
         .where(Visit.id == visit_id, Visit.user_id == user.id)
         .options(
             selectinload(Visit.place),
+            selectinload(Visit.expenses),
             selectinload(Visit.images).selectinload(Image.analysis),
             selectinload(Visit.images).selectinload(Image.expense),
             selectinload(Visit.images).selectinload(Image.place),
@@ -132,4 +134,4 @@ async def update_visit(visit_id: int, body: VisitUpdate, user: CurrentUser, db: 
     visit.pinned = True
     await db.commit()
     await db.refresh(visit)
-    return visit_out(visit)
+    return visit_out(visit, user.preferred_currency)

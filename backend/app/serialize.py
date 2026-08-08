@@ -10,6 +10,7 @@ from app.schemas import (
     ExpenseOut,
     ImageOut,
     PlaceOut,
+    SpendOut,
     TimelineDayOut,
     TripDetailOut,
     TripOut,
@@ -70,12 +71,18 @@ def expense_out(expense: Expense) -> ExpenseOut:
         id=expense.id,
         image_id=expense.image_id,
         visit_id=expense.visit_id,
+        source=expense.source,
         merchant=expense.merchant,
         spent_at=expense.spent_at,
         currency=expense.currency,
         total_minor=expense.total_minor,
         tax_minor=expense.tax_minor,
         tip_minor=expense.tip_minor,
+        base_currency=expense.base_currency,
+        base_total_minor=expense.base_total_minor,
+        fx_rate=float(expense.fx_rate) if expense.fx_rate is not None else None,
+        fx_rate_source=expense.fx_rate_source,
+        needs_review=expense.needs_review,
         note=expense.note,
         items=[
             ExpenseItemOut(
@@ -90,14 +97,24 @@ def expense_out(expense: Expense) -> ExpenseOut:
     )
 
 
-def spend_totals(expenses: list[Expense]) -> list[CurrencyTotal]:
+def spend_out(expenses: list[Expense], base_currency: str) -> SpendOut:
     by_currency: dict[str, int] = defaultdict(int)
+    base_total = 0
+    unconfirmed = 0
     for expense in expenses:
         by_currency[expense.currency] += expense.total_minor
-    return [
-        CurrencyTotal(currency=currency, total_minor=total)
-        for currency, total in sorted(by_currency.items())
-    ]
+        base_total += expense.base_total_minor or 0
+        if expense.needs_review or expense.base_total_minor is None:
+            unconfirmed += 1
+    return SpendOut(
+        base_currency=base_currency,
+        base_total_minor=base_total,
+        by_currency=[
+            CurrencyTotal(currency=currency, total_minor=total)
+            for currency, total in sorted(by_currency.items())
+        ],
+        unconfirmed_count=unconfirmed,
+    )
 
 
 def visit_label(visit: Visit) -> str:
@@ -109,10 +126,11 @@ def visit_label(visit: Visit) -> str:
 
 
 def _visit_expenses(visit: Visit) -> list[Expense]:
-    return [image.expense for image in visit.images if image.expense is not None]
+    """Expenses attached to the visit — from receipts and from manual entry alike."""
+    return list(visit.expenses)
 
 
-def visit_out(visit: Visit) -> VisitOut:
+def visit_out(visit: Visit, base_currency: str) -> VisitOut:
     return VisitOut(
         id=visit.id,
         trip_id=visit.trip_id,
@@ -124,11 +142,11 @@ def visit_out(visit: Visit) -> VisitOut:
         lng=visit.lng,
         pinned=visit.pinned,
         images=[image_out(image) for image in visit.images],
-        spend=spend_totals(_visit_expenses(visit)),
+        spend=spend_out(_visit_expenses(visit), base_currency),
     )
 
 
-def _trip_fields(trip: Trip) -> dict:
+def _trip_fields(trip: Trip, base_currency: str) -> dict:
     expenses = [e for visit in trip.visits for e in _visit_expenses(visit)]
     return {
         "id": trip.id,
@@ -139,24 +157,31 @@ def _trip_fields(trip: Trip) -> dict:
         "pinned": trip.pinned,
         "visit_count": len(trip.visits),
         "image_count": sum(len(visit.images) for visit in trip.visits),
-        "spend": spend_totals(expenses),
+        "spend": spend_out(expenses, base_currency),
     }
 
 
-def trip_out(trip: Trip) -> TripOut:
-    return TripOut(**_trip_fields(trip))
+def trip_out(trip: Trip, base_currency: str) -> TripOut:
+    return TripOut(**_trip_fields(trip, base_currency))
 
 
-def trip_detail_out(trip: Trip) -> TripDetailOut:
-    return TripDetailOut(**_trip_fields(trip), visits=[visit_out(v) for v in trip.visits])
+def trip_detail_out(trip: Trip, base_currency: str) -> TripDetailOut:
+    return TripDetailOut(
+        **_trip_fields(trip, base_currency),
+        visits=[visit_out(v, base_currency) for v in trip.visits],
+    )
 
 
 def timeline_day_out(
-    date: str, trips: list[Trip], unassigned: list[Image], expenses: list[Expense]
+    date: str,
+    trips: list[Trip],
+    unassigned: list[Image],
+    expenses: list[Expense],
+    base_currency: str,
 ) -> TimelineDayOut:
     return TimelineDayOut(
         date=date,
-        trips=[trip_detail_out(trip) for trip in trips],
+        trips=[trip_detail_out(trip, base_currency) for trip in trips],
         unassigned_images=[image_out(image) for image in unassigned],
-        spend=spend_totals(expenses),
+        spend=spend_out(expenses, base_currency),
     )
