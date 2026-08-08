@@ -9,11 +9,11 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/70 md:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 dark:bg-black/85 md:items-center"
       onClick={onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-surface md:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-surface ring-1 ring-line md:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative">
@@ -21,7 +21,7 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 rounded-full bg-slate-900/60 p-2 text-white"
+            className="absolute right-3 top-3 rounded-full bg-black/60 p-2 text-white"
             aria-label="Close"
           >
             <X className="size-5" />

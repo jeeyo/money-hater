@@ -13,11 +13,11 @@ export function Sheet({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 md:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 dark:bg-black/80 md:items-center"
       onClick={onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-surface pb-[env(safe-area-inset-bottom)] md:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-surface pb-[env(safe-area-inset-bottom)] ring-1 ring-line md:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="sticky top-0 flex items-center justify-between border-b border-line-soft bg-surface px-4 py-3">

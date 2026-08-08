@@ -15,7 +15,7 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 - Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
 - Installs as a **PWA**: add it to your home screen and it opens standalone, with the shell available
   offline.
-- **Dark mode**, following your system unless you pin it.
+- **Dark mode** in true black for OLED, following your system unless you pin it.
 
 ## Screenshots
 
@@ -56,7 +56,9 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 
 ### Dark mode
 
-Follows your system by default; **Settings → Appearance** pins it to light or dark.
+True black for OLED — the page and the cards are `#000`, separated by borders rather than raised
+grey surfaces, so unlit pixels stay unlit. Follows your system by default; **Settings → Appearance**
+pins it to light or dark.
 
 <table>
   <tr>

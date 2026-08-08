@@ -19,7 +19,7 @@ export function applyTheme(theme: Theme): void {
   document.documentElement.classList.toggle('dark', dark);
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', dark ? '#0b1120' : '#f8fafc');
+    ?.setAttribute('content', dark ? '#000000' : '#f8fafc');
 }
 
 interface ThemeState {

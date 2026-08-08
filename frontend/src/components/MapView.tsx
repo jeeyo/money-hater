@@ -31,8 +31,8 @@ const OSM_STYLE: maplibregl.StyleSpecification = {
 /** Dim and desaturate the light OSM raster so it sits under a dark page.
  *  Applied to the tile layer only, so the day routes keep their exact colours. */
 const DARK_BASEMAP_PAINT = {
-  'raster-brightness-max': 0.4,
-  'raster-saturation': -0.4,
+  'raster-brightness-max': 0.3,
+  'raster-saturation': -0.45,
   'raster-contrast': -0.1,
 } as const;
 
