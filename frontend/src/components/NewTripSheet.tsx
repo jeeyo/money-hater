@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useCreateTrip, useExpenses } from '../hooks/useData';
-import { formatMoney } from '../lib/format';
+import { formatMoney, localDateString } from '../lib/format';
 import type { Expense } from '../types';
 import { Sheet, inputClass, labelClass } from './Sheet';
 
@@ -10,48 +10,88 @@ function expenseLabel(expense: Expense): string {
   return expense.description ?? expense.place?.name ?? expense.merchant ?? 'Expense';
 }
 
-function expenseWhen(expense: Expense): string {
-  return expense.spent_at ? new Date(expense.spent_at).toLocaleString() : 'date unknown';
+function expenseTime(expense: Expense): string {
+  return expense.spent_at
+    ? new Date(expense.spent_at).toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
 }
 
-/** Pick the expense that started the trip and the one that ended it. */
-function ExpensePicker({
+function expenseDay(expense: Expense): string {
+  return expense.spent_at ? localDateString(new Date(expense.spent_at)) : '';
+}
+
+/** Narrow to a day, then pick the expense on it. */
+function BoundPicker({
+  legend,
+  hint,
+  date,
+  onDateChange,
+  bounds,
   expenses,
   selectedId,
   onSelect,
 }: {
+  legend: string;
+  hint: string;
+  date: string;
+  onDateChange: (date: string) => void;
+  bounds: { min: string; max: string } | null;
   expenses: Expense[];
   selectedId: number | null;
   onSelect: (id: number) => void;
 }) {
   return (
-    <ul className="max-h-44 overflow-y-auto rounded-xl border border-slate-200">
-      {expenses.map((expense) => {
-        const selected = expense.id === selectedId;
-        return (
-          <li key={expense.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(expense.id)}
-              className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-0 ${
-                selected ? 'bg-brand-50' : 'active:bg-slate-50'
-              }`}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-slate-800">
-                  {expenseLabel(expense)}
-                </span>
-                <span className="block text-xs text-slate-400">{expenseWhen(expense)}</span>
-              </span>
-              <span className="shrink-0 text-xs text-slate-500 tabular-nums">
-                {formatMoney(expense.total_minor, expense.currency)}
-              </span>
-              {selected && <Check className="size-4 shrink-0 text-brand-600" />}
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <fieldset className="space-y-2 rounded-2xl border border-slate-200 p-3">
+      <legend className="px-1 text-sm font-medium text-slate-700">{legend}</legend>
+      <label className="block space-y-1">
+        <span className="text-xs text-slate-400">{hint}</span>
+        <input
+          type="date"
+          value={date}
+          min={bounds?.min}
+          max={bounds?.max}
+          onChange={(e) => onDateChange(e.target.value)}
+          className={inputClass}
+        />
+      </label>
+
+      {expenses.length === 0 ? (
+        <p className="rounded-xl bg-slate-50 px-3 py-3 text-center text-sm text-slate-500">
+          Nothing logged on this day.
+        </p>
+      ) : (
+        <ul className="max-h-40 overflow-y-auto rounded-xl border border-slate-200">
+          {expenses.map((expense) => {
+            const selected = expense.id === selectedId;
+            return (
+              <li key={expense.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(expense.id)}
+                  className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-0 ${
+                    selected ? 'bg-brand-50' : 'active:bg-slate-50'
+                  }`}
+                >
+                  <span className="w-12 shrink-0 text-xs text-slate-400 tabular-nums">
+                    {expenseTime(expense)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                    {expenseLabel(expense)}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+                    {formatMoney(expense.total_minor, expense.currency)}
+                  </span>
+                  {selected && <Check className="size-4 shrink-0 text-brand-600" />}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </fieldset>
   );
 }
 
@@ -62,36 +102,63 @@ export function NewTripSheet({ onClose }: { onClose: () => void }) {
   const [startId, setStartId] = useState<number | null>(null);
   const [endId, setEndId] = useState<number | null>(null);
 
-  // Oldest first reads like a journey: the outbound fare, then the way home
-  const ordered = useMemo(
+  const dated = useMemo(
     () =>
-      [...(expenses ?? [])].sort((a, b) =>
-        (a.spent_at ?? '').localeCompare(b.spent_at ?? ''),
-      ),
+      [...(expenses ?? [])]
+        .filter((e) => e.spent_at)
+        .sort((a, b) => (a.spent_at ?? '').localeCompare(b.spent_at ?? '')),
     [expenses],
   );
 
-  const start = ordered.find((e) => e.id === startId);
-  const end = ordered.find((e) => e.id === endId);
-  const span =
-    start && end && start.spent_at && end.spent_at
-      ? {
-          from: new Date(start.spent_at),
-          to: new Date(end.spent_at),
-        }
-      : null;
-  const dayCount = span
-    ? Math.round(
-        (new Date(span.to.toDateString()).getTime() -
-          new Date(span.from.toDateString()).getTime()) /
-          86_400_000,
-      ) + 1
-    : 0;
-  const valid = start && end && span && span.to >= span.from;
+  const bounds = dated.length
+    ? { min: expenseDay(dated[0]), max: expenseDay(dated[dated.length - 1]) }
+    : null;
+  // Until a day is chosen, follow the data: the most recent day always has
+  // something to pick, and expenses arrive after the first render.
+  const [chosenStart, setChosenStart] = useState<string | null>(null);
+  const [chosenEnd, setChosenEnd] = useState<string | null>(null);
+  const latestDay = bounds?.max ?? localDateString(new Date());
+  const startDate = chosenStart ?? latestDay;
+  const endDate = chosenEnd ?? latestDay;
+
+  const startOptions = useMemo(
+    () => dated.filter((e) => expenseDay(e) === startDate),
+    [dated, startDate],
+  );
+  const endOptions = useMemo(
+    () => dated.filter((e) => expenseDay(e) === endDate),
+    [dated, endDate],
+  );
+
+  const start = dated.find((e) => e.id === startId);
+  const end = dated.find((e) => e.id === endId);
+  const dayCount =
+    startDate && endDate
+      ? Math.round(
+          (new Date(`${endDate}T00:00`).getTime() - new Date(`${startDate}T00:00`).getTime()) /
+            86_400_000,
+        ) + 1
+      : 0;
+  const valid = Boolean(start && end && dayCount >= 1);
+
+  function pickStartDate(day: string) {
+    setChosenStart(day);
+    setStartId(null);
+    // A trip cannot end before it starts
+    if (day > endDate) {
+      setChosenEnd(day);
+      setEndId(null);
+    }
+  }
+
+  function pickEndDate(day: string) {
+    setChosenEnd(day);
+    setEndId(null);
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!valid || !title.trim()) return;
+    if (!valid || !title.trim() || !start || !end) return;
     createTrip.mutate(
       { title: title.trim(), start_expense_id: start.id, end_expense_id: end.id },
       { onSuccess: onClose },
@@ -102,8 +169,8 @@ export function NewTripSheet({ onClose }: { onClose: () => void }) {
     <Sheet title="New trip" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-slate-500">
-          A trip groups days together. Pick the expense it started with and the one it ended
-          with — everything in between belongs to the trip.
+          A trip groups days together. Pick the day and expense it started with, and the ones it
+          ended with — everything in between belongs to the trip.
         </p>
 
         <label className="block space-y-1">
@@ -117,37 +184,45 @@ export function NewTripSheet({ onClose }: { onClose: () => void }) {
           />
         </label>
 
-        {ordered.length === 0 ? (
+        {dated.length === 0 ? (
           <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">
             No expenses yet — log one first, then you can bound a trip with it.
           </p>
         ) : (
           <>
-            <div className="space-y-1">
-              <span className={labelClass}>Started with</span>
-              <ExpensePicker expenses={ordered} selectedId={startId} onSelect={setStartId} />
-            </div>
-            <div className="space-y-1">
-              <span className={labelClass}>Ended with</span>
-              <ExpensePicker expenses={ordered} selectedId={endId} onSelect={setEndId} />
-            </div>
+            <BoundPicker
+              legend="Started with"
+              hint="First day of the trip"
+              date={startDate}
+              onDateChange={pickStartDate}
+              bounds={bounds}
+              expenses={startOptions}
+              selectedId={startId}
+              onSelect={setStartId}
+            />
+            <BoundPicker
+              legend="Ended with"
+              hint="Last day of the trip"
+              date={endDate}
+              onDateChange={pickEndDate}
+              bounds={bounds ? { min: startDate, max: bounds.max } : null}
+              expenses={endOptions}
+              selectedId={endId}
+              onSelect={setEndId}
+            />
           </>
         )}
 
-        {span && !valid && (
-          <p className="text-sm text-rose-600">The ending expense comes before the start.</p>
-        )}
         {valid && (
           <p className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700">
-            {span.from.toLocaleDateString()} – {span.to.toLocaleDateString()} ·{' '}
+            {new Date(`${startDate}T00:00`).toLocaleDateString()} –{' '}
+            {new Date(`${endDate}T00:00`).toLocaleDateString()} ·{' '}
             <span className="font-semibold">
               {dayCount} day{dayCount === 1 ? '' : 's'}
             </span>
           </p>
         )}
-        {createTrip.isError && (
-          <p className="text-sm text-rose-600">{createTrip.error.message}</p>
-        )}
+        {createTrip.isError && <p className="text-sm text-rose-600">{createTrip.error.message}</p>}
 
         <button
           type="submit"
