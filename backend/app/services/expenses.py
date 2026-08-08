@@ -6,7 +6,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Expense, User, Visit
+from app.models import Expense, Place, User, Visit
 from app.services import fx
 from app.services.money import convert_minor
 
@@ -59,13 +59,31 @@ async def attach_to_visit(db: AsyncSession, expense: Expense) -> None:
     expense.visit_id = visit_id
 
 
+async def resolve_where(
+    db: AsyncSession, user: User, place_id: int | None, merchant: str | None
+) -> tuple[int | None, str | None]:
+    """Normalize the "where" of an expense.
+
+    A picked place wins and also fills the free-text name, so merchant grouping
+    keeps working whether or not the user chose from the suggestions.
+    """
+    if place_id is None:
+        return None, merchant
+    place = await db.get(Place, place_id)
+    if place is None:
+        return None, merchant
+    return place.id, merchant or place.name
+
+
 async def create_expense(
     db: AsyncSession,
     user: User,
     *,
     total_minor: int,
     currency: str,
+    description: str | None = None,
     merchant: str | None = None,
+    place_id: int | None = None,
     spent_at: datetime | None = None,
     note: str | None = None,
     tax_minor: int | None = None,
@@ -74,11 +92,14 @@ async def create_expense(
     source: str = "manual",
     fx_rate: Decimal | None = None,
 ) -> Expense:
+    place_id, merchant = await resolve_where(db, user, place_id, merchant)
     expense = Expense(
         user_id=user.id,
         image_id=image_id,
         source=source,
+        description=description,
         merchant=merchant,
+        place_id=place_id,
         spent_at=spent_at,
         currency=currency.upper(),
         total_minor=total_minor,

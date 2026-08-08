@@ -18,7 +18,12 @@ from app.schemas import (
 )
 from app.serialize import expense_out, spend_out
 from app.services import fx
-from app.services.expenses import apply_conversion, attach_to_visit, create_expense
+from app.services.expenses import (
+    apply_conversion,
+    attach_to_visit,
+    create_expense,
+    resolve_where,
+)
 from app.services.money import convert_minor, to_minor
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -39,7 +44,7 @@ async def _get_owned(db: DbSession, user_id: int, expense_id: int) -> Expense:
     expense = await db.scalar(
         sa.select(Expense)
         .where(Expense.id == expense_id, Expense.user_id == user_id)
-        .options(selectinload(Expense.items))
+        .options(selectinload(Expense.items), selectinload(Expense.place))
     )
     if expense is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Expense not found")
@@ -57,7 +62,10 @@ async def list_expenses(
     offset: int = 0,
 ):
     query = _range_filter(
-        sa.select(Expense).options(selectinload(Expense.items)), user.id, date_from, date_to
+        sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place)),
+        user.id,
+        date_from,
+        date_to,
     )
     if needs_review is not None:
         query = query.where(Expense.needs_review.is_(needs_review))
@@ -74,7 +82,9 @@ async def add_expense(body: ExpenseCreate, user: CurrentUser, db: DbSession):
         user,
         total_minor=to_minor(body.total, currency) or 0,
         currency=currency,
+        description=body.description,
         merchant=body.merchant,
+        place_id=body.place_id,
         spent_at=body.spent_at or datetime.now(tz=None).astimezone(),
         note=body.note,
         tax_minor=to_minor(body.tax, currency),
@@ -185,7 +195,13 @@ async def update_expense(
     expense_id: int, body: ExpenseUpdate, user: CurrentUser, db: DbSession
 ):
     expense = await _get_owned(db, user.id, expense_id)
-    if body.merchant is not None:
+    if body.description is not None:
+        expense.description = body.description or None
+    if body.place_id is not None:
+        expense.place_id, expense.merchant = await resolve_where(
+            db, user, body.place_id, body.merchant
+        )
+    elif body.merchant is not None:
         expense.merchant = body.merchant or None
     if body.spent_at is not None:
         expense.spent_at = body.spent_at
@@ -206,6 +222,10 @@ async def update_expense(
             rate_is_manual=body.fx_rate is not None or expense.fx_rate_source == "manual",
         )
     await db.commit()
+    if body.place_id is not None:
+        # The session keeps objects unexpired on commit, so a newly linked
+        # place would otherwise serialize from the stale relationship
+        await db.refresh(expense, attribute_names=["place"])
     return expense_out(expense)
 
 

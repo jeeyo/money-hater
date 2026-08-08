@@ -7,13 +7,14 @@ UI shows raw coordinates.
 """
 
 import logging
+from datetime import datetime
 
 import httpx
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Place
+from app.models import Place, User, Visit
 from app.services.geo import haversine_m
 
 log = logging.getLogger(__name__)
@@ -24,6 +25,10 @@ FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.locati
 SEARCH_RADIUS_M = 150.0
 # Reuse a cached place if it's within this distance of the photo
 CACHE_RADIUS_M = 120.0
+# Suggestions are biased to, not restricted to, this radius around the user
+SUGGEST_BIAS_RADIUS_M = 3000.0
+# Shortest query worth sending to Google
+MIN_QUERY_FOR_GOOGLE = 2
 
 # Vision hints -> preferred Google place types, used to pick a better candidate
 # (a food photo near both a park and a restaurant should pick the restaurant)
@@ -121,6 +126,138 @@ async def resolve_place(
         return None
     candidate = _pick_candidate(items, hint)
     return await _upsert_place(db, candidate) if candidate else None
+
+
+async def anchor_for_time(
+    db: AsyncSession, user: User, at: datetime | None
+) -> tuple[float, float] | None:
+    """Where the user was around `at` — the bias point for place suggestions.
+
+    Prefers the visit covering that moment, then the nearest visit in time,
+    then their home location. Returns None if we know none of those.
+    """
+    if at is not None:
+        covering = await db.execute(
+            sa.select(Visit.lat, Visit.lng)
+            .where(
+                Visit.user_id == user.id,
+                Visit.started_at <= at,
+                Visit.ended_at >= at,
+                Visit.lat.isnot(None),
+            )
+            .limit(1)
+        )
+        row = covering.first()
+        if row:
+            return row.lat, row.lng
+
+        # Nearest visit in time, so an expense logged between stops still
+        # suggests places from that part of the day
+        gap = sa.func.abs(
+            sa.extract("epoch", Visit.started_at) - sa.extract("epoch", at)
+        )
+        nearest = await db.execute(
+            sa.select(Visit.lat, Visit.lng)
+            .where(Visit.user_id == user.id, Visit.lat.isnot(None))
+            .order_by(gap)
+            .limit(1)
+        )
+        row = nearest.first()
+        if row:
+            return row.lat, row.lng
+
+    if user.home_lat is not None and user.home_lng is not None:
+        return user.home_lat, user.home_lng
+    return None
+
+
+async def _visited_places(db: AsyncSession, user: User) -> list[Place]:
+    """Places already on this user's itinerary — free to search, no API call."""
+    result = await db.execute(
+        sa.select(Place)
+        .join(Visit, Visit.place_id == Place.id)
+        .where(Visit.user_id == user.id)
+        .distinct()
+    )
+    return list(result.scalars())
+
+
+async def _google_text_search(
+    query: str, anchor: tuple[float, float] | None, limit: int
+) -> list[dict]:
+    if not settings.google_maps_api_key:
+        return []
+    body: dict = {"textQuery": query, "maxResultCount": limit}
+    if anchor is not None:
+        body["locationBias"] = {
+            "circle": {
+                "center": {"latitude": anchor[0], "longitude": anchor[1]},
+                "radius": SUGGEST_BIAS_RADIUS_M,
+            }
+        }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(
+                TEXT_URL,
+                json=body,
+                headers={
+                    "X-Goog-Api-Key": settings.google_maps_api_key,
+                    "X-Goog-FieldMask": FIELD_MASK,
+                },
+            )
+            response.raise_for_status()
+            return response.json().get("places", [])
+    except httpx.HTTPError as exc:
+        log.warning("Places suggest failed: %s", exc)
+        return []
+
+
+async def suggest_places(
+    db: AsyncSession,
+    user: User,
+    query: str,
+    at: datetime | None = None,
+    limit: int = 8,
+) -> list[tuple[Place, float | None, str]]:
+    """Suggest places for a query, biased to where the user was at `at`.
+
+    Returns (place, distance_from_anchor_m, source) with places already on the
+    itinerary first — those cost nothing and are what people usually mean.
+    Google is only consulted when the local list is thin, which keeps the
+    keystroke-driven UI off the billing meter.
+    """
+    anchor = await anchor_for_time(db, user, at)
+    needle = query.strip().lower()
+
+    def distance(place: Place) -> float | None:
+        if anchor is None:
+            return None
+        return haversine_m(anchor[0], anchor[1], place.lat, place.lng)
+
+    local = [
+        place
+        for place in await _visited_places(db, user)
+        if not needle or needle in place.name.lower()
+    ]
+    local.sort(key=lambda p: (distance(p) if anchor else 0) or 0)
+    results: list[tuple[Place, float | None, str]] = [
+        (place, distance(place), "visited") for place in local[:limit]
+    ]
+
+    # Google is the fallback, not the default: the "where" of an expense is
+    # almost always somewhere already on the itinerary, and this endpoint is
+    # driven by keystrokes.
+    if results or len(needle) < MIN_QUERY_FOR_GOOGLE:
+        return results[:limit]
+
+    seen = {place.google_place_id for place, _, _ in results}
+    for item in await _google_text_search(query, anchor, limit - len(results)):
+        if item.get("id") in seen:
+            continue
+        place = await _upsert_place(db, item)
+        if place is not None:
+            results.append((place, distance(place), "google"))
+    return results[:limit]
 
 
 async def search_place_by_text(db: AsyncSession, query: str) -> Place | None:

@@ -100,6 +100,14 @@ worker as two containers sharing that PVC (RWO-friendly). `kubectl apply -k depl
 
 ## Adding expenses without a receipt
 
-Not everything comes with paper. **Expenses → Add** records an amount, currency, what/where and
-when; if the time falls inside a stop on your timeline, it attaches to that stop automatically and
-counts toward that trip's total. Re-clustering keeps the link.
+Not everything comes with paper. **Expenses → Add** records an amount, currency, **what** it was
+(“Extra gyoza”) and **where** it was, plus when. If the time falls inside a stop on your timeline
+the expense attaches to that stop automatically and counts toward that trip's total; re-clustering
+keeps the link.
+
+The **Where** field suggests places from your own itinerary, ranked by distance from wherever you
+actually were at that time — pick a lunchtime and the restaurant you ate at is metres away and top
+of the list; pick the evening and the night market is. Those suggestions cost nothing (they come
+from places already in your database), and Google is queried only when your itinerary has no match
+and you have typed at least two characters. Free text is always allowed: a stall with no listing is
+just a name.

@@ -41,6 +41,12 @@ class PlaceOut(BaseModel):
     types: list | None
 
 
+class PlaceSuggestion(PlaceOut):
+    # Distance from where the user was at the time of the expense
+    distance_m: float | None
+    source: str  # visited|google
+
+
 # --- Images ---
 class AnalysisOut(BaseModel):
     kind: str
@@ -80,7 +86,9 @@ class ExpenseOut(BaseModel):
     image_id: int | None
     visit_id: int | None
     source: str
+    description: str | None
     merchant: str | None
+    place: PlaceOut | None
     spent_at: datetime | None
     currency: str
     total_minor: int
@@ -106,7 +114,9 @@ class ExpenseCreate(BaseModel):
 
     total: Decimal = Field(gt=0)
     currency: str = Field(min_length=3, max_length=3)
-    merchant: str | None = None
+    description: str | None = Field(default=None, max_length=255)
+    merchant: str | None = Field(default=None, max_length=255)
+    place_id: int | None = None
     spent_at: datetime | None = None
     note: str | None = None
     tax: Decimal | None = None
@@ -116,7 +126,9 @@ class ExpenseCreate(BaseModel):
 
 
 class ExpenseUpdate(BaseModel):
+    description: str | None = None
     merchant: str | None = None
+    place_id: int | None = None
     spent_at: datetime | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     total: Decimal | None = Field(default=None, gt=0)

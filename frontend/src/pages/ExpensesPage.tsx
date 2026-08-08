@@ -1,4 +1,4 @@
-import { AlertTriangle, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
+import { AlertTriangle, MapPin, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { AddExpenseSheet } from '../components/AddExpenseSheet';
 import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
@@ -40,6 +40,7 @@ function ExpenseRow({ expense, onConfirm }: { expense: Expense; onConfirm: () =>
   const remove = useDeleteExpense();
 
   const isForeign = expense.currency !== expense.base_currency;
+  const whereLabel = expense.place?.name ?? expense.merchant;
 
   return (
     <li className="rounded-2xl border border-slate-200 bg-white">
@@ -63,10 +64,19 @@ function ExpenseRow({ expense, onConfirm }: { expense: Expense; onConfirm: () =>
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-slate-900">
-            {expense.merchant ?? 'Unknown merchant'}
+            {expense.description ?? whereLabel ?? 'Expense'}
           </span>
-          <span className="block text-xs text-slate-500">
-            {expense.spent_at ? new Date(expense.spent_at).toLocaleString() : 'date unknown'}
+          <span className="flex items-center gap-1 text-xs text-slate-500">
+            {expense.description && whereLabel && (
+              <>
+                <MapPin className="size-3 shrink-0 text-slate-400" />
+                <span className="max-w-32 truncate">{whereLabel}</span>
+                <span className="text-slate-300">·</span>
+              </>
+            )}
+            <span className="truncate">
+              {expense.spent_at ? new Date(expense.spent_at).toLocaleString() : 'date unknown'}
+            </span>
           </span>
         </span>
         <span className="shrink-0 text-right">
@@ -120,6 +130,12 @@ function ExpenseRow({ expense, onConfirm }: { expense: Expense; onConfirm: () =>
           {expense.tax_minor != null && (
             <p className="mt-1 text-xs text-slate-400">
               incl. tax {formatMoney(expense.tax_minor, expense.currency)}
+            </p>
+          )}
+          {expense.place?.formatted_address && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+              <MapPin className="size-3 shrink-0" />
+              {expense.place.formatted_address}
             </p>
           )}
           {expense.note && <p className="mt-1 text-xs text-slate-500">{expense.note}</p>}

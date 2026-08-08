@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useAddExpense } from '../hooks/useData';
 import { COMMON_CURRENCIES } from '../lib/format';
 import { CurrencyRateField } from './CurrencyRateField';
+import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Sheet, inputClass, labelClass } from './Sheet';
 
 function localDateTimeValue(date: Date): string {
@@ -22,7 +23,9 @@ export function AddExpenseSheet({
   const addExpense = useAddExpense();
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState(baseCurrency);
-  const [merchant, setMerchant] = useState('');
+  const [description, setDescription] = useState('');
+  const [where, setWhere] = useState('');
+  const [placeId, setPlaceId] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [spentAt, setSpentAt] = useState(() => localDateTimeValue(new Date()));
   const [rate, setRate] = useState<number | null>(null);
@@ -37,7 +40,9 @@ export function AddExpenseSheet({
       {
         total: numericAmount,
         currency,
-        merchant: merchant.trim() || null,
+        description: description.trim() || null,
+        merchant: where.trim() || null,
+        place_id: placeId,
         note: note.trim() || null,
         spent_at: new Date(spentAt).toISOString(),
         // Only send a rate the user actually vouched for; otherwise the server
@@ -103,14 +108,30 @@ export function AddExpenseSheet({
         />
 
         <label className="block space-y-1">
-          <span className={labelClass}>What / where</span>
+          <span className={labelClass}>What</span>
           <input
-            value={merchant}
-            onChange={(e) => setMerchant(e.target.value)}
-            placeholder="Taxi to airport"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Taxi to the airport"
             className={inputClass}
           />
         </label>
+
+        <div className="space-y-1">
+          <span className={labelClass}>Where</span>
+          <PlaceAutocomplete
+            value={where}
+            placeId={placeId}
+            at={spentAt}
+            onChange={(name, id) => {
+              setWhere(name);
+              setPlaceId(id);
+            }}
+          />
+          <span className="block text-xs text-slate-400">
+            Suggests places from where you were at that time.
+          </span>
+        </div>
 
         <label className="block space-y-1">
           <span className={labelClass}>When</span>

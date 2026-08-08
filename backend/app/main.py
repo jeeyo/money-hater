@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.queue import queue_app
-from app.routers import auth, expenses, health, images, timeline, trips
+from app.routers import auth, expenses, health, images, places, timeline, trips
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -27,6 +27,7 @@ api.include_router(images.router)
 api.include_router(timeline.router)
 api.include_router(trips.router)
 api.include_router(expenses.router)
+api.include_router(places.router)
 app.mount("/api", api)
 
 # In the production container the built frontend is baked into backend/static;

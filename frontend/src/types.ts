@@ -16,6 +16,11 @@ export interface Place {
   types: string[] | null;
 }
 
+export interface PlaceSuggestion extends Place {
+  distance_m: number | null;
+  source: 'visited' | 'google';
+}
+
 export interface Analysis {
   kind: 'place' | 'food' | 'item' | 'receipt' | 'document' | 'other';
   caption: string | null;
@@ -103,7 +108,11 @@ export interface Expense {
   image_id: number | null;
   visit_id: number | null;
   source: 'receipt' | 'manual';
+  /** What the money went on */
+  description: string | null;
+  /** Where it was spent — free text, plus a resolved Place when picked */
   merchant: string | null;
+  place: Place | null;
   spent_at: string | null;
   currency: string;
   total_minor: number;

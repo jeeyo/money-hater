@@ -16,7 +16,9 @@ import type {
 export interface ExpenseInput {
   total?: number;
   currency?: string;
+  description?: string | null;
   merchant?: string | null;
+  place_id?: number | null;
   spent_at?: string | null;
   note?: string | null;
   fx_rate?: number | null;

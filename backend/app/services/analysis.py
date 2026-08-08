@@ -56,6 +56,8 @@ async def _apply_receipt(
         image_id=image.id,
         source="receipt",
         merchant=receipt.merchant,
+        # The photo's own GPS already told us where this was
+        place_id=image.place_id,
         spent_at=spent_at or image.taken_at,
         currency=currency,
         total_minor=to_minor(receipt.total, currency) or 0,

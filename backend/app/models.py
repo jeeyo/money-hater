@@ -157,7 +157,11 @@ class Expense(Base):
     )
     visit_id: Mapped[int | None] = mapped_column(sa.ForeignKey("visits.id", ondelete="SET NULL"))
     source: Mapped[str] = mapped_column(sa.String(16), default="receipt")  # receipt|manual
+    # "What" — what the money went on ("Motorbike taxi", "Souvenir")
+    description: Mapped[str | None] = mapped_column(sa.String(255))
+    # "Where" — the place, as free text plus an optional resolved Place
     merchant: Mapped[str | None] = mapped_column(sa.String(255))
+    place_id: Mapped[int | None] = mapped_column(sa.ForeignKey("places.id", ondelete="SET NULL"))
     spent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     currency: Mapped[str] = mapped_column(sa.String(3), default="THB")
     total_minor: Mapped[int] = mapped_column(sa.BigInteger, default=0)
@@ -175,6 +179,7 @@ class Expense(Base):
 
     image: Mapped[Image | None] = relationship(back_populates="expense")
     visit: Mapped[Visit | None] = relationship(back_populates="expenses")
+    place: Mapped[Place | None] = relationship()
     items: Mapped[list["ExpenseItem"]] = relationship(
         back_populates="expense", cascade="all, delete-orphan"
     )

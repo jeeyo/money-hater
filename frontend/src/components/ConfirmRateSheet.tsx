@@ -25,7 +25,11 @@ export function ConfirmRateSheet({
     <Sheet title="Confirm conversion" onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-sm text-slate-500">{expense.merchant ?? 'Expense'}</p>
+          <p className="text-sm text-slate-500">
+            {[expense.description, expense.place?.name ?? expense.merchant]
+              .filter(Boolean)
+              .join(' · ') || 'Expense'}
+          </p>
           <p className="text-2xl font-bold text-slate-900">
             {formatMoney(expense.total_minor, expense.currency)}
           </p>
