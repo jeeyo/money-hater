@@ -11,6 +11,8 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 - Groups images into **stops** and days automatically — no set-up, no tagging.
 - **Trips are optional**: when you want to group some days together, name a trip and pick the
   expense it started with and the one it ended with. Nothing is ever grouped for you.
+- **Name a trip while you're on it**: leave the end open and it runs to today, growing as you go,
+  until you tap *End trip now*.
 - Handles **multiple currencies**: everything rolls up into your base currency (THB by default), and
   foreign spend asks you to confirm the rate before it counts.
 - Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
@@ -45,8 +47,8 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
       <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
     </td>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/trips.webp" alt="List of trips the user has created" />
-      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+      <img src="docs/screenshots/trip-open.webp" alt="A trip that is still running, with an End trip now button" />
+      <sub><b>Still going</b> — a trip named on the way out runs to today until you end it.</sub>
     </td>
   </tr>
 </table>
@@ -86,8 +88,8 @@ pins it to light or dark.
       <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
     </td>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/trips-dark.webp" alt="List of trips the user has created" />
-      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+      <img src="docs/screenshots/trip-open-dark.webp" alt="A trip that is still running, with an End trip now button" />
+      <sub><b>Still going</b> — a trip named on the way out runs to today until you end it.</sub>
     </td>
   </tr>
 </table>
@@ -136,7 +138,8 @@ cd frontend && npm run dev
 
 The account is seeded with two days of fabricated itinerary — a day around Bangkok (with a
 receipt, a couple of hand-entered fares and a foreign-currency expense waiting for its rate to be
-confirmed) and a weekend in Chiang Mai. Dates are always relative to today, so the demo lands on
+confirmed) and a weekend in Chiang Mai. Both kinds of trip are there: the Chiang Mai weekend is
+finished, today's is still running. Dates are always relative to today, so the demo lands on
 "today" and "last weekend" whenever you spin the container up.
 
 Seeding is a no-op once the account exists, so restarts never clobber what you've been poking at.
@@ -215,6 +218,21 @@ Bounding by expenses rather than dates means the edges are things you actually r
 window follows them: correct the time on the outbound fare and the trip's first day moves with it.
 The window covers whole days, so a photo taken minutes before its own receipt still counts. A day
 belongs to at most one trip, and deleting a trip only ungroups — the days and spending stay.
+
+### Trips you are still on
+
+<img src="docs/screenshots/trips.webp" alt="Trip list with one trip marked ongoing" width="300" align="right" />
+
+You rarely know the last expense when the trip begins. Tick **Still going** instead and the trip
+has a start and no end: its window runs from that first expense to **today** and keeps moving, so
+each new day, stop and receipt joins it as it happens.
+
+Because "the trip I'm on right now" is singular, only one trip can be open at a time — enforced by
+a partial unique index, not just a check in the service. While it is open it claims every day up to
+today, so no other trip can overlap that stretch; the error names the trip in the way.
+
+Ending it is one tap — **End trip now** closes it at the most recent expense inside it. If it
+actually finished earlier, pick that expense instead and the days after it drop back out.
 
 ## Money and currencies
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, formatSpend, shiftDate, toMajor, toMinor } from './format';
+import {
+  formatMoney,
+  formatSpend,
+  formatTripRange,
+  isOpenTrip,
+  shiftDate,
+  toMajor,
+  toMinor,
+} from './format';
 
 describe('formatMoney', () => {
   it('divides minor units for decimal currencies', () => {
@@ -48,6 +56,38 @@ describe('formatSpend', () => {
     });
     expect(text).toMatch(/282/);
     expect(text).toMatch(/\(.*1,?200.*\)/);
+  });
+});
+
+describe('open trips', () => {
+  const closed = {
+    end_expense_id: 7,
+    started_at: '2026-08-01T00:00:00Z',
+    ended_at: '2026-08-03T23:59:59Z',
+    day_count: 3,
+  };
+  const open = { ...closed, end_expense_id: null };
+
+  it('reads openness from the missing ending expense', () => {
+    expect(isOpenTrip(open)).toBe(true);
+    expect(isOpenTrip(closed)).toBe(false);
+  });
+
+  it('runs an open trip to "now" rather than naming a last day', () => {
+    expect(formatTripRange(open)).toMatch(/– now · 3 days$/);
+  });
+
+  it('names both ends of a finished trip', () => {
+    const text = formatTripRange(closed);
+    expect(text).toContain('–');
+    expect(text).not.toContain('now');
+    expect(text).toMatch(/3 days$/);
+  });
+
+  it('does not repeat the day of a one-day trip', () => {
+    const text = formatTripRange({ ...closed, day_count: 1, ended_at: closed.started_at });
+    expect(text).not.toContain('–');
+    expect(text).toMatch(/1 day$/);
   });
 });
 

@@ -77,7 +77,8 @@ export interface Trip {
   title: string;
   note: string | null;
   start_expense_id: number;
-  end_expense_id: number;
+  /** Null while the trip is still going; `ended_at` then reports today. */
+  end_expense_id: number | null;
   started_at: string;
   ended_at: string;
   day_count: number;
@@ -100,6 +101,7 @@ export interface TripDetail extends Trip {
 export interface TripRef {
   id: number;
   title: string;
+  end_expense_id: number | null;
 }
 
 export interface TimelineDay {

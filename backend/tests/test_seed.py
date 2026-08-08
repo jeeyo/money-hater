@@ -2,11 +2,15 @@
 
 from datetime import UTC, datetime
 
+import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 import app.dev.seed as seed_mod
+from app.config import settings
 from app.dev.seed import DEMO_EMAIL, DEMO_PASSWORD, build, main
-from app.models import Expense, Image, Trip, User, Visit
+from app.models import Base, Expense, Image, Trip, User, Visit
 from app.security import verify_password
 
 
@@ -23,8 +27,11 @@ async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
         # Photos, clustered stops and trips
         assert await db.scalar(sa.select(sa.func.count()).select_from(Image)) == 10
         assert await db.scalar(sa.select(sa.func.count()).select_from(Visit)) > 0
-        # One hand-made trip grouping the Chiang Mai days
-        assert await db.scalar(sa.select(sa.func.count()).select_from(Trip)) == 1
+        # Two hand-made trips: the finished Chiang Mai weekend and today's,
+        # still running, so both states are on screen in a fresh devcontainer.
+        trips = (await db.execute(sa.select(Trip))).scalars().all()
+        assert {trip.title for trip in trips} == {"Chiang Mai weekend", "Out in Bangkok"}
+        assert [trip.title for trip in trips if trip.end_expense_id is None] == ["Out in Bangkok"]
 
         expenses = (await db.execute(sa.select(Expense))).scalars().all()
         # Receipt-backed, hand-entered, and one foreign awaiting confirmation
@@ -77,6 +84,39 @@ async def test_reset_rebuilds_from_scratch(db_sessionmaker, monkeypatch):
     async with db_sessionmaker() as db:
         assert await db.scalar(sa.select(sa.func.count()).select_from(User)) == 1
         assert await db.scalar(sa.select(sa.func.count()).select_from(Expense)) == before
+
+
+@pytest.fixture
+async def strict_sessionmaker(tmp_path, monkeypatch):
+    """A test database that enforces foreign keys, as Postgres does.
+
+    sqlite ignores them unless asked, which hides ordering mistakes in `purge`:
+    a trip's bounding expenses are ON DELETE RESTRICT, so deleting expenses
+    while a trip still points at them fails for real users and not in tests.
+    """
+    engine = create_async_engine(
+        "sqlite+aiosqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+
+    @sa.event.listens_for(engine.sync_engine, "connect")
+    def _enforce_foreign_keys(connection, _record):
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    monkeypatch.setattr(settings, "media_root", tmp_path / "media")
+    yield async_sessionmaker(engine, expire_on_commit=False)
+    await engine.dispose()
+
+
+async def test_reset_survives_foreign_keys_being_enforced(strict_sessionmaker, monkeypatch):
+    monkeypatch.setattr(seed_mod, "SessionLocal", strict_sessionmaker)
+    assert await main(reset=False) == 0
+    assert await main(reset=True) == 0
+
+    async with strict_sessionmaker() as db:
+        assert await db.scalar(sa.select(sa.func.count()).select_from(User)) == 1
+        assert await db.scalar(sa.select(sa.func.count()).select_from(Trip)) == 2
 
 
 async def test_demo_data_is_anchored_to_today(db_sessionmaker):

@@ -173,7 +173,9 @@ def group_by_day(
 
 
 def trip_ref(trip: Trip | None) -> TripRef | None:
-    return TripRef(id=trip.id, title=trip.title) if trip else None
+    return (
+        TripRef(id=trip.id, title=trip.title, end_expense_id=trip.end_expense_id) if trip else None
+    )
 
 
 def _trip_fields(

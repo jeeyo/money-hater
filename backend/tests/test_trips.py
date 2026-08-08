@@ -122,7 +122,11 @@ async def test_timeline_shows_which_trip_a_day_belongs_to(client):
     trip = await _trip(client, start, end)
 
     inside = (await client.get("/api/timeline", params={"date": "2026-08-02"})).json()
-    assert inside["trip"] == {"id": trip["id"], "title": "Chiang Mai weekend"}
+    assert inside["trip"] == {
+        "id": trip["id"],
+        "title": "Chiang Mai weekend",
+        "end_expense_id": end["id"],
+    }
 
     outside = (await client.get("/api/timeline", params={"date": "2026-08-05"})).json()
     assert outside["trip"] is None

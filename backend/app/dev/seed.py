@@ -257,11 +257,13 @@ async def purge(db, user: User) -> None:
     image_ids = sa.select(Image.id).where(Image.user_id == user.id)
     expense_ids = sa.select(Expense.id).where(Expense.user_id == user.id)
     await db.execute(sa.delete(ExpenseItem).where(ExpenseItem.expense_id.in_(expense_ids)))
+    # Trips first: their bounding expenses are RESTRICT, so Postgres refuses to
+    # delete an expense while a trip still points at it.
+    await db.execute(sa.delete(Trip).where(Trip.user_id == user.id))
     await db.execute(sa.delete(Expense).where(Expense.user_id == user.id))
     await db.execute(sa.delete(ImageAnalysis).where(ImageAnalysis.image_id.in_(image_ids)))
     await db.execute(sa.delete(Image).where(Image.user_id == user.id))
     await db.execute(sa.delete(Visit).where(Visit.user_id == user.id))
-    await db.execute(sa.delete(Trip).where(Trip.user_id == user.id))
     await db.execute(sa.delete(AuthSession).where(AuthSession.user_id == user.id))
     await db.delete(user)
     await db.commit()
@@ -398,7 +400,19 @@ async def build(db) -> User:
                 end_expense_id=bounds[1].id,
             )
         )
-        await db.commit()
+
+    # ...and one still running: named at the BTS gate this morning, with no end
+    # yet, so today's spending keeps joining it.
+    today_start = await db.scalar(
+        sa.select(Expense)
+        .where(Expense.user_id == user.id, Expense.merchant == "BTS Ari")
+        .order_by(sa.func.coalesce(Expense.spent_at, Expense.created_at))
+        .limit(1)
+    )
+    if today_start is not None:
+        db.add(Trip(user_id=user.id, title="Out in Bangkok", start_expense_id=today_start.id))
+
+    await db.commit()
     return user
 
 

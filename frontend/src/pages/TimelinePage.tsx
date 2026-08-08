@@ -5,7 +5,7 @@ import { ImageModal } from '../components/ImageModal';
 import { ImageThumb } from '../components/ImageThumb';
 import { VisitCard } from '../components/VisitCard';
 import { useTimeline } from '../hooks/useData';
-import { formatSpend, localDateString, shiftDate } from '../lib/format';
+import { formatSpend, isOpenTrip, localDateString, shiftDate } from '../lib/format';
 import type { ImageRecord } from '../types';
 
 export function TimelinePage() {
@@ -50,6 +50,7 @@ export function TimelinePage() {
           <Luggage className="size-4 shrink-0" />
           <span className="flex-1 truncate">
             Part of <span className="font-semibold">{data.trip.title}</span>
+            {isOpenTrip(data.trip) && ' · ongoing'}
           </span>
           <ChevronRight className="size-4 shrink-0 text-brand-500" />
         </Link>

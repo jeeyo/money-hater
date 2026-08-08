@@ -196,6 +196,8 @@ class TripRef(BaseModel):
 
     id: int
     title: str
+    # Null means the trip is still going, so the chip can say so.
+    end_expense_id: int | None
 
 
 class TripOut(BaseModel):
@@ -203,7 +205,8 @@ class TripOut(BaseModel):
     title: str
     note: str | None
     start_expense_id: int
-    end_expense_id: int
+    # Null while the trip is open; `ended_at` then reports today.
+    end_expense_id: int | None
     started_at: datetime
     ended_at: datetime
     day_count: int
@@ -226,15 +229,23 @@ class TripDetailOut(TripOut):
 class TripCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     start_expense_id: int
-    end_expense_id: int
+    # Omit (or send null) for a trip you are still on.
+    end_expense_id: int | None = None
     note: str | None = None
 
 
 class TripUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     start_expense_id: int | None = None
+    # An explicit null reopens the trip; absent leaves the end alone.
     end_expense_id: int | None = None
     note: str | None = None
+
+
+class TripEnd(BaseModel):
+    """Close an open trip. Omit the expense to end it at the latest one."""
+
+    end_expense_id: int | None = None
 
 
 class TimelineDayOut(BaseModel):

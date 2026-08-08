@@ -50,8 +50,24 @@ export function useTrip(tripId: number) {
 
 export function useCreateTrip() {
   return useMutation({
-    mutationFn: (body: { title: string; start_expense_id: number; end_expense_id: number }) =>
-      postJson<TripDetail>(`/api/trips?tz_offset_minutes=${tzOffsetMinutes()}`, body),
+    // A null end starts a trip you are still on: it runs to today and grows.
+    mutationFn: (body: {
+      title: string;
+      start_expense_id: number;
+      end_expense_id: number | null;
+    }) => postJson<TripDetail>(`/api/trips?tz_offset_minutes=${tzOffsetMinutes()}`, body),
+    onSuccess: invalidateItinerary,
+  });
+}
+
+/** Close an open trip. Without an expense the server ends it at the latest one. */
+export function useEndTrip(tripId: number) {
+  return useMutation({
+    mutationFn: (body: { end_expense_id?: number } = {}) =>
+      postJson<TripDetail>(
+        `/api/trips/${tripId}/end?tz_offset_minutes=${tzOffsetMinutes()}`,
+        body,
+      ),
     onSuccess: invalidateItinerary,
   });
 }
@@ -154,7 +170,12 @@ export function useUploadImages() {
 
 export function useUpdateTrip(tripId: number) {
   return useMutation({
-    mutationFn: (body: { title?: string; start_expense_id?: number; end_expense_id?: number }) =>
+    // An explicit null end reopens the trip; leaving it out keeps it as it is.
+    mutationFn: (body: {
+      title?: string;
+      start_expense_id?: number;
+      end_expense_id?: number | null;
+    }) =>
       postJson<TripDetail>(
         `/api/trips/${tripId}?tz_offset_minutes=${tzOffsetMinutes()}`,
         body,

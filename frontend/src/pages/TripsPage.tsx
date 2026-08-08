@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { NewTripSheet } from '../components/NewTripSheet';
 import { useTrips } from '../hooks/useData';
-import { formatDay, formatSpend } from '../lib/format';
+import { formatSpend, formatTripRange, isOpenTrip } from '../lib/format';
 
 export function TripsPage() {
   const { data: trips, isLoading } = useTrips();
@@ -48,9 +48,12 @@ export function TripsPage() {
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-ink">{trip.title}</span>
                 <span className="block text-xs text-ink-3">
-                  {formatDay(trip.started_at)}
-                  {trip.day_count > 1 && <> – {formatDay(trip.ended_at)}</>} · {trip.day_count} day
-                  {trip.day_count === 1 ? '' : 's'} · {trip.image_count} photo
+                  {isOpenTrip(trip) && (
+                    <span className="mr-1.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+                      Ongoing
+                    </span>
+                  )}
+                  {formatTripRange(trip)} · {trip.image_count} photo
                   {trip.image_count === 1 ? '' : 's'}
                 </span>
               </span>

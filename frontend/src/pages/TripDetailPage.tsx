@@ -1,10 +1,11 @@
-import { ArrowLeft, Check, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, Flag, Pencil, Trash2 } from 'lucide-react';
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { EndTripSheet } from '../components/EndTripSheet';
 import { VisitCard } from '../components/VisitCard';
-import { useDeleteTrip, useTrip, useUpdateTrip } from '../hooks/useData';
+import { useDeleteTrip, useEndTrip, useTrip, useUpdateTrip } from '../hooks/useData';
 import { dayColor } from '../lib/dayColors';
-import { formatDay, formatSpend } from '../lib/format';
+import { formatDay, formatSpend, formatTripRange, isOpenTrip } from '../lib/format';
 
 // maplibre-gl is heavy; load it only when a trip map is actually shown
 const MapView = lazy(() => import('../components/MapView').then((m) => ({ default: m.MapView })));
@@ -16,8 +17,10 @@ export function TripDetailPage() {
   const { data: trip, isLoading } = useTrip(id);
   const updateTrip = useUpdateTrip(id);
   const deleteTrip = useDeleteTrip();
+  const endTrip = useEndTrip(id);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
+  const [choosingEnd, setChoosingEnd] = useState(false);
 
   // One route per day, so the map shows which stops belonged to which day
   const mapDays = useMemo(
@@ -45,7 +48,7 @@ export function TripDetailPage() {
         <Link to="/trips" className="inline-flex items-center gap-1 text-sm text-ink-3">
           <ArrowLeft className="size-4" /> Trips
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editing ? (
             <>
               <input
@@ -67,6 +70,11 @@ export function TripDetailPage() {
           ) : (
             <>
               <h1 className="truncate text-xl font-bold text-ink">{trip.title}</h1>
+              {isOpenTrip(trip) && (
+                <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-700">
+                  Ongoing · day {trip.day_count}
+                </span>
+              )}
               <button
                 type="button"
                 aria-label="Rename trip"
@@ -82,9 +90,7 @@ export function TripDetailPage() {
           )}
         </div>
         <p className="text-sm text-ink-3">
-          {formatDay(trip.started_at)}
-          {trip.day_count > 1 && <> – {formatDay(trip.ended_at)}</>} · {trip.day_count} day
-          {trip.day_count === 1 ? '' : 's'}
+          {formatTripRange(trip)}
           {trip.spend.base_total_minor > 0 && (
             <>
               {' '}
@@ -94,6 +100,32 @@ export function TripDetailPage() {
           )}
         </p>
       </header>
+
+      {isOpenTrip(trip) && (
+        <div className="space-y-2 rounded-2xl border border-line bg-surface p-3">
+          <p className="text-sm text-ink-3">
+            This trip is still running — today and everything you log from here joins it.
+          </p>
+          <button
+            type="button"
+            onClick={() => endTrip.mutate({})}
+            disabled={endTrip.isPending}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white active:bg-brand-700 disabled:opacity-50"
+          >
+            <Flag className="size-4" /> {endTrip.isPending ? 'Ending…' : 'End trip now'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setChoosingEnd(true)}
+            className="w-full text-center text-xs text-ink-3 underline underline-offset-2"
+          >
+            Ended earlier? Pick the expense it ended with
+          </button>
+          {endTrip.isError && (
+            <p className="text-center text-sm text-danger">{endTrip.error.message}</p>
+          )}
+        </div>
+      )}
 
       {hasMapPoints && (
         <Suspense
@@ -148,6 +180,8 @@ export function TripDetailPage() {
       >
         <Trash2 className="size-4" /> Delete trip
       </button>
+
+      {choosingEnd && <EndTripSheet trip={trip} onClose={() => setChoosingEnd(false)} />}
     </div>
   );
 }

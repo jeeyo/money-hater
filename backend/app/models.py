@@ -60,9 +60,23 @@ class Trip(Base):
     airport taxi) and the one that ended it, and every day, stop and expense in
     that window belongs to it. Membership is derived from the window rather
     than stored, so it stays correct as things are edited.
+
+    A trip you are still on has no ending expense yet: ``end_expense_id`` is
+    NULL and the window runs to now, so today joins it as it happens. That null
+    is the only marker of an open trip — there is no second flag to disagree
+    with it — and a partial unique index keeps it to one per user.
     """
 
     __tablename__ = "trips"
+    __table_args__ = (
+        sa.Index(
+            "uq_trips_one_open_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=sa.text("end_expense_id IS NULL"),
+            sqlite_where=sa.text("end_expense_id IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -70,12 +84,14 @@ class Trip(Base):
     start_expense_id: Mapped[int] = mapped_column(
         sa.ForeignKey("expenses.id", ondelete="RESTRICT")
     )
-    end_expense_id: Mapped[int] = mapped_column(sa.ForeignKey("expenses.id", ondelete="RESTRICT"))
+    end_expense_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("expenses.id", ondelete="RESTRICT")
+    )
     note: Mapped[str | None] = mapped_column(sa.Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
 
     start_expense: Mapped["Expense"] = relationship(foreign_keys=[start_expense_id])
-    end_expense: Mapped["Expense"] = relationship(foreign_keys=[end_expense_id])
+    end_expense: Mapped["Expense | None"] = relationship(foreign_keys=[end_expense_id])
 
 
 class Visit(Base):

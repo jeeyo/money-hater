@@ -4,6 +4,10 @@ Nothing here infers a trip. The user marks the expense that started it (the
 airport taxi) and the one that ended it; everything in that window — days,
 stops, photos, spend — belongs to the trip. Membership is derived on read, so
 it stays correct when the underlying expenses are edited.
+
+A trip can also be *open*: named when you set off, with no ending expense yet.
+Its window runs to now, and because membership is derived rather than stored,
+today falls into it without anything having to update the row.
 """
 
 from dataclasses import dataclass
@@ -46,36 +50,84 @@ def snap_to_days(start: datetime, end: datetime, tz_offset_minutes: int) -> Trip
     return TripWindow(started_at=first, ended_at=last)
 
 
-def window_of(trip: Trip, tz_offset_minutes: int = 0) -> TripWindow:
-    """The trip's span: the full local days its bounding expenses fall on."""
-    return snap_to_days(
-        moment_of(trip.start_expense), moment_of(trip.end_expense), tz_offset_minutes
+def is_open(trip: Trip) -> bool:
+    """No ending expense yet — the trip is still running."""
+    return trip.end_expense_id is None
+
+
+def window_of(trip: Trip, tz_offset_minutes: int = 0, now: datetime | None = None) -> TripWindow:
+    """The trip's span: the full local days its bounding expenses fall on.
+
+    An open trip has no ending expense, so it runs to ``now`` — today's local
+    day — and grows by itself. ``now`` is injectable so tests can pin it.
+    """
+    ends_at = (
+        moment_of(trip.end_expense) if trip.end_expense is not None else (now or datetime.now(UTC))
     )
+    return snap_to_days(moment_of(trip.start_expense), ends_at, tz_offset_minutes)
 
 
 async def resolve_bounds(
-    db: AsyncSession, user: User, start_expense_id: int, end_expense_id: int
-) -> tuple[Expense, Expense]:
+    db: AsyncSession,
+    user: User,
+    start_expense_id: int,
+    end_expense_id: int | None,
+    now: datetime | None = None,
+) -> tuple[Expense, Expense | None]:
+    """Load the bounding expenses. A missing end means an open trip."""
+    wanted = {start_expense_id} | ({end_expense_id} if end_expense_id is not None else set())
     expenses = {
         expense.id: expense
         for expense in (
             await db.execute(
-                sa.select(Expense).where(
-                    Expense.user_id == user.id,
-                    Expense.id.in_({start_expense_id, end_expense_id}),
-                )
+                sa.select(Expense).where(Expense.user_id == user.id, Expense.id.in_(wanted))
             )
         ).scalars()
     }
-    start, end = expenses.get(start_expense_id), expenses.get(end_expense_id)
-    if start is None or end is None:
+    start = expenses.get(start_expense_id)
+    end = expenses.get(end_expense_id) if end_expense_id is not None else None
+    if start is None or (end_expense_id is not None and end is None):
         raise TripWindowError("Both expenses must exist and belong to you")
 
-    start_at = _aware(start.spent_at or start.created_at)
-    end_at = _aware(end.spent_at or end.created_at)
-    if end_at < start_at:
+    start_at = moment_of(start)
+    if end is None:
+        # An open trip ends now, so a start in the future cannot bound anything.
+        if start_at > (now or datetime.now(UTC)):
+            raise TripWindowError("An ongoing trip cannot start in the future")
+        return start, None
+    if moment_of(end) < start_at:
         raise TripWindowError("The ending expense comes before the starting one")
     return start, end
+
+
+async def latest_expense_in(db: AsyncSession, user: User, window: TripWindow) -> Expense | None:
+    """The most recent expense in the window — what "end trip now" picks.
+
+    Worst case that is the trip's own starting expense, so a trip opened today
+    can still be ended today.
+    """
+    return await db.scalar(
+        sa.select(Expense)
+        .where(
+            Expense.user_id == user.id,
+            _spent() >= window.started_at,
+            _spent() <= window.ended_at,
+        )
+        .order_by(_spent().desc(), Expense.id.desc())
+        .limit(1)
+    )
+
+
+async def assert_no_other_open_trip(
+    db: AsyncSession, user: User, exclude_id: int | None = None
+) -> None:
+    """"The trip I am on right now" is singular, so only one may be open."""
+    query = sa.select(Trip).where(Trip.user_id == user.id, Trip.end_expense_id.is_(None))
+    if exclude_id is not None:
+        query = query.where(Trip.id != exclude_id)
+    other = await db.scalar(query.limit(1))
+    if other is not None:
+        raise TripWindowError(f"“{other.title}” is still going — end it first")
 
 
 async def assert_no_overlap(

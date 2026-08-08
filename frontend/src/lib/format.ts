@@ -60,6 +60,27 @@ export function formatDay(iso: string): string {
   });
 }
 
+/** A trip with no ending expense is one you are still on. */
+export function isOpenTrip(trip: { end_expense_id: number | null }): boolean {
+  return trip.end_expense_id === null;
+}
+
+/**
+ * "Sat, Aug 1, 2026 – now · 3 days". An open trip has no end to name, so its
+ * range runs to now and the day count is what it is *today*.
+ */
+export function formatTripRange(trip: {
+  end_expense_id: number | null;
+  started_at: string;
+  ended_at: string;
+  day_count: number;
+}): string {
+  const days = `${trip.day_count} day${trip.day_count === 1 ? '' : 's'}`;
+  if (isOpenTrip(trip)) return `${formatDay(trip.started_at)} – now · ${days}`;
+  if (trip.day_count === 1) return `${formatDay(trip.started_at)} · ${days}`;
+  return `${formatDay(trip.started_at)} – ${formatDay(trip.ended_at)} · ${days}`;
+}
+
 export function localDateString(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
