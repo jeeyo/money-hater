@@ -1,0 +1,97 @@
+import { RefreshCw, Trash2, X } from 'lucide-react';
+import { useDeleteImage, useReanalyzeImage } from '../hooks/useData';
+import { formatTime } from '../lib/format';
+import type { ImageRecord } from '../types';
+
+export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: () => void }) {
+  const reanalyze = useReanalyzeImage();
+  const remove = useDeleteImage();
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/70 md:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white md:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative">
+          <img src={image.original_url} alt="" className="max-h-[50dvh] w-full object-contain bg-slate-100" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 rounded-full bg-slate-900/60 p-2 text-white"
+            aria-label="Close"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="space-y-3 p-4">
+          {image.analysis?.caption && (
+            <p className="text-sm text-slate-700">{image.analysis.caption}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {image.analysis?.labels?.map((label) => (
+              <span
+                key={label}
+                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500">
+            {image.taken_at && (
+              <>
+                <dt>Taken</dt>
+                <dd>
+                  {formatTime(image.taken_at)}{' '}
+                  <span className="text-slate-400">({image.taken_at_source})</span>
+                </dd>
+              </>
+            )}
+            {image.place && (
+              <>
+                <dt>Place</dt>
+                <dd>{image.place.name}</dd>
+              </>
+            )}
+            {image.lat != null && (
+              <>
+                <dt>GPS</dt>
+                <dd>
+                  {image.lat.toFixed(4)}, {image.lng?.toFixed(4)}
+                </dd>
+              </>
+            )}
+            {image.status === 'failed' && (
+              <>
+                <dt className="text-rose-600">Failed</dt>
+                <dd className="text-rose-600">{image.error}</dd>
+              </>
+            )}
+          </dl>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => reanalyze.mutate(image.id, { onSuccess: onClose })}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 active:bg-slate-50"
+            >
+              <RefreshCw className="size-4" /> Re-analyze
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Delete this photo?')) remove.mutate(image.id, { onSuccess: onClose });
+              }}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-rose-200 py-2.5 text-sm font-medium text-rose-600 active:bg-rose-50"
+            >
+              <Trash2 className="size-4" /> Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
