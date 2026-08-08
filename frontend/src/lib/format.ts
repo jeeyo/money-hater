@@ -1,3 +1,5 @@
+import type { Spend } from '../types';
+
 const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'RWF', 'XAF', 'XOF', 'XPF']);
 
 export function formatMoney(totalMinor: number, currency: string): string {
@@ -9,9 +11,41 @@ export function formatMoney(totalMinor: number, currency: string): string {
   }
 }
 
-export function formatSpend(spend: { currency: string; total_minor: number }[]): string {
-  return spend.map((s) => formatMoney(s.total_minor, s.currency)).join(' + ');
+export function toMinor(amount: number, currency: string): number {
+  return Math.round(amount * (ZERO_DECIMAL.has(currency) ? 1 : 100));
 }
+
+export function toMajor(minor: number, currency: string): number {
+  return ZERO_DECIMAL.has(currency) ? minor : minor / 100;
+}
+
+/** Spend totals always read in the base currency; foreign originals go in parentheses. */
+export function formatSpend(spend: Spend): string {
+  const base = formatMoney(spend.base_total_minor, spend.base_currency);
+  const foreign = spend.by_currency.filter((c) => c.currency !== spend.base_currency);
+  if (foreign.length === 0) return base;
+  const detail = foreign.map((c) => formatMoney(c.total_minor, c.currency)).join(' + ');
+  return `${base} (${detail})`;
+}
+
+export const COMMON_CURRENCIES = [
+  'THB',
+  'JPY',
+  'USD',
+  'EUR',
+  'GBP',
+  'SGD',
+  'MYR',
+  'VND',
+  'KRW',
+  'CNY',
+  'HKD',
+  'TWD',
+  'AUD',
+  'IDR',
+  'PHP',
+  'INR',
+];
 
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });

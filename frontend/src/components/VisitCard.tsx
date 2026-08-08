@@ -34,7 +34,7 @@ export function VisitCard({ visit }: { visit: Visit }) {
               )}
             </p>
           </div>
-          {visit.spend.length > 0 && (
+          {visit.spend.base_total_minor > 0 && (
             <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
               {formatSpend(visit.spend)}
             </span>

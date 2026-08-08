@@ -77,7 +77,7 @@ export function TripDetailPage() {
         </div>
         <p className="text-sm text-slate-500">
           {formatDay(trip.started_at)} · {trip.kind}
-          {trip.spend.length > 0 && (
+          {trip.spend.base_total_minor > 0 && (
             <> · spent <span className="font-semibold text-amber-700">{formatSpend(trip.spend)}</span></>
           )}
         </p>

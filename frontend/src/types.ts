@@ -45,6 +45,14 @@ export interface CurrencyTotal {
   total_minor: number;
 }
 
+/** Spend rolled up into the user's base currency (THB by default). */
+export interface Spend {
+  base_currency: string;
+  base_total_minor: number;
+  by_currency: CurrencyTotal[];
+  unconfirmed_count: number;
+}
+
 export interface Visit {
   id: number;
   trip_id: number;
@@ -56,7 +64,7 @@ export interface Visit {
   lng: number | null;
   pinned: boolean;
   images: ImageRecord[];
-  spend: CurrencyTotal[];
+  spend: Spend;
 }
 
 export interface Trip {
@@ -68,7 +76,7 @@ export interface Trip {
   pinned: boolean;
   visit_count: number;
   image_count: number;
-  spend: CurrencyTotal[];
+  spend: Spend;
 }
 
 export interface TripDetail extends Trip {
@@ -79,7 +87,7 @@ export interface TimelineDay {
   date: string;
   trips: TripDetail[];
   unassigned_images: ImageRecord[];
-  spend: CurrencyTotal[];
+  spend: Spend;
 }
 
 export interface ExpenseItem {
@@ -92,26 +100,40 @@ export interface ExpenseItem {
 
 export interface Expense {
   id: number;
-  image_id: number;
+  image_id: number | null;
   visit_id: number | null;
+  source: 'receipt' | 'manual';
   merchant: string | null;
   spent_at: string | null;
   currency: string;
   total_minor: number;
   tax_minor: number | null;
   tip_minor: number | null;
+  base_currency: string;
+  base_total_minor: number | null;
+  fx_rate: number | null;
+  fx_rate_source: 'same' | 'api' | 'manual' | null;
+  needs_review: boolean;
   note: string | null;
   items: ExpenseItem[];
 }
 
 export interface MerchantTotal {
   merchant: string;
-  currency: string;
-  total_minor: number;
+  base_currency: string;
+  base_total_minor: number;
   count: number;
 }
 
 export interface ExpenseSummary {
-  totals: CurrencyTotal[];
+  spend: Spend;
   by_merchant: MerchantTotal[];
+  needs_review_count: number;
+}
+
+export interface RateQuote {
+  from_currency: string;
+  to_currency: string;
+  rate: number | null;
+  converted_minor: number | null;
 }

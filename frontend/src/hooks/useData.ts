@@ -6,11 +6,22 @@ import type {
   Expense,
   ExpenseSummary,
   ImageRecord,
+  RateQuote,
   TimelineDay,
   Trip,
   TripDetail,
   User,
 } from '../types';
+
+export interface ExpenseInput {
+  total?: number;
+  currency?: string;
+  merchant?: string | null;
+  spent_at?: string | null;
+  note?: string | null;
+  fx_rate?: number | null;
+  items?: { name: string; qty: number; amount: number }[];
+}
 
 export function useTimeline(date: string) {
   return useQuery({
@@ -31,8 +42,52 @@ export function useTrip(tripId: number) {
   });
 }
 
-export function useExpenses() {
-  return useQuery({ queryKey: ['expenses'], queryFn: () => apiJson<Expense[]>('/api/expenses') });
+export function useExpenses(needsReview?: boolean) {
+  const query = needsReview === undefined ? '' : `?needs_review=${needsReview}`;
+  return useQuery({
+    queryKey: ['expenses', 'list', needsReview ?? 'all'],
+    queryFn: () => apiJson<Expense[]>(`/api/expenses${query}`),
+  });
+}
+
+/** Today's rate into the base currency, used to prefill the confirmation UI. */
+export function useRateQuote(fromCurrency: string, baseCurrency: string) {
+  return useQuery({
+    queryKey: ['rate', fromCurrency],
+    queryFn: () => apiJson<RateQuote>(`/api/expenses/rate?from_currency=${fromCurrency}`),
+    enabled: Boolean(fromCurrency) && fromCurrency !== baseCurrency,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useAddExpense() {
+  return useMutation({
+    mutationFn: (body: ExpenseInput) => postJson<Expense>('/api/expenses', body),
+    onSuccess: invalidateItinerary,
+  });
+}
+
+export function useConfirmExpense() {
+  return useMutation({
+    mutationFn: ({ id, fx_rate }: { id: number; fx_rate?: number }) =>
+      postJson<Expense>(`/api/expenses/${id}/confirm`, fx_rate ? { fx_rate } : {}),
+    onSuccess: invalidateItinerary,
+  });
+}
+
+export function useUpdateExpense() {
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: number } & Partial<ExpenseInput>) =>
+      postJson<Expense>(`/api/expenses/${id}`, body, 'PATCH'),
+    onSuccess: invalidateItinerary,
+  });
+}
+
+export function useDeleteExpense() {
+  return useMutation({
+    mutationFn: (id: number) => apiJson<void>(`/api/expenses/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidateItinerary,
+  });
 }
 
 export function useExpenseSummary() {

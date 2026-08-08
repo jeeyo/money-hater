@@ -37,7 +37,7 @@ export function TripsPage() {
                     {trip.image_count === 1 ? '' : 's'}
                   </span>
                 </span>
-                {trip.spend.length > 0 && (
+                {trip.spend.base_total_minor > 0 && (
                   <span className="shrink-0 text-xs font-semibold text-amber-700">
                     {formatSpend(trip.spend)}
                   </span>

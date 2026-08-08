@@ -22,7 +22,7 @@ function TripSection({ trip }: { trip: TripDetail }) {
             {trip.visit_count} stop{trip.visit_count === 1 ? '' : 's'}
           </span>
         </span>
-        {trip.spend.length > 0 && (
+        {trip.spend.base_total_minor > 0 && (
           <span className="shrink-0 text-xs font-semibold text-amber-700">
             {formatSpend(trip.spend)}
           </span>
@@ -72,7 +72,7 @@ export function TimelinePage() {
         </button>
       </header>
 
-      {data && data.spend.length > 0 && (
+      {data && data.spend.base_total_minor > 0 && (
         <p className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           Spent this day: <span className="font-semibold">{formatSpend(data.spend)}</span>
         </p>
