@@ -372,6 +372,33 @@ async def build(db) -> User:
 
     await db.commit()
     await recluster_user(db, user)
+
+    # One hand-made trip: the Chiang Mai weekend, from the first coffee there
+    # to the souvenir on the way out. Trips are always made this way — nothing
+    # groups days on its own.
+    bounds = (
+        (
+            await db.execute(
+                sa.select(Expense)
+                .where(Expense.user_id == user.id, Expense.merchant.in_(
+                    ["Graph Cafe", "Baan Celadon"]
+                ))
+                .order_by(sa.func.coalesce(Expense.spent_at, Expense.created_at))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if len(bounds) == 2:
+        db.add(
+            Trip(
+                user_id=user.id,
+                title="Chiang Mai weekend",
+                start_expense_id=bounds[0].id,
+                end_expense_id=bounds[1].id,
+            )
+        )
+        await db.commit()
     return user
 
 

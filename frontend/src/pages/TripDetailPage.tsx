@@ -1,26 +1,27 @@
-import { ArrowLeft, Check, Pencil } from 'lucide-react';
+import { ArrowLeft, Check, Pencil, Trash2 } from 'lucide-react';
 import { Suspense, lazy, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { VisitCard } from '../components/VisitCard';
+import { useDeleteTrip, useTrip, useUpdateTrip } from '../hooks/useData';
+import { formatDay, formatSpend } from '../lib/format';
 
 // maplibre-gl is heavy; load it only when a trip map is actually shown
-const MapView = lazy(() =>
-  import('../components/MapView').then((m) => ({ default: m.MapView })),
-);
-import { VisitCard } from '../components/VisitCard';
-import { useTrip, useUpdateTrip } from '../hooks/useData';
-import { formatDay, formatSpend } from '../lib/format';
+const MapView = lazy(() => import('../components/MapView').then((m) => ({ default: m.MapView })));
 
 export function TripDetailPage() {
   const { tripId } = useParams();
   const id = Number(tripId);
+  const navigate = useNavigate();
   const { data: trip, isLoading } = useTrip(id);
   const updateTrip = useUpdateTrip(id);
+  const deleteTrip = useDeleteTrip();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
 
   const mapPoints = useMemo(
     () =>
-      (trip?.visits ?? [])
+      (trip?.days ?? [])
+        .flatMap((day) => day.visits)
         .filter((v) => v.lat != null && v.lng != null)
         .map((v) => ({ lat: v.lat!, lng: v.lng!, label: v.label })),
     [trip],
@@ -76,24 +77,65 @@ export function TripDetailPage() {
           )}
         </div>
         <p className="text-sm text-slate-500">
-          {formatDay(trip.started_at)} · {trip.kind}
+          {formatDay(trip.started_at)}
+          {trip.day_count > 1 && <> – {formatDay(trip.ended_at)}</>} · {trip.day_count} day
+          {trip.day_count === 1 ? '' : 's'}
           {trip.spend.base_total_minor > 0 && (
-            <> · spent <span className="font-semibold text-amber-700">{formatSpend(trip.spend)}</span></>
+            <>
+              {' '}
+              · spent{' '}
+              <span className="font-semibold text-amber-700">{formatSpend(trip.spend)}</span>
+            </>
           )}
         </p>
       </header>
 
       {mapPoints.length > 0 && (
-        <Suspense fallback={<div className="h-56 w-full animate-pulse rounded-2xl bg-slate-100 md:h-72" />}>
+        <Suspense
+          fallback={<div className="h-56 w-full animate-pulse rounded-2xl bg-slate-100 md:h-72" />}
+        >
           <MapView points={mapPoints} className="h-56 w-full overflow-hidden rounded-2xl md:h-72" />
         </Suspense>
       )}
 
-      <div className="space-y-3 border-l border-slate-200 [&>*]:-ml-px">
-        {trip.visits.map((visit) => (
-          <VisitCard key={visit.id} visit={visit} />
-        ))}
-      </div>
+      {trip.days.length === 0 && (
+        <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+          No photographed stops in this window yet — the expenses are still counted below.
+        </p>
+      )}
+
+      {trip.days.map((day, index) => (
+        <section key={day.date} className="space-y-3">
+          <div className="flex items-baseline justify-between gap-2 px-1">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Day {index + 1}
+              <span className="ml-2 font-normal text-slate-400">{formatDay(day.date)}</span>
+            </h2>
+            {day.spend.base_total_minor > 0 && (
+              <span className="text-xs font-semibold text-amber-700">
+                {formatSpend(day.spend)}
+              </span>
+            )}
+          </div>
+          <div className="space-y-3 border-l border-slate-200 [&>*]:-ml-px">
+            {day.visits.map((visit) => (
+              <VisitCard key={visit.id} visit={visit} />
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => {
+          if (confirm(`Ungroup “${trip.title}”? The days and expenses stay.`)) {
+            deleteTrip.mutate(trip.id, { onSuccess: () => navigate('/trips') });
+          }
+        }}
+        className="flex items-center gap-1.5 text-sm font-medium text-rose-600"
+      >
+        <Trash2 className="size-4" /> Delete trip
+      </button>
     </div>
   );
 }

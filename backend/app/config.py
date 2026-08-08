@@ -43,12 +43,9 @@ class Settings(BaseSettings):
     # (foreign expenses then wait for a manually entered rate).
     exchange_rate_api_url: str = "https://api.frankfurter.dev/v1/latest"
 
-    # Clustering thresholds
+    # Visit clustering thresholds (trips are made by hand, never inferred)
     visit_max_gap_minutes: int = 45
     visit_max_distance_m: int = 300
-    trip_max_gap_hours: int = 4
-    # A trip starting and ending within this distance of home is tagged a commute/outing
-    home_radius_m: int = 300
 
 
 settings = Settings()

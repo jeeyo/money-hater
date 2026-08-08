@@ -5,9 +5,10 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 
 from app.deps import CurrentUser, DbSession
-from app.models import Expense, Image, Trip, Visit
+from app.models import Expense, Image, Visit
 from app.schemas import TimelineDayOut
 from app.serialize import timeline_day_out
+from app.services.trips import trip_overlapping
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
 
@@ -31,26 +32,25 @@ async def get_timeline(
     date: str = Query(description="Local calendar day, YYYY-MM-DD"),
     tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
 ):
+    """One day: the stops you made, plus what you spent."""
     start, end = day_window_utc(date, tz_offset_minutes)
 
-    trips = (
+    visits = (
         (
             await db.execute(
-                sa.select(Trip)
-                .where(Trip.user_id == user.id, Trip.started_at < end, Trip.ended_at >= start)
-                .order_by(Trip.started_at)
+                sa.select(Visit)
+                .where(
+                    Visit.user_id == user.id,
+                    Visit.started_at < end,
+                    Visit.ended_at >= start,
+                )
+                .order_by(Visit.started_at)
                 .options(
-                    selectinload(Trip.visits).selectinload(Visit.place),
-                    selectinload(Trip.visits).selectinload(Visit.expenses),
-                    selectinload(Trip.visits)
-                    .selectinload(Visit.images)
-                    .selectinload(Image.analysis),
-                    selectinload(Trip.visits)
-                    .selectinload(Visit.images)
-                    .selectinload(Image.expense),
-                    selectinload(Trip.visits)
-                    .selectinload(Visit.images)
-                    .selectinload(Image.place),
+                    selectinload(Visit.place),
+                    selectinload(Visit.expenses),
+                    selectinload(Visit.images).selectinload(Image.analysis),
+                    selectinload(Visit.images).selectinload(Image.expense),
+                    selectinload(Visit.images).selectinload(Image.place),
                 )
             )
         )
@@ -94,4 +94,7 @@ async def get_timeline(
         .all()
     )
 
-    return timeline_day_out(date, trips, unassigned, expenses, user.preferred_currency)
+    trip = await trip_overlapping(db, user, start, end, tz_offset_minutes)
+    return timeline_day_out(
+        date, trip, list(visits), list(unassigned), list(expenses), user.preferred_currency
+    )

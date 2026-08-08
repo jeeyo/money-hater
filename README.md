@@ -7,8 +7,9 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 - Maps coordinates to **Google Places** so stops get real names.
 - Understands image content with a **vision model** (OpenAI Agents SDK): place, food, item, or receipt.
 - Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
-- Groups images into **visits** and **trips** automatically — a trip can be a vacation, the commute to
-  work, or going out for lunch while working from home.
+- Groups images into **stops** and days automatically — no set-up, no tagging.
+- **Trips are optional**: when you want to group some days together, name a trip and pick the
+  expense it started with and the one it ended with. Nothing is ever grouped for you.
 - Handles **multiple currencies**: everything rolls up into your base currency (THB by default), and
   foreign spend asks you to confirm the rate before it counts.
 - Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
@@ -24,8 +25,8 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
       <sub><b>Timeline</b> — your day rebuilt from photos: each stop, when you were there, what you spent.</sub>
     </td>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/trip-detail.webp" alt="Trip detail with a route map through the stops" />
-      <sub><b>Trip</b> — the route through the day's stops, with the total for the trip.</sub>
+      <img src="docs/screenshots/trip-detail.webp" alt="Trip detail showing its days, stops and route map" />
+      <sub><b>Trip</b> — the days you grouped, their stops, and the route across them.</sub>
     </td>
     <td width="33%" valign="top">
       <img src="docs/screenshots/expenses.webp" alt="Expenses rolled up into the base currency" />
@@ -42,8 +43,8 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
       <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
     </td>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/upload.webp" alt="Uploading photos from camera or gallery" />
-      <sub><b>Upload</b> — shoot or pick photos; analysis runs in the background.</sub>
+      <img src="docs/screenshots/trips.webp" alt="List of trips the user has created" />
+      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
     </td>
   </tr>
 </table>
@@ -140,9 +141,21 @@ worker as two containers sharing that PVC (RWO-friendly). `kubectl apply -k depl
 3. **Places** — GPS is reverse-geocoded and matched to nearby Google Places (cached by `place_id`).
 4. **Vision** — an OpenAI agent classifies the image (place / food / item / receipt / …), captions it,
    and for receipts extracts merchant, currency, totals, and line items into expenses.
-5. **Clustering** — images become **visits** (≤ 45 min and ≤ 300 m apart) and visits chain into
-   **trips** (gaps ≤ 4 h). Your manual edits (rename, merge, split, reassign) are pinned and
-   survive re-clustering.
+5. **Clustering** — images become **stops** (≤ 45 min and ≤ 300 m apart), and stops make up your
+   day. Stops you rename or correct are pinned and survive re-clustering.
+
+## Trips are optional
+
+Days are automatic; grouping them is not. Nothing decides on your behalf that a holiday happened.
+
+When you *do* want a group — a weekend away, a work visit — make a trip and pick **the expense it
+started with and the one it ended with**: the airport taxi out and the taxi home. Every day, stop,
+photo and expense between those two belongs to the trip, and its total is the sum of them.
+
+Bounding by expenses rather than dates means the edges are things you actually remember, and the
+window follows them: correct the time on the outbound fare and the trip's first day moves with it.
+The window covers whole days, so a photo taken minutes before its own receipt still counts. A day
+belongs to at most one trip, and deleting a trip only ungroups — the days and spending stay.
 
 ## Money and currencies
 

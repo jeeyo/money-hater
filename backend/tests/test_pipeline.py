@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
-from app.models import Image, Trip, Visit
+from app.models import Image, Visit
 from app.services.analysis import run_image_analysis
 from tests.conftest import register
 from tests.util import make_jpeg
@@ -63,18 +63,16 @@ async def test_analysis_extracts_exif_and_builds_timeline(client, db_sessionmake
         assert image.thumb_path is not None
         assert image.visit_id is not None
         visit = await db.get(Visit, image.visit_id)
-        trip = await db.get(Trip, visit.trip_id)
-        assert trip.user_id == image.user_id
+        assert visit.user_id == image.user_id
 
     response = await client.get(
         "/api/timeline", params={"date": "2026-08-08", "tz_offset_minutes": 0}
     )
     assert response.status_code == 200
     day = response.json()
-    assert len(day["trips"]) == 1
-    trip_out = day["trips"][0]
-    assert trip_out["image_count"] == 1
-    assert trip_out["visits"][0]["images"][0]["id"] == image_id
+    assert day["trip"] is None  # no trip until the user makes one
+    assert len(day["visits"]) == 1
+    assert day["visits"][0]["images"][0]["id"] == image_id
 
 
 async def test_two_images_far_apart_make_two_visits(client, db_sessionmaker):
@@ -94,9 +92,7 @@ async def test_two_images_far_apart_make_two_visits(client, db_sessionmaker):
 
     async with db_sessionmaker() as db:
         visits = (await db.execute(sa.select(Visit))).scalars().all()
-        trips = (await db.execute(sa.select(Trip))).scalars().all()
         assert len(visits) == 2
-        assert len(trips) == 1  # 30 min gap chains into one trip
 
 
 async def test_reanalyze_and_delete(client, db_sessionmaker, in_memory_queue):

@@ -5,106 +5,151 @@ from sqlalchemy.orm import selectinload
 from app.deps import CurrentUser, DbSession
 from app.models import Image, Trip, Visit
 from app.schemas import (
+    TripCreate,
     TripDetailOut,
-    TripMergeRequest,
     TripOut,
     TripUpdate,
     VisitOut,
     VisitUpdate,
 )
 from app.serialize import trip_detail_out, trip_out, visit_out
-from app.services.clustering import load_trip_detail
+from app.services import trips as trip_service
 from app.services.places import search_place_by_text
+from app.services.trips import TripWindowError
 
 router = APIRouter(tags=["trips"])
 
-_TRIP_LOADS = (
-    selectinload(Trip.visits).selectinload(Visit.place),
-    selectinload(Trip.visits).selectinload(Visit.expenses),
-    selectinload(Trip.visits).selectinload(Visit.images).selectinload(Image.analysis),
-    selectinload(Trip.visits).selectinload(Visit.images).selectinload(Image.expense),
-    selectinload(Trip.visits).selectinload(Visit.images).selectinload(Image.place),
-)
 
-
-async def _get_owned_trip(db: DbSession, user_id: int, trip_id: int) -> Trip:
-    trip = await db.scalar(
-        sa.select(Trip).where(Trip.id == trip_id, Trip.user_id == user_id).options(*_TRIP_LOADS)
-    )
+async def _load(db: DbSession, user, trip_id: int) -> Trip:
+    trip = await trip_service.load_trip(db, user, trip_id)
     if trip is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Trip not found")
     return trip
+
+
+async def _render(db: DbSession, user, trip: Trip, tz_offset_minutes: int, detail: bool):
+    window = trip_service.window_of(trip, tz_offset_minutes)
+    visits = await trip_service.visits_in(db, user, window)
+    expenses = await trip_service.expenses_in(db, user, window)
+    render = trip_detail_out if detail else trip_out
+    return render(trip, window, visits, expenses, user.preferred_currency, tz_offset_minutes)
 
 
 @router.get("/trips", response_model=list[TripOut])
 async def list_trips(
     user: CurrentUser,
     db: DbSession,
-    limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
 ):
     trips = (
         (
             await db.execute(
                 sa.select(Trip)
                 .where(Trip.user_id == user.id)
-                .order_by(Trip.started_at.desc())
-                .limit(limit)
-                .offset(offset)
-                .options(*_TRIP_LOADS)
+                .options(
+                    selectinload(Trip.start_expense), selectinload(Trip.end_expense)
+                )
             )
         )
         .scalars()
         .all()
     )
-    return [trip_out(trip, user.preferred_currency) for trip in trips]
+    rendered = [await _render(db, user, trip, tz_offset_minutes, detail=False) for trip in trips]
+    return sorted(rendered, key=lambda t: t.started_at, reverse=True)
+
+
+@router.post("/trips", response_model=TripDetailOut, status_code=201)
+async def create_trip(
+    body: TripCreate,
+    user: CurrentUser,
+    db: DbSession,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+):
+    """Group everything between two expenses into a named trip."""
+    try:
+        start, end = await trip_service.resolve_bounds(
+            db, user, body.start_expense_id, body.end_expense_id
+        )
+        await trip_service.assert_no_overlap(
+            db,
+            user,
+            trip_service.snap_to_days(
+                trip_service.moment_of(start), trip_service.moment_of(end), tz_offset_minutes
+            ),
+            exclude_id=None,
+            tz_offset_minutes=tz_offset_minutes,
+        )
+    except TripWindowError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+
+    trip = Trip(
+        user_id=user.id,
+        title=body.title.strip(),
+        start_expense_id=start.id,
+        end_expense_id=end.id,
+        note=body.note or None,
+    )
+    db.add(trip)
+    await db.commit()
+    return await _render(db, user, await _load(db, user, trip.id), tz_offset_minutes, detail=True)
 
 
 @router.get("/trips/{trip_id}", response_model=TripDetailOut)
-async def get_trip(trip_id: int, user: CurrentUser, db: DbSession):
-    return trip_detail_out(await _get_owned_trip(db, user.id, trip_id), user.preferred_currency)
+async def get_trip(
+    trip_id: int,
+    user: CurrentUser,
+    db: DbSession,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+):
+    return await _render(db, user, await _load(db, user, trip_id), tz_offset_minutes, detail=True)
 
 
 @router.patch("/trips/{trip_id}", response_model=TripDetailOut)
-async def update_trip(trip_id: int, body: TripUpdate, user: CurrentUser, db: DbSession):
-    trip = await _get_owned_trip(db, user.id, trip_id)
-    if body.title is not None:
-        trip.title = body.title or None
-    if body.kind is not None:
-        trip.kind = body.kind
-    trip.pinned = True
-    await db.commit()
-    return trip_detail_out(trip, user.preferred_currency)
-
-
-@router.post("/trips/{trip_id}/merge", response_model=TripDetailOut)
-async def merge_trips(
-    trip_id: int, body: TripMergeRequest, user: CurrentUser, db: DbSession
+async def update_trip(
+    trip_id: int,
+    body: TripUpdate,
+    user: CurrentUser,
+    db: DbSession,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
 ):
-    trip = await _get_owned_trip(db, user.id, trip_id)
-    other = await _get_owned_trip(db, user.id, body.other_trip_id)
-    if other.id == trip.id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot merge a trip with itself")
-    await db.execute(sa.update(Visit).where(Visit.trip_id == other.id).values(trip_id=trip.id))
-    trip.started_at = min(trip.started_at, other.started_at)
-    trip.ended_at = max(trip.ended_at, other.ended_at)
-    trip.pinned = True
-    await db.delete(other)
+    trip = await _load(db, user, trip_id)
+    if body.title is not None:
+        trip.title = body.title.strip()
+    if body.note is not None or "note" in body.model_fields_set:
+        trip.note = body.note or None
+
+    if body.start_expense_id is not None or body.end_expense_id is not None:
+        try:
+            start, end = await trip_service.resolve_bounds(
+                db,
+                user,
+                body.start_expense_id or trip.start_expense_id,
+                body.end_expense_id or trip.end_expense_id,
+            )
+            await trip_service.assert_no_overlap(
+                db,
+                user,
+                trip_service.snap_to_days(
+                    trip_service.moment_of(start), trip_service.moment_of(end), tz_offset_minutes
+                ),
+                exclude_id=trip.id,
+                tz_offset_minutes=tz_offset_minutes,
+            )
+        except TripWindowError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        trip.start_expense_id, trip.end_expense_id = start.id, end.id
+
     await db.commit()
-    db.expire_all()
-    refreshed = await load_trip_detail(db, trip.id)
-    return trip_detail_out(refreshed, user.preferred_currency)
+    # The session keeps objects unexpired on commit, so the bounds would
+    # otherwise still render from the relationships loaded before the change.
+    await db.refresh(trip, attribute_names=["start_expense", "end_expense"])
+    return await _render(db, user, trip, tz_offset_minutes, detail=True)
 
 
 @router.delete("/trips/{trip_id}", status_code=204)
 async def delete_trip(trip_id: int, user: CurrentUser, db: DbSession):
-    """Delete a trip grouping (images stay, detached from visits)."""
-    trip = await _get_owned_trip(db, user.id, trip_id)
-    visit_ids = [visit.id for visit in trip.visits]
-    if visit_ids:
-        await db.execute(
-            sa.update(Image).where(Image.visit_id.in_(visit_ids)).values(visit_id=None)
-        )
+    """Ungroup. The days, stops and expenses inside are untouched."""
+    trip = await _load(db, user, trip_id)
     await db.delete(trip)
     await db.commit()
 

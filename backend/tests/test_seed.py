@@ -23,7 +23,8 @@ async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
         # Photos, clustered stops and trips
         assert await db.scalar(sa.select(sa.func.count()).select_from(Image)) == 10
         assert await db.scalar(sa.select(sa.func.count()).select_from(Visit)) > 0
-        assert await db.scalar(sa.select(sa.func.count()).select_from(Trip)) > 0
+        # One hand-made trip grouping the Chiang Mai days
+        assert await db.scalar(sa.select(sa.func.count()).select_from(Trip)) == 1
 
         expenses = (await db.execute(sa.select(Expense))).scalars().all()
         # Receipt-backed, hand-entered, and one foreign awaiting confirmation

@@ -34,13 +34,32 @@ export function useTimeline(date: string) {
 }
 
 export function useTrips() {
-  return useQuery({ queryKey: ['trips'], queryFn: () => apiJson<Trip[]>('/api/trips') });
+  return useQuery({
+    queryKey: ['trips'],
+    queryFn: () => apiJson<Trip[]>(`/api/trips?tz_offset_minutes=${tzOffsetMinutes()}`),
+  });
 }
 
 export function useTrip(tripId: number) {
   return useQuery({
     queryKey: ['trips', tripId],
-    queryFn: () => apiJson<TripDetail>(`/api/trips/${tripId}`),
+    queryFn: () =>
+      apiJson<TripDetail>(`/api/trips/${tripId}?tz_offset_minutes=${tzOffsetMinutes()}`),
+  });
+}
+
+export function useCreateTrip() {
+  return useMutation({
+    mutationFn: (body: { title: string; start_expense_id: number; end_expense_id: number }) =>
+      postJson<TripDetail>(`/api/trips?tz_offset_minutes=${tzOffsetMinutes()}`, body),
+    onSuccess: invalidateItinerary,
+  });
+}
+
+export function useDeleteTrip() {
+  return useMutation({
+    mutationFn: (tripId: number) => apiJson<void>(`/api/trips/${tripId}`, { method: 'DELETE' }),
+    onSuccess: invalidateItinerary,
   });
 }
 
@@ -135,8 +154,12 @@ export function useUploadImages() {
 
 export function useUpdateTrip(tripId: number) {
   return useMutation({
-    mutationFn: (body: { title?: string; kind?: string }) =>
-      postJson<TripDetail>(`/api/trips/${tripId}`, body, 'PATCH'),
+    mutationFn: (body: { title?: string; start_expense_id?: number; end_expense_id?: number }) =>
+      postJson<TripDetail>(
+        `/api/trips/${tripId}?tz_offset_minutes=${tzOffsetMinutes()}`,
+        body,
+        'PATCH',
+      ),
     onSuccess: invalidateItinerary,
   });
 }

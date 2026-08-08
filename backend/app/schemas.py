@@ -180,7 +180,6 @@ class ExpenseSummaryOut(BaseModel):
 # --- Visits / trips / timeline ---
 class VisitOut(BaseModel):
     id: int
-    trip_id: int
     label: str
     place: PlaceOut | None
     started_at: datetime
@@ -192,41 +191,63 @@ class VisitOut(BaseModel):
     spend: SpendOut
 
 
+class TripRef(BaseModel):
+    """Just enough to show "part of <trip>" and link to it."""
+
+    id: int
+    title: str
+
+
 class TripOut(BaseModel):
     id: int
     title: str
-    kind: str
+    note: str | None
+    start_expense_id: int
+    end_expense_id: int
     started_at: datetime
     ended_at: datetime
-    pinned: bool
+    day_count: int
     visit_count: int
     image_count: int
     spend: SpendOut
 
 
-class TripDetailOut(TripOut):
+class TripDayOut(BaseModel):
+    date: str
     visits: list[VisitOut]
+    spend: SpendOut
+
+
+class TripDetailOut(TripOut):
+    days: list[TripDayOut]
+    expenses: list["ExpenseOut"]
+
+
+class TripCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    start_expense_id: int
+    end_expense_id: int
+    note: str | None = None
+
+
+class TripUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    start_expense_id: int | None = None
+    end_expense_id: int | None = None
+    note: str | None = None
 
 
 class TimelineDayOut(BaseModel):
     date: str
-    trips: list[TripDetailOut]
+    trip: TripRef | None
+    visits: list[VisitOut]
     unassigned_images: list[ImageOut]
     spend: SpendOut
-
-
-class TripUpdate(BaseModel):
-    title: str | None = None
-    kind: str | None = Field(default=None, pattern="^(trip|commute|outing)$")
 
 
 class VisitUpdate(BaseModel):
     label_override: str | None = None
     google_place_id: str | None = None
-
-
-class TripMergeRequest(BaseModel):
-    other_trip_id: int
 
 
 class ImageAssignRequest(BaseModel):

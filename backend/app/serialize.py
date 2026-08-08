@@ -1,6 +1,7 @@
 """ORM -> API schema mapping (relationships must be eagerly loaded by callers)."""
 
 from collections import defaultdict
+from datetime import date, datetime, timedelta
 
 from app.models import Expense, Image, Place, Trip, Visit
 from app.schemas import (
@@ -12,8 +13,10 @@ from app.schemas import (
     PlaceOut,
     SpendOut,
     TimelineDayOut,
+    TripDayOut,
     TripDetailOut,
     TripOut,
+    TripRef,
     UserOut,
     VisitOut,
 )
@@ -135,7 +138,6 @@ def _visit_expenses(visit: Visit) -> list[Expense]:
 def visit_out(visit: Visit, base_currency: str) -> VisitOut:
     return VisitOut(
         id=visit.id,
-        trip_id=visit.trip_id,
         label=visit_label(visit),
         place=place_out(visit.place),
         started_at=visit.started_at,
@@ -148,42 +150,87 @@ def visit_out(visit: Visit, base_currency: str) -> VisitOut:
     )
 
 
-def _trip_fields(trip: Trip, base_currency: str) -> dict:
-    expenses = [e for visit in trip.visits for e in _visit_expenses(visit)]
+def day_key(moment: datetime, tz_offset_minutes: int) -> str:
+    return (moment + timedelta(minutes=tz_offset_minutes)).date().isoformat()
+
+
+def group_by_day(
+    visits: list[Visit], base_currency: str, tz_offset_minutes: int
+) -> list[TripDayOut]:
+    days: dict[str, list[Visit]] = defaultdict(list)
+    for visit in visits:
+        days[day_key(visit.started_at, tz_offset_minutes)].append(visit)
+    return [
+        TripDayOut(
+            date=date,
+            visits=[visit_out(v, base_currency) for v in day_visits],
+            spend=spend_out(
+                [e for v in day_visits for e in _visit_expenses(v)], base_currency
+            ),
+        )
+        for date, day_visits in sorted(days.items())
+    ]
+
+
+def trip_ref(trip: Trip | None) -> TripRef | None:
+    return TripRef(id=trip.id, title=trip.title) if trip else None
+
+
+def _trip_fields(
+    trip: Trip,
+    window,
+    visits: list[Visit],
+    expenses: list[Expense],
+    base_currency: str,
+    tz_offset_minutes: int,
+) -> dict:
+    first = day_key(window.started_at, tz_offset_minutes)
+    last = day_key(window.ended_at, tz_offset_minutes)
     return {
         "id": trip.id,
-        "title": trip.title or trip.auto_title,
-        "kind": trip.kind,
-        "started_at": trip.started_at,
-        "ended_at": trip.ended_at,
-        "pinned": trip.pinned,
-        "visit_count": len(trip.visits),
-        "image_count": sum(len(visit.images) for visit in trip.visits),
+        "title": trip.title,
+        "note": trip.note,
+        "start_expense_id": trip.start_expense_id,
+        "end_expense_id": trip.end_expense_id,
+        "started_at": window.started_at,
+        "ended_at": window.ended_at,
+        "day_count": (date.fromisoformat(last) - date.fromisoformat(first)).days + 1,
+        "visit_count": len(visits),
+        "image_count": sum(len(visit.images) for visit in visits),
         "spend": spend_out(expenses, base_currency),
     }
 
 
-def trip_out(trip: Trip, base_currency: str) -> TripOut:
-    return TripOut(**_trip_fields(trip, base_currency))
+def trip_out(
+    trip: Trip, window, visits, expenses, base_currency: str, tz_offset_minutes: int = 0
+) -> TripOut:
+    return TripOut(
+        **_trip_fields(trip, window, visits, expenses, base_currency, tz_offset_minutes)
+    )
 
 
-def trip_detail_out(trip: Trip, base_currency: str) -> TripDetailOut:
+def trip_detail_out(
+    trip: Trip, window, visits, expenses, base_currency: str, tz_offset_minutes: int = 0
+) -> TripDetailOut:
     return TripDetailOut(
-        **_trip_fields(trip, base_currency),
-        visits=[visit_out(v, base_currency) for v in trip.visits],
+        **_trip_fields(trip, window, visits, expenses, base_currency, tz_offset_minutes),
+        days=group_by_day(visits, base_currency, tz_offset_minutes),
+        expenses=[expense_out(expense) for expense in expenses],
     )
 
 
 def timeline_day_out(
-    date: str,
-    trips: list[Trip],
+    date_str: str,
+    trip: Trip | None,
+    visits: list[Visit],
     unassigned: list[Image],
     expenses: list[Expense],
     base_currency: str,
 ) -> TimelineDayOut:
     return TimelineDayOut(
-        date=date,
-        trips=[trip_detail_out(trip, base_currency) for trip in trips],
+        date=date_str,
+        trip=trip_ref(trip),
+        visits=[visit_out(visit, base_currency) for visit in visits],
         unassigned_images=[image_out(image) for image in unassigned],
         spend=spend_out(expenses, base_currency),
     )

@@ -60,7 +60,6 @@ export interface Spend {
 
 export interface Visit {
   id: number;
-  trip_id: number;
   label: string;
   place: Place | null;
   started_at: string;
@@ -72,25 +71,41 @@ export interface Visit {
   spend: Spend;
 }
 
+/** A trip is optional: a grouping the user makes by picking two expenses. */
 export interface Trip {
   id: number;
   title: string;
-  kind: 'trip' | 'commute' | 'outing';
+  note: string | null;
+  start_expense_id: number;
+  end_expense_id: number;
   started_at: string;
   ended_at: string;
-  pinned: boolean;
+  day_count: number;
   visit_count: number;
   image_count: number;
   spend: Spend;
 }
 
-export interface TripDetail extends Trip {
+export interface TripDay {
+  date: string;
   visits: Visit[];
+  spend: Spend;
+}
+
+export interface TripDetail extends Trip {
+  days: TripDay[];
+  expenses: Expense[];
+}
+
+export interface TripRef {
+  id: number;
+  title: string;
 }
 
 export interface TimelineDay {
   date: string;
-  trips: TripDetail[];
+  trip: TripRef | null;
+  visits: Visit[];
   unassigned_images: ImageRecord[];
   spend: Spend;
 }

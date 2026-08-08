@@ -112,7 +112,7 @@ async def test_manual_expense_attaches_to_the_visit_it_falls_inside(
         )
     ).json()
     assert day["spend"]["base_total_minor"] == 4000
-    assert day["trips"][0]["visits"][0]["spend"]["base_total_minor"] == 4000
+    assert day["visits"][0]["spend"]["base_total_minor"] == 4000
 
 
 async def test_manual_expense_survives_reclustering(client, db_sessionmaker):
@@ -166,7 +166,7 @@ async def test_manual_expense_survives_reclustering(client, db_sessionmaker):
             "/api/timeline", params={"date": "2026-08-08", "tz_offset_minutes": 0}
         )
     ).json()
-    assert day["trips"][0]["visits"][0]["spend"]["base_total_minor"] == 4000
+    assert day["visits"][0]["spend"]["base_total_minor"] == 4000
 
 
 async def test_expense_outside_any_visit_stays_unattached(client):

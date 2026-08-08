@@ -1,4 +1,4 @@
-import { Briefcase, ChevronLeft, ChevronRight, Footprints, Plane } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Luggage } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageModal } from '../components/ImageModal';
@@ -6,44 +6,14 @@ import { ImageThumb } from '../components/ImageThumb';
 import { VisitCard } from '../components/VisitCard';
 import { useTimeline } from '../hooks/useData';
 import { formatSpend, localDateString, shiftDate } from '../lib/format';
-import type { ImageRecord, TripDetail } from '../types';
-
-const KIND_ICON = { trip: Plane, commute: Briefcase, outing: Footprints };
-
-function TripSection({ trip }: { trip: TripDetail }) {
-  const Icon = KIND_ICON[trip.kind] ?? Footprints;
-  return (
-    <section className="space-y-3">
-      <Link to={`/trips/${trip.id}`} className="flex items-center justify-between gap-2 px-1">
-        <span className="flex min-w-0 items-center gap-2">
-          <Icon className="size-4 shrink-0 text-brand-600" />
-          <span className="truncate font-semibold text-slate-800">{trip.title}</span>
-          <span className="shrink-0 text-xs text-slate-400">
-            {trip.visit_count} stop{trip.visit_count === 1 ? '' : 's'}
-          </span>
-        </span>
-        {trip.spend.base_total_minor > 0 && (
-          <span className="shrink-0 text-xs font-semibold text-amber-700">
-            {formatSpend(trip.spend)}
-          </span>
-        )}
-      </Link>
-      <div className="space-y-3 border-l border-slate-200 [&>*]:-ml-px">
-        {trip.visits.map((visit) => (
-          <VisitCard key={visit.id} visit={visit} />
-        ))}
-      </div>
-    </section>
-  );
-}
+import type { ImageRecord } from '../types';
 
 export function TimelinePage() {
   const [date, setDate] = useState(() => localDateString(new Date()));
   const { data, isLoading } = useTimeline(date);
   const [openImage, setOpenImage] = useState<ImageRecord | null>(null);
 
-  const isEmpty =
-    data && data.trips.length === 0 && data.unassigned_images.length === 0;
+  const isEmpty = data && data.visits.length === 0 && data.unassigned_images.length === 0;
 
   return (
     <div className="space-y-5">
@@ -72,6 +42,19 @@ export function TimelinePage() {
         </button>
       </header>
 
+      {data?.trip && (
+        <Link
+          to={`/trips/${data.trip.id}`}
+          className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700"
+        >
+          <Luggage className="size-4 shrink-0" />
+          <span className="flex-1 truncate">
+            Part of <span className="font-semibold">{data.trip.title}</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-brand-500" />
+        </Link>
+      )}
+
       {data && data.spend.base_total_minor > 0 && (
         <p className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           Spent this day: <span className="font-semibold">{formatSpend(data.spend)}</span>
@@ -89,7 +72,13 @@ export function TimelinePage() {
         </div>
       )}
 
-      {data?.trips.map((trip) => <TripSection key={trip.id} trip={trip} />)}
+      {data && data.visits.length > 0 && (
+        <div className="space-y-3 border-l border-slate-200 [&>*]:-ml-px">
+          {data.visits.map((visit) => (
+            <VisitCard key={visit.id} visit={visit} />
+          ))}
+        </div>
+      )}
 
       {data && data.unassigned_images.length > 0 && (
         <section className="space-y-2">

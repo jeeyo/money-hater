@@ -54,27 +54,34 @@ class Place(Base):
 
 
 class Trip(Base):
+    """An optional, user-made grouping: everything between two expenses.
+
+    Trips are never inferred. You mark the expense that started the trip (the
+    airport taxi) and the one that ended it, and every day, stop and expense in
+    that window belongs to it. Membership is derived from the window rather
+    than stored, so it stays correct as things are edited.
+    """
+
     __tablename__ = "trips"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title: Mapped[str | None] = mapped_column(sa.String(255))  # user override
-    auto_title: Mapped[str] = mapped_column(sa.String(255), default="Trip")
-    kind: Mapped[str] = mapped_column(sa.String(16), default="outing")  # trip|commute|outing
-    started_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
-    ended_at: Mapped[datetime] = mapped_column(UTCDateTime)
-    pinned: Mapped[bool] = mapped_column(sa.Boolean, default=False)
-
-    visits: Mapped[list["Visit"]] = relationship(
-        back_populates="trip", cascade="all, delete-orphan", order_by="Visit.started_at"
+    title: Mapped[str] = mapped_column(sa.String(255))
+    start_expense_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("expenses.id", ondelete="RESTRICT")
     )
+    end_expense_id: Mapped[int] = mapped_column(sa.ForeignKey("expenses.id", ondelete="RESTRICT"))
+    note: Mapped[str | None] = mapped_column(sa.Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
+
+    start_expense: Mapped["Expense"] = relationship(foreign_keys=[start_expense_id])
+    end_expense: Mapped["Expense"] = relationship(foreign_keys=[end_expense_id])
 
 
 class Visit(Base):
     __tablename__ = "visits"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    trip_id: Mapped[int] = mapped_column(sa.ForeignKey("trips.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"), index=True)
     place_id: Mapped[int | None] = mapped_column(sa.ForeignKey("places.id", ondelete="SET NULL"))
     label_override: Mapped[str | None] = mapped_column(sa.String(255))
@@ -84,7 +91,6 @@ class Visit(Base):
     lng: Mapped[float | None] = mapped_column(sa.Float)
     pinned: Mapped[bool] = mapped_column(sa.Boolean, default=False)
 
-    trip: Mapped[Trip] = relationship(back_populates="visits")
     place: Mapped[Place | None] = relationship()
     images: Mapped[list["Image"]] = relationship(back_populates="visit", order_by="Image.taken_at")
     # Linked by visit_id, so manually entered expenses count too

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 
 from app.deps import CurrentUser, DbSession
-from app.models import Expense, ExpenseItem
+from app.models import Expense, ExpenseItem, Trip
 from app.schemas import (
     ExpenseConfirm,
     ExpenseCreate,
@@ -241,5 +241,19 @@ async def update_expense(
 @router.delete("/{expense_id}", status_code=204)
 async def delete_expense(expense_id: int, user: CurrentUser, db: DbSession):
     expense = await _get_owned(db, user.id, expense_id)
+    # Trips are defined by their bounding expenses, so deleting one would leave
+    # the trip without an edge. Say so instead of failing on the constraint.
+    bounding = await db.scalar(
+        sa.select(Trip).where(
+            Trip.user_id == user.id,
+            sa.or_(Trip.start_expense_id == expense.id, Trip.end_expense_id == expense.id),
+        )
+    )
+    if bounding is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"This expense marks the start or end of “{bounding.title}” — "
+            "change that trip's bounds first",
+        )
     await db.delete(expense)
     await db.commit()

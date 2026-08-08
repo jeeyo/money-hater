@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from app.services.clustering import Point, group_into_trips, group_into_visits
+from app.services.clustering import Point, group_into_visits
 
 BASE = datetime(2026, 8, 8, 9, 0, tzinfo=UTC)
 GAP = timedelta(minutes=45)
@@ -46,17 +46,3 @@ def test_unsorted_input_is_sorted():
     groups = group_into_visits(points, GAP, DIST)
     assert [g[0].id for g in groups] == [1, 2]
 
-
-def test_trips_chain_visits_within_gap():
-    spans = [
-        (BASE, BASE + timedelta(minutes=30)),
-        (BASE + timedelta(hours=1), BASE + timedelta(hours=2)),  # 30min gap -> same trip
-        (BASE + timedelta(hours=8), BASE + timedelta(hours=9)),  # 6h gap -> new trip
-    ]
-    trips = group_into_trips(spans, max_gap=timedelta(hours=4))
-    assert trips == [[0, 1], [2]]
-
-
-def test_single_visit_single_trip():
-    spans = [(BASE, BASE + timedelta(minutes=10))]
-    assert group_into_trips(spans, max_gap=timedelta(hours=4)) == [[0]]
