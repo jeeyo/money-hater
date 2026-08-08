@@ -87,7 +87,10 @@ export function MapView({ days, className }: { days: MapDay[]; className?: strin
     }
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
 
-    map.on('load', () => {
+    // 'style.load', not 'load': the latter also waits for the basemap tiles to
+    // arrive, so a slow or unreachable tile server holds back the routes — they
+    // need only the style, which is the inline object above.
+    map.on('style.load', () => {
       if (dark) {
         for (const [property, value] of Object.entries(DARK_BASEMAP_PAINT)) {
           map.setPaintProperty('osm', property as 'raster-saturation', value);
