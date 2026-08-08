@@ -1,229 +1,82 @@
-# Money Hater - Expense Tracker
+# Money Hater — Trip Logger
 
-A modern, full-stack expense tracking application built with React, TypeScript, Cloudflare Workers, and D1 database.
+Money Hater is a self-hosted trip logger. Upload the photos you take during the day — a place,
+a plate of food, an item you bought, a receipt — and it reconstructs your itinerary:
 
-## 🚀 Tech Stack
+- Reads **timestamps, EXIF and GPS coordinates** from each image.
+- Maps coordinates to **Google Places** so stops get real names.
+- Understands image content with a **vision model** (OpenAI Agents SDK): place, food, item, or receipt.
+- Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
+- Groups images into **visits** and **trips** automatically — a trip can be a vacation, the commute to
+  work, or going out for lunch while working from home.
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Backend**: Cloudflare Workers + Hono
-- **Database**: Cloudflare D1 (SQLite)
-- **Storage**: Cloudflare R2 (Object Storage)
-- **ORM**: Prisma with D1 Adapter
-- **Styling**: Custom CSS with modern design
-- **Charts**: Recharts
-- **Icons**: Lucide React
+## Tech stack
 
-## ✨ Features
+| Layer      | Choice                                                                 |
+| ---------- | ---------------------------------------------------------------------- |
+| Backend    | Python 3.11+, FastAPI, SQLAlchemy 2 (async), Alembic                    |
+| Jobs       | Procrastinate (PostgreSQL-native task queue — no Redis)                 |
+| Database   | PostgreSQL 17 (CloudNativePG in Kubernetes)                             |
+| AI         | OpenAI Agents SDK (vision classification + receipt parsing)             |
+| Geo        | Google Geocoding + Places API (cached in Postgres, stubbed without key) |
+| Frontend   | React 19 + TypeScript + Vite, TanStack Query, Tailwind CSS v4           |
+| Map        | MapLibre GL + OpenStreetMap tiles                                       |
+| Images     | Filesystem (`MEDIA_ROOT`) — a PVC in Kubernetes                         |
 
-- 📊 Track income and expenses
-- 📈 Visual analytics and charts
-- 🏷️ Category-based organization
-- 🔐 **Secure authentication** with JWT tokens
-- 🔒 **Password hashing** using PBKDF2
-- 👤 **User-specific data** - Each user sees only their own expenses
-- 💾 Persistent storage with D1
-- 🌐 Serverless architecture
-- ⚡ Fast and responsive UI
-- 📎 **File attachments** for receipts and invoices (R2 storage)
-- 🗄️ **Optimized database** with indexes
+## Local development
 
-## 🛠️ Development Setup
+### Devcontainer (recommended)
 
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-- Cloudflare account (for deployment)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd money-hater
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up Prisma**
-   ```bash
-   npx prisma generate
-   ```
-
-### Running the Application
-
-You need to run **TWO** development servers:
-
-1. **Start the backend (Cloudflare Worker)**
-   ```bash
-   npm run dev:worker
-   ```
-   This runs on `http://localhost:8787`
-
-2. **Start the frontend (Vite)** (in a new terminal)
-   ```bash
-   npm run dev
-   ```
-   This runs on `http://localhost:5174`
-
-The frontend automatically proxies API requests to the backend.
-
-## 📚 Database
-
-This project uses **Cloudflare D1** with **Prisma ORM**. See [PRISMA_D1_SETUP.md](./PRISMA_D1_SETUP.md) for detailed documentation on:
-
-- Database schema
-- Making schema changes
-- Running migrations
-- Querying the database
-- Production deployment
-
-### Quick Database Commands
+Open the repo in VS Code and choose **Reopen in Container**. The devcontainer starts a
+Python + Node workspace and a PostgreSQL 17 service, installs dependencies, and applies
+migrations. Then:
 
 ```bash
-# View users in local database
-npx wrangler d1 execute money-hater-db --local --command "SELECT * FROM User"
+# terminal 1 — API (http://localhost:8000)
+cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0
 
-# Apply migrations locally
-npx wrangler d1 migrations apply money-hater-db --local
+# terminal 2 — worker (image analysis pipeline)
+cd backend && uv run python -m app.worker.run
 
-# Apply migrations to production
-npx wrangler d1 migrations apply money-hater-db --remote
-
-# Regenerate Prisma Client
-npx prisma generate
+# terminal 3 — frontend (http://localhost:5173, proxies /api to :8000)
+cd frontend && npm run dev
 ```
 
-## 🏗️ Project Structure
-
-```
-money-hater/
-├── src/                    # Frontend source code
-│   ├── components/         # React components
-│   ├── context/           # React context (Auth, etc.)
-│   ├── pages/             # Page components
-│   ├── services/          # API services
-│   └── types.ts           # TypeScript types
-├── worker/                # Cloudflare Worker (backend)
-│   └── index.ts          # API routes with Prisma
-├── prisma/               # Database schema and config
-│   └── schema.prisma     # Database models
-├── migrations/           # D1 migration files
-└── wrangler.jsonc       # Cloudflare configuration
-```
-
-## 🔌 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-
-### Expenses
-- `GET /api/expenses` - Get all expenses
-- `POST /api/expenses` - Create expense
-- `PUT /api/expenses/:id` - Update expense
-- `DELETE /api/expenses/:id` - Delete expense
-
-### File Storage
-- `POST /api/upload` - Upload file to R2
-- `GET /api/attachments/:key` - Get file from R2
-
-📚 **See [R2_SETUP.md](./R2_SETUP.md)** for R2 object storage setup and usage.
-
-### Automated Deployment with GitHub Actions (Recommended)
-
-The project includes a GitHub Actions workflow for automated CI/CD:
-
-1. **Set up GitHub Secrets** (one-time setup):
-   - `CLOUDFLARE_API_TOKEN` - Your Cloudflare API token
-   - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
-
-2. **Push to main branch**:
-   ```bash
-   git push origin main
-   ```
-
-The workflow will automatically:
-- ✅ Install dependencies
-- ✅ Generate Prisma Client
-- ✅ Build frontend
-- ✅ Apply database migrations
-- ✅ Deploy to Cloudflare Workers
-
-📚 **See [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md)** for detailed setup instructions.
-
-### Manual Deployment
-
-If you prefer manual deployment:
+### Docker Compose
 
 ```bash
-# Build frontend and deploy to Cloudflare
-npm run deploy
+cp .env.example .env   # add OPENAI_API_KEY / GOOGLE_MAPS_API_KEY if you have them
+docker compose up --build
 ```
 
-This will:
-1. Build the frontend (`npm run build`)
-2. Deploy the worker and assets to Cloudflare
+Frontend at http://localhost:5173, API at http://localhost:8000.
 
-### Before First Deployment
+Without `OPENAI_API_KEY` and `GOOGLE_MAPS_API_KEY` the app still works: places fall back to
+raw coordinates and image understanding is skipped (images are logged by time/location only).
 
-1. **Apply migrations to production database**
-   ```bash
-   npx wrangler d1 migrations apply money-hater-db --remote
-   ```
+## Tests & checks
 
-2. **Set JWT_SECRET** (for production security)
-   ```bash
-   npx wrangler secret put JWT_SECRET
-   ```
+```bash
+cd backend && uv run pytest          # backend tests
+cd backend && uv run ruff check .    # lint
+cd frontend && npm run typecheck     # tsc
+cd frontend && npm test              # vitest
+cd frontend && npm run build         # production build
+```
 
-3. **Deploy**
-   ```bash
-   npm run deploy
-   ```
-   Or push to main branch if using GitHub Actions.
+## Deployment (Kubernetes + CloudNativePG)
 
-## 🔐 Security
+See [deploy/README.md](deploy/README.md). In short: a CloudNativePG `Cluster` provides
+PostgreSQL, a PVC holds the media files, and a single Deployment runs the API and the
+worker as two containers sharing that PVC (RWO-friendly). `kubectl apply -k deploy/`.
 
-✅ **Production-Ready Security Features:**
+## How itinerary reconstruction works
 
-- ✅ **Password Hashing** - PBKDF2 with 100,000 iterations
-- ✅ **JWT Authentication** - Secure token-based auth with 7-day expiration
-- ✅ **User-Specific Data** - Users can only access their own expenses
-- ✅ **Database Indexes** - Optimized query performance
-- ✅ **Cascade Delete** - Automatic cleanup of user data
-
-📚 **See [SECURITY.md](./SECURITY.md)** for detailed security documentation.
-
-**Additional Recommendations for Production:**
-
-- [ ] Set JWT_SECRET environment variable (don't use default)
-- [ ] Implement rate limiting
-- [ ] Add email verification
-
-## 📝 Available Scripts
-
-- `npm run dev` - Start frontend dev server
-- `npm run dev:worker` - Start backend worker
-- `npm run build` - Build for production
-- `npm run deploy` - Build and deploy to Cloudflare
-- `npm run lint` - Run ESLint
-- `npm run preview` - Preview production build
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is open source and available under the MIT License.
-
-## 🙏 Acknowledgments
-
-- Built with [Vite](https://vitejs.dev/)
-- Powered by [Cloudflare Workers](https://workers.cloudflare.com/)
-- Database by [Cloudflare D1](https://developers.cloudflare.com/d1/)
-- ORM by [Prisma](https://www.prisma.io/)
+1. **Upload** — images are deduplicated by SHA-256 and stored under `MEDIA_ROOT`; a job is queued.
+2. **EXIF** — `taken_at` (falls back to upload time), GPS coordinates, camera info; thumbnail generated.
+3. **Places** — GPS is reverse-geocoded and matched to nearby Google Places (cached by `place_id`).
+4. **Vision** — an OpenAI agent classifies the image (place / food / item / receipt / …), captions it,
+   and for receipts extracts merchant, currency, totals, and line items into expenses.
+5. **Clustering** — images become **visits** (≤ 45 min and ≤ 300 m apart) and visits chain into
+   **trips** (gaps ≤ 4 h). Your manual edits (rename, merge, split, reassign) are pinned and
+   survive re-clustering.
