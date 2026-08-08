@@ -9,6 +9,11 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 - Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
 - Groups images into **visits** and **trips** automatically — a trip can be a vacation, the commute to
   work, or going out for lunch while working from home.
+- Handles **multiple currencies**: everything rolls up into your base currency (THB by default), and
+  foreign spend asks you to confirm the rate before it counts.
+- Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
+- Installs as a **PWA**: add it to your home screen and it opens standalone, with the shell available
+  offline.
 
 ## Tech stack
 
@@ -80,3 +85,21 @@ worker as two containers sharing that PVC (RWO-friendly). `kubectl apply -k depl
 5. **Clustering** — images become **visits** (≤ 45 min and ≤ 300 m apart) and visits chain into
    **trips** (gaps ≤ 4 h). Your manual edits (rename, merge, split, reassign) are pinned and
    survive re-clustering.
+
+## Money and currencies
+
+- Amounts are stored as integers in each currency's minor unit (satang, yen) next to its ISO 4217
+  code — no floating-point money.
+- Every expense also carries a conversion into your **base currency** (Settings → base currency,
+  THB out of the box), so a day, a trip and the dashboard each show one honest number.
+- When a receipt is in another currency, the day's reference rate is fetched and applied, and the
+  expense is **flagged for confirmation** — your card or a money changer rarely matches the
+  reference rate, so you can accept the suggestion or type the rate you actually got.
+- Rates are cached in Postgres and fetched at most once per currency pair per day. If the rate
+  service is unreachable, the amount stays unconverted rather than wrong, and waits for you.
+
+## Adding expenses without a receipt
+
+Not everything comes with paper. **Expenses → Add** records an amount, currency, what/where and
+when; if the time falls inside a stop on your timeline, it attaches to that stop automatically and
+counts toward that trip's total. Re-clustering keeps the link.

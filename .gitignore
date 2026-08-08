@@ -26,3 +26,6 @@ data/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# TS incremental build info
+*.tsbuildinfo
