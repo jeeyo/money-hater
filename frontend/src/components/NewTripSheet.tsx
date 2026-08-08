@@ -44,10 +44,10 @@ function BoundPicker({
   onSelect: (id: number) => void;
 }) {
   return (
-    <fieldset className="space-y-2 rounded-2xl border border-slate-200 p-3">
-      <legend className="px-1 text-sm font-medium text-slate-700">{legend}</legend>
+    <fieldset className="space-y-2 rounded-2xl border border-line p-3">
+      <legend className="px-1 text-sm font-medium text-ink-2">{legend}</legend>
       <label className="block space-y-1">
-        <span className="text-xs text-slate-400">{hint}</span>
+        <span className="text-xs text-ink-4">{hint}</span>
         <input
           type="date"
           value={date}
@@ -59,11 +59,11 @@ function BoundPicker({
       </label>
 
       {expenses.length === 0 ? (
-        <p className="rounded-xl bg-slate-50 px-3 py-3 text-center text-sm text-slate-500">
+        <p className="rounded-xl bg-surface-2 px-3 py-3 text-center text-sm text-ink-3">
           Nothing logged on this day.
         </p>
       ) : (
-        <ul className="max-h-40 overflow-y-auto rounded-xl border border-slate-200">
+        <ul className="max-h-40 overflow-y-auto rounded-xl border border-line">
           {expenses.map((expense) => {
             const selected = expense.id === selectedId;
             return (
@@ -71,17 +71,17 @@ function BoundPicker({
                 <button
                   type="button"
                   onClick={() => onSelect(expense.id)}
-                  className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-0 ${
-                    selected ? 'bg-brand-50' : 'active:bg-slate-50'
+                  className={`flex w-full items-center gap-2 border-b border-line-soft px-3 py-2 text-left last:border-0 ${
+                    selected ? 'bg-brand-50' : 'active:bg-surface-2'
                   }`}
                 >
-                  <span className="w-12 shrink-0 text-xs text-slate-400 tabular-nums">
+                  <span className="w-12 shrink-0 text-xs text-ink-4 tabular-nums">
                     {expenseTime(expense)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">
                     {expenseLabel(expense)}
                   </span>
-                  <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+                  <span className="shrink-0 text-xs text-ink-3 tabular-nums">
                     {formatMoney(expense.total_minor, expense.currency)}
                   </span>
                   {selected && <Check className="size-4 shrink-0 text-brand-600" />}
@@ -168,7 +168,7 @@ export function NewTripSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title="New trip" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-3">
           A trip groups days together. Pick the day and expense it started with, and the ones it
           ended with — everything in between belongs to the trip.
         </p>
@@ -185,7 +185,7 @@ export function NewTripSheet({ onClose }: { onClose: () => void }) {
         </label>
 
         {dated.length === 0 ? (
-          <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">
+          <p className="rounded-xl bg-surface-2 px-3 py-4 text-center text-sm text-ink-3">
             No expenses yet — log one first, then you can bound a trip with it.
           </p>
         ) : (
@@ -222,7 +222,7 @@ export function NewTripSheet({ onClose }: { onClose: () => void }) {
             </span>
           </p>
         )}
-        {createTrip.isError && <p className="text-sm text-rose-600">{createTrip.error.message}</p>}
+        {createTrip.isError && <p className="text-sm text-danger">{createTrip.error.message}</p>}
 
         <button
           type="submit"

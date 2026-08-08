@@ -28,7 +28,7 @@ function NavItems({ vertical }: { vertical?: boolean }) {
                 ? vertical
                   ? 'bg-brand-50 text-brand-700'
                   : 'text-brand-600'
-                : 'text-slate-500 hover:text-slate-800',
+                : 'text-ink-3 hover:text-ink',
             ].join(' ')
           }
         >
@@ -44,12 +44,12 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh md:flex">
       {/* Sidebar on ≥md */}
-      <aside className="hidden md:flex md:w-56 md:flex-col md:gap-1 md:border-r md:border-slate-200 md:bg-white md:p-4">
+      <aside className="hidden md:flex md:w-56 md:flex-col md:gap-1 md:border-r md:border-line md:bg-surface md:p-4">
         <div className="mb-4 flex items-center gap-2.5 px-3">
           <img src="/icon-192.png" alt="" className="size-10" />
           <div>
-            <h1 className="text-lg font-bold leading-tight text-slate-900">Money Hater</h1>
-            <p className="text-xs text-slate-400">trip logger</p>
+            <h1 className="text-lg font-bold leading-tight text-ink">Money Hater</h1>
+            <p className="text-xs text-ink-4">trip logger</p>
           </div>
         </div>
         <NavItems vertical />
@@ -58,7 +58,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-4 md:pb-8">{children}</main>
 
       {/* Bottom tab bar on mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white/95 backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-surface/95 backdrop-blur md:hidden">
         <NavItems />
       </nav>
     </div>

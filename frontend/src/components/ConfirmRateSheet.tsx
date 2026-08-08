@@ -24,16 +24,16 @@ export function ConfirmRateSheet({
   return (
     <Sheet title="Confirm conversion" onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-sm text-slate-500">
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-sm text-ink-3">
             {[expense.description, expense.place?.name ?? expense.merchant]
               .filter(Boolean)
               .join(' · ') || 'Expense'}
           </p>
-          <p className="text-2xl font-bold text-slate-900">
+          <p className="text-2xl font-bold text-ink">
             {formatMoney(expense.total_minor, expense.currency)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ink-3">
             Paid in {expense.currency}
             {expense.spent_at && <> · {new Date(expense.spent_at).toLocaleString()}</>}
           </p>
@@ -53,7 +53,7 @@ export function ConfirmRateSheet({
             placeholder="e.g. 0.235"
             className={inputClass}
           />
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-4">
             {expense.fx_rate_source === 'api'
               ? "Prefilled with today's reference rate — edit it if your card charged another."
               : 'No rate was available; enter the one you got.'}
@@ -67,7 +67,7 @@ export function ConfirmRateSheet({
           </p>
         </div>
 
-        {confirm.isError && <p className="text-sm text-rose-600">{confirm.error.message}</p>}
+        {confirm.isError && <p className="text-sm text-danger">{confirm.error.message}</p>}
 
         <button
           type="button"

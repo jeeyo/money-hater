@@ -81,12 +81,12 @@ export function ExpenseSheet({
       <form onSubmit={handleSubmit} className="space-y-4">
         {editing ? (
           expense.source === 'receipt' && (
-            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500">
+            <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink-3">
               Read from a receipt photo. Your edits win over what was detected.
             </p>
           )
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-3">
             For spending with no receipt photo — cash, a fare, a tip, your share of a bill.
           </p>
         )}
@@ -163,7 +163,7 @@ export function ExpenseSheet({
               setPlaceId(id);
             }}
           />
-          <span className="block text-xs text-slate-400">
+          <span className="block text-xs text-ink-4">
             Suggests places from where you were at that time.
           </span>
         </div>
@@ -176,7 +176,7 @@ export function ExpenseSheet({
             onChange={(e) => setSpentAt(e.target.value)}
             className={inputClass}
           />
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-4">
             Lands on the stop you were at, if there is one.
           </span>
         </label>
@@ -191,7 +191,7 @@ export function ExpenseSheet({
           />
         </label>
 
-        {mutation.isError && <p className="text-sm text-rose-600">{mutation.error.message}</p>}
+        {mutation.isError && <p className="text-sm text-danger">{mutation.error.message}</p>}
 
         <button
           type="submit"

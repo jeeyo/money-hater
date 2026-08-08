@@ -75,7 +75,7 @@ export function PlaceAutocomplete({
               type="button"
               aria-label="Unlink place"
               onClick={() => onChange(value, null)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 active:bg-slate-100"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-ink-4 active:bg-surface-2"
             >
               <X className="size-4" />
             </button>
@@ -87,10 +87,10 @@ export function PlaceAutocomplete({
         <ul
           id="place-suggestions"
           role="listbox"
-          className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-lg"
         >
           {loading && suggestions.length === 0 && (
-            <li className="px-3 py-2 text-sm text-slate-400">Searching…</li>
+            <li className="px-3 py-2 text-sm text-ink-4">Searching…</li>
           )}
           {suggestions.map((place) => (
             <li key={place.id} role="option" aria-selected={place.id === placeId}>
@@ -101,25 +101,25 @@ export function PlaceAutocomplete({
                   onChange(place.name, place.id);
                   setOpen(false);
                 }}
-                className="flex w-full items-start gap-2 px-3 py-2 text-left active:bg-slate-50"
+                className="flex w-full items-start gap-2 px-3 py-2 text-left active:bg-surface-2"
               >
                 {place.source === 'visited' ? (
-                  <Star className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                  <Star className="mt-0.5 size-4 shrink-0 text-money" />
                 ) : (
-                  <MapPin className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-ink-4" />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-slate-800">
+                  <span className="block truncate text-sm font-medium text-ink">
                     {place.name}
                   </span>
                   {place.formatted_address && (
-                    <span className="block truncate text-xs text-slate-400">
+                    <span className="block truncate text-xs text-ink-4">
                       {place.formatted_address}
                     </span>
                   )}
                 </span>
                 {place.distance_m != null && (
-                  <span className="shrink-0 text-xs text-slate-400 tabular-nums">
+                  <span className="shrink-0 text-xs text-ink-4 tabular-nums">
                     {place.distance_m < 1000
                       ? `${Math.round(place.distance_m)} m`
                       : `${(place.distance_m / 1000).toFixed(1)} km`}

@@ -15,7 +15,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-slate-400">Loading…</div>
+      <div className="flex min-h-dvh items-center justify-center text-ink-4">Loading…</div>
     );
   }
 

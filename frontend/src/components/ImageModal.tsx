@@ -13,11 +13,11 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
       onClick={onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white md:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-surface md:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative">
-          <img src={image.original_url} alt="" className="max-h-[50dvh] w-full object-contain bg-slate-100" />
+          <img src={image.original_url} alt="" className="max-h-[50dvh] w-full object-contain bg-surface-2" />
           <button
             type="button"
             onClick={onClose}
@@ -29,25 +29,25 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
         </div>
         <div className="space-y-3 p-4">
           {image.analysis?.caption && (
-            <p className="text-sm text-slate-700">{image.analysis.caption}</p>
+            <p className="text-sm text-ink-2">{image.analysis.caption}</p>
           )}
           <div className="flex flex-wrap gap-1.5">
             {image.analysis?.labels?.map((label) => (
               <span
                 key={label}
-                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600"
+                className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-ink-2"
               >
                 {label}
               </span>
             ))}
           </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-3">
             {image.taken_at && (
               <>
                 <dt>Taken</dt>
                 <dd>
                   {formatTime(image.taken_at)}{' '}
-                  <span className="text-slate-400">({image.taken_at_source})</span>
+                  <span className="text-ink-4">({image.taken_at_source})</span>
                 </dd>
               </>
             )}
@@ -67,8 +67,8 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
             )}
             {image.status === 'failed' && (
               <>
-                <dt className="text-rose-600">Failed</dt>
-                <dd className="text-rose-600">{image.error}</dd>
+                <dt className="text-danger">Failed</dt>
+                <dd className="text-danger">{image.error}</dd>
               </>
             )}
           </dl>
@@ -76,7 +76,7 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
             <button
               type="button"
               onClick={() => reanalyze.mutate(image.id, { onSuccess: onClose })}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-700 active:bg-slate-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-line py-2.5 text-sm font-medium text-ink-2 active:bg-surface-2"
             >
               <RefreshCw className="size-4" /> Re-analyze
             </button>
@@ -85,7 +85,7 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
               onClick={() => {
                 if (confirm('Delete this photo?')) remove.mutate(image.id, { onSuccess: onClose });
               }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-rose-200 py-2.5 text-sm font-medium text-rose-600 active:bg-rose-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-danger-line py-2.5 text-sm font-medium text-danger active:bg-danger-bg"
             >
               <Trash2 className="size-4" /> Delete
             </button>

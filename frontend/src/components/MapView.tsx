@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import { useEffect, useRef } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import { dayColor, dayDash } from '../lib/dayColors';
 
 export interface MapPoint {
@@ -27,10 +28,18 @@ const OSM_STYLE: maplibregl.StyleSpecification = {
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };
 
+/** Dim and desaturate the light OSM raster so it sits under a dark page.
+ *  Applied to the tile layer only, so the day routes keep their exact colours. */
+const DARK_BASEMAP_PAINT = {
+  'raster-brightness-max': 0.4,
+  'raster-saturation': -0.4,
+  'raster-contrast': -0.1,
+} as const;
+
 function marker(color: string, text: string): HTMLElement {
   const el = document.createElement('div');
   el.className =
-    'flex size-6 items-center justify-center rounded-full text-xs font-bold text-white shadow ring-2 ring-white';
+    'flex size-6 items-center justify-center rounded-full text-xs font-bold text-white shadow ring-2 ring-surface';
   el.style.backgroundColor = color;
   el.textContent = text;
   return el;
@@ -39,6 +48,10 @@ function marker(color: string, text: string): HTMLElement {
 /** One route per day, each in its own colour and dash pattern. */
 export function MapView({ days, className }: { days: MapDay[]; className?: string }) {
   const container = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+  const dark =
+    theme === 'dark' ||
+    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   useEffect(() => {
     const withPoints = days.filter((day) => day.points.length > 0);
@@ -75,6 +88,11 @@ export function MapView({ days, className }: { days: MapDay[]; className?: strin
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
 
     map.on('load', () => {
+      if (dark) {
+        for (const [property, value] of Object.entries(DARK_BASEMAP_PAINT)) {
+          map.setPaintProperty('osm', property as 'raster-saturation', value);
+        }
+      }
       withPoints.forEach((day, dayIndex) => {
         if (day.points.length < 2) return;
         const id = `route-${dayIndex}`;
@@ -104,7 +122,7 @@ export function MapView({ days, className }: { days: MapDay[]; className?: strin
     });
 
     return () => map.remove();
-  }, [days]);
+  }, [days, dark]);
 
   const withPoints = days.filter((day) => day.points.length > 0);
   if (withPoints.length === 0) return null;
@@ -115,7 +133,7 @@ export function MapView({ days, className }: { days: MapDay[]; className?: strin
       {withPoints.length > 1 && (
         <ul className="flex flex-wrap gap-x-4 gap-y-1 px-1">
           {withPoints.map((day, index) => (
-            <li key={day.label} className="flex items-center gap-1.5 text-xs text-slate-600">
+            <li key={day.label} className="flex items-center gap-1.5 text-xs text-ink-2">
               <span
                 aria-hidden
                 className="h-0.5 w-5 rounded-full"

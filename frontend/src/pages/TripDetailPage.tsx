@@ -32,8 +32,8 @@ export function TripDetailPage() {
   );
   const hasMapPoints = mapDays.some((day) => day.points.length > 0);
 
-  if (isLoading) return <p className="py-12 text-center text-sm text-slate-400">Loading trip…</p>;
-  if (!trip) return <p className="py-12 text-center text-sm text-slate-500">Trip not found.</p>;
+  if (isLoading) return <p className="py-12 text-center text-sm text-ink-4">Loading trip…</p>;
+  if (!trip) return <p className="py-12 text-center text-sm text-ink-3">Trip not found.</p>;
 
   function saveTitle() {
     updateTrip.mutate({ title }, { onSuccess: () => setEditing(false) });
@@ -42,7 +42,7 @@ export function TripDetailPage() {
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <Link to="/trips" className="inline-flex items-center gap-1 text-sm text-slate-500">
+        <Link to="/trips" className="inline-flex items-center gap-1 text-sm text-ink-3">
           <ArrowLeft className="size-4" /> Trips
         </Link>
         <div className="flex items-center gap-2">
@@ -53,7 +53,7 @@ export function TripDetailPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
-                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-lg font-bold"
+                className="min-w-0 flex-1 rounded-lg border border-line-strong px-3 py-1.5 text-lg font-bold"
               />
               <button
                 type="button"
@@ -66,7 +66,7 @@ export function TripDetailPage() {
             </>
           ) : (
             <>
-              <h1 className="truncate text-xl font-bold text-slate-900">{trip.title}</h1>
+              <h1 className="truncate text-xl font-bold text-ink">{trip.title}</h1>
               <button
                 type="button"
                 aria-label="Rename trip"
@@ -74,14 +74,14 @@ export function TripDetailPage() {
                   setTitle(trip.title);
                   setEditing(true);
                 }}
-                className="rounded-full p-1.5 text-slate-400 active:bg-slate-100"
+                className="rounded-full p-1.5 text-ink-4 active:bg-surface-2"
               >
                 <Pencil className="size-4" />
               </button>
             </>
           )}
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-3">
           {formatDay(trip.started_at)}
           {trip.day_count > 1 && <> – {formatDay(trip.ended_at)}</>} · {trip.day_count} day
           {trip.day_count === 1 ? '' : 's'}
@@ -89,7 +89,7 @@ export function TripDetailPage() {
             <>
               {' '}
               · spent{' '}
-              <span className="font-semibold text-amber-700">{formatSpend(trip.spend)}</span>
+              <span className="font-semibold text-money">{formatSpend(trip.spend)}</span>
             </>
           )}
         </p>
@@ -97,14 +97,14 @@ export function TripDetailPage() {
 
       {hasMapPoints && (
         <Suspense
-          fallback={<div className="h-56 w-full animate-pulse rounded-2xl bg-slate-100 md:h-72" />}
+          fallback={<div className="h-56 w-full animate-pulse rounded-2xl bg-surface-2 md:h-72" />}
         >
           <MapView days={mapDays} className="h-56 w-full overflow-hidden rounded-2xl md:h-72" />
         </Suspense>
       )}
 
       {trip.days.length === 0 && (
-        <p className="rounded-2xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-2xl bg-surface-2 px-4 py-6 text-center text-sm text-ink-3">
           No photographed stops in this window yet — the expenses are still counted below.
         </p>
       )}
@@ -112,7 +112,7 @@ export function TripDetailPage() {
       {trip.days.map((day, index) => (
         <section key={day.date} className="space-y-3">
           <div className="flex items-baseline justify-between gap-2 px-1">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-2">
               {hasMapPoints && (
                 <span
                   aria-hidden
@@ -121,15 +121,15 @@ export function TripDetailPage() {
                 />
               )}
               Day {index + 1}
-              <span className="font-normal text-slate-400">{formatDay(day.date)}</span>
+              <span className="font-normal text-ink-4">{formatDay(day.date)}</span>
             </h2>
             {day.spend.base_total_minor > 0 && (
-              <span className="text-xs font-semibold text-amber-700">
+              <span className="text-xs font-semibold text-money">
                 {formatSpend(day.spend)}
               </span>
             )}
           </div>
-          <div className="space-y-3 border-l border-slate-200 [&>*]:-ml-px">
+          <div className="space-y-3 border-l border-line [&>*]:-ml-px">
             {day.visits.map((visit) => (
               <VisitCard key={visit.id} visit={visit} />
             ))}
@@ -144,7 +144,7 @@ export function TripDetailPage() {
             deleteTrip.mutate(trip.id, { onSuccess: () => navigate('/trips') });
           }
         }}
-        className="flex items-center gap-1.5 text-sm font-medium text-rose-600"
+        className="flex items-center gap-1.5 text-sm font-medium text-danger"
       >
         <Trash2 className="size-4" /> Delete trip
       </button>

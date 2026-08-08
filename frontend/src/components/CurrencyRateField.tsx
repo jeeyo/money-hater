@@ -37,7 +37,7 @@ export function CurrencyRateField({
   const converted = rate != null && amount > 0 ? toMinor(amount * rate, baseCurrency) : null;
 
   return (
-    <div className="space-y-2 rounded-xl bg-amber-50 p-3">
+    <div className="space-y-2 rounded-xl bg-money-bg p-3">
       <div className="flex items-center justify-between">
         <span className={labelClass}>
           Rate — 1 {currency} in {baseCurrency}
@@ -48,7 +48,7 @@ export function CurrencyRateField({
             setEdited(false);
             refetch();
           }}
-          className="flex items-center gap-1 text-xs font-medium text-amber-700"
+          className="flex items-center gap-1 text-xs font-medium text-money"
         >
           <RefreshCw className={`size-3 ${isLoading ? 'animate-spin' : ''}`} /> today's rate
         </button>
@@ -66,14 +66,14 @@ export function CurrencyRateField({
         className={inputClass}
       />
       {converted != null ? (
-        <p className="text-sm text-amber-900">
+        <p className="text-sm text-money">
           = <span className="font-semibold">{formatMoney(converted, baseCurrency)}</span>
           {!edited && quote?.rate != null && (
-            <span className="ml-1 text-xs text-amber-700">at today's rate</span>
+            <span className="ml-1 text-xs text-money">at today's rate</span>
           )}
         </p>
       ) : (
-        <p className="text-xs text-amber-700">
+        <p className="text-xs text-money">
           No rate available — enter the rate you got to convert this.
         </p>
       )}

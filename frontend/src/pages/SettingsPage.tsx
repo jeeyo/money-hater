@@ -1,11 +1,20 @@
-import { LocateFixed, LogOut } from 'lucide-react';
+import { LocateFixed, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
 import { useUpdateSettings } from '../hooks/useData';
+
+const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+];
 
 export function SettingsPage() {
   const { user, logout, refreshUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const update = useUpdateSettings();
   const [currency, setCurrency] = useState(user?.preferred_currency ?? 'USD');
   const [homeLabel, setHomeLabel] = useState(user?.home_label ?? '');
@@ -40,16 +49,35 @@ export function SettingsPage() {
   }
 
   const inputClass =
-    'w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base outline-none focus:border-brand-500';
+    'w-full rounded-xl border border-line-strong bg-surface px-4 py-2.5 text-base outline-none focus:border-brand-500';
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-bold text-slate-900">Settings</h1>
-      <p className="text-sm text-slate-500">{user?.email}</p>
+      <h1 className="text-lg font-bold text-ink">Settings</h1>
+      <p className="text-sm text-ink-3">{user?.email}</p>
+
+      <div className="space-y-1">
+        <span className="text-sm font-medium text-ink-2">Appearance</span>
+        <div className="flex gap-2 rounded-xl border border-line bg-surface p-1">
+          {THEMES.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              aria-pressed={theme === value}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${
+                theme === value ? 'bg-brand-50 text-brand-700' : 'text-ink-3 active:bg-surface-2'
+              }`}
+            >
+              <Icon className="size-4" /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <form onSubmit={save} className="space-y-4">
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-slate-700">Preferred currency</span>
+          <span className="text-sm font-medium text-ink-2">Preferred currency</span>
           <input
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
@@ -57,14 +85,14 @@ export function SettingsPage() {
             className={inputClass}
             placeholder="USD"
           />
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-4">
             Used when a receipt doesn't state its currency.
           </span>
         </label>
 
-        <fieldset className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-          <legend className="px-1 text-sm font-medium text-slate-700">Home location</legend>
-          <p className="text-xs text-slate-400">
+        <fieldset className="space-y-2 rounded-2xl border border-line bg-surface p-4">
+          <legend className="px-1 text-sm font-medium text-ink-2">Home location</legend>
+          <p className="text-xs text-ink-4">
             Helps label short round-trips from home as commutes.
           </p>
           <input
@@ -110,7 +138,7 @@ export function SettingsPage() {
       <button
         type="button"
         onClick={logout}
-        className="flex items-center gap-2 text-sm font-medium text-rose-600"
+        className="flex items-center gap-2 text-sm font-medium text-danger"
       >
         <LogOut className="size-4" /> Sign out
       </button>

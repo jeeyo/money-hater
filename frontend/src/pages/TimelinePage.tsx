@@ -22,7 +22,7 @@ export function TimelinePage() {
           type="button"
           aria-label="Previous day"
           onClick={() => setDate((d) => shiftDate(d, -1))}
-          className="rounded-full p-2 text-slate-500 active:bg-slate-100"
+          className="rounded-full p-2 text-ink-3 active:bg-surface-2"
         >
           <ChevronLeft className="size-5" />
         </button>
@@ -30,13 +30,13 @@ export function TimelinePage() {
           type="date"
           value={date}
           onChange={(e) => e.target.value && setDate(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink"
         />
         <button
           type="button"
           aria-label="Next day"
           onClick={() => setDate((d) => shiftDate(d, 1))}
-          className="rounded-full p-2 text-slate-500 active:bg-slate-100"
+          className="rounded-full p-2 text-ink-3 active:bg-surface-2"
         >
           <ChevronRight className="size-5" />
         </button>
@@ -56,16 +56,16 @@ export function TimelinePage() {
       )}
 
       {data && data.spend.base_total_minor > 0 && (
-        <p className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        <p className="rounded-xl bg-money-bg px-4 py-2.5 text-sm text-money">
           Spent this day: <span className="font-semibold">{formatSpend(data.spend)}</span>
         </p>
       )}
 
-      {isLoading && <p className="py-12 text-center text-sm text-slate-400">Loading day…</p>}
+      {isLoading && <p className="py-12 text-center text-sm text-ink-4">Loading day…</p>}
 
       {isEmpty && (
         <div className="py-16 text-center">
-          <p className="text-slate-500">Nothing logged this day.</p>
+          <p className="text-ink-3">Nothing logged this day.</p>
           <Link to="/upload" className="mt-2 inline-block font-medium text-brand-600">
             Upload photos →
           </Link>
@@ -73,7 +73,7 @@ export function TimelinePage() {
       )}
 
       {data && data.visits.length > 0 && (
-        <div className="space-y-3 border-l border-slate-200 [&>*]:-ml-px">
+        <div className="space-y-3 border-l border-line [&>*]:-ml-px">
           {data.visits.map((visit) => (
             <VisitCard key={visit.id} visit={visit} />
           ))}
@@ -82,7 +82,7 @@ export function TimelinePage() {
 
       {data && data.unassigned_images.length > 0 && (
         <section className="space-y-2">
-          <h2 className="px-1 text-sm font-semibold text-slate-500">Not yet placed</h2>
+          <h2 className="px-1 text-sm font-semibold text-ink-3">Not yet placed</h2>
           <div className="flex flex-wrap gap-2">
             {data.unassigned_images.map((image) => (
               <ImageThumb key={image.id} image={image} onClick={() => setOpenImage(image)} />

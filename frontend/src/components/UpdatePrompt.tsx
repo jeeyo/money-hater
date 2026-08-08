@@ -12,11 +12,11 @@ export function UpdatePrompt() {
   if (!offlineReady && !needRefresh) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-20 z-50 mx-auto max-w-sm rounded-2xl border border-slate-200 bg-white p-3 shadow-lg md:bottom-4">
+    <div className="fixed inset-x-3 bottom-20 z-50 mx-auto max-w-sm rounded-2xl border border-line bg-surface p-3 shadow-lg md:bottom-4">
       {needRefresh ? (
         <div className="flex items-center gap-3">
           <RefreshCw className="size-5 shrink-0 text-brand-600" />
-          <p className="flex-1 text-sm text-slate-700">A new version is ready.</p>
+          <p className="flex-1 text-sm text-ink-2">A new version is ready.</p>
           <button
             type="button"
             onClick={() => updateServiceWorker(true)}
@@ -27,15 +27,15 @@ export function UpdatePrompt() {
           <button
             type="button"
             onClick={() => setNeedRefresh(false)}
-            className="text-sm text-slate-400"
+            className="text-sm text-ink-4"
           >
             Later
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <CloudOff className="size-5 shrink-0 text-slate-400" />
-          <p className="flex-1 text-sm text-slate-700">Ready to work offline.</p>
+          <CloudOff className="size-5 shrink-0 text-ink-4" />
+          <p className="flex-1 text-sm text-ink-2">Ready to work offline.</p>
           <button
             type="button"
             onClick={() => setOfflineReady(false)}

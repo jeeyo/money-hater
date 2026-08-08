@@ -20,7 +20,7 @@ export function ImageThumb({
     <button
       type="button"
       onClick={onClick}
-      className={`relative ${size} shrink-0 overflow-hidden rounded-xl bg-slate-200 text-left`}
+      className={`relative ${size} shrink-0 overflow-hidden rounded-xl bg-surface-2 text-left`}
     >
       {image.thumb_url ? (
         <img
@@ -30,9 +30,9 @@ export function ImageThumb({
           className="size-full object-cover"
         />
       ) : (
-        <div className="flex size-full items-center justify-center text-slate-400">
+        <div className="flex size-full items-center justify-center text-ink-4">
           {image.status === 'failed' ? (
-            <TriangleAlert className="size-6 text-rose-500" />
+            <TriangleAlert className="size-6 text-danger" />
           ) : (
             <Loader2 className="size-6 animate-spin" />
           )}

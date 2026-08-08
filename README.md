@@ -15,18 +15,19 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 - Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
 - Installs as a **PWA**: add it to your home screen and it opens standalone, with the shell available
   offline.
+- **Dark mode**, following your system unless you pin it.
 
 ## Screenshots
 
 <table>
   <tr>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/timeline.webp" alt="Day timeline of visits with photos and spend" />
+      <img src="docs/screenshots/timeline.webp" alt="Day timeline of stops with photos and spend" />
       <sub><b>Timeline</b> — your day rebuilt from photos: each stop, when you were there, what you spent.</sub>
     </td>
     <td width="33%" valign="top">
       <img src="docs/screenshots/trip-detail.webp" alt="Trip detail showing its days, stops and route map" />
-      <sub><b>Trip</b> — the days you grouped, their stops, and the route across them.</sub>
+      <sub><b>Trip</b> — the days you grouped, their stops, and a route per day on the map.</sub>
     </td>
     <td width="33%" valign="top">
       <img src="docs/screenshots/expenses.webp" alt="Expenses rolled up into the base currency" />
@@ -52,6 +53,45 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 <img src="docs/screenshots/desktop.webp" alt="Desktop layout with a sidebar" />
 
 <sub>The same app on a wide screen — the bottom tab bar becomes a sidebar.</sub>
+
+### Dark mode
+
+Follows your system by default; **Settings → Appearance** pins it to light or dark.
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/timeline-dark.webp" alt="Day timeline of stops with photos and spend" />
+      <sub><b>Timeline</b> — your day rebuilt from photos: each stop, when you were there, what you spent.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trip-detail-dark.webp" alt="Trip detail showing its days, stops and route map" />
+      <sub><b>Trip</b> — the days you grouped, their stops, and a route per day on the map.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/expenses-dark.webp" alt="Expenses rolled up into the base currency" />
+      <sub><b>Expenses</b> — everything in your base currency, with what was actually paid alongside.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/confirm-rate-dark.webp" alt="Confirming the exchange rate for a foreign expense" />
+      <sub><b>Confirm a rate</b> — foreign spend is converted at the day's rate, then waits for you to agree.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/add-expense-dark.webp" alt="Adding an expense with place suggestions" />
+      <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trips-dark.webp" alt="List of trips the user has created" />
+      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+    </td>
+  </tr>
+</table>
+
+<img src="docs/screenshots/desktop-dark.webp" alt="Desktop layout in dark mode" />
+
+<sub>The basemap is dimmed rather than inverted, so each day's route keeps its exact colour.</sub>
 
 ## Tech stack
 

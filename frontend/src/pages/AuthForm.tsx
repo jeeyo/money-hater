@@ -36,14 +36,14 @@ export function AuthForm({
   }
 
   return (
-    <div className="flex min-h-dvh flex-col justify-center bg-slate-50 px-6 py-12">
+    <div className="flex min-h-dvh flex-col justify-center bg-surface-2 px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
         <img src="/icon-192.png" alt="" className="mx-auto size-24" />
-        <h1 className="mt-3 text-center text-2xl font-bold text-slate-900">Money Hater</h1>
-        <p className="mt-1 text-center text-sm text-slate-500">
+        <h1 className="mt-3 text-center text-2xl font-bold text-ink">Money Hater</h1>
+        <p className="mt-1 text-center text-sm text-ink-3">
           Trip logger — photos in, itinerary and spending out.
         </p>
-        <h2 className="mt-8 text-lg font-semibold text-slate-800">{title}</h2>
+        <h2 className="mt-8 text-lg font-semibold text-ink">{title}</h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <input
             type="email"
@@ -52,7 +52,7 @@ export function AuthForm({
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+            className="w-full rounded-xl border border-line-strong bg-surface px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
           />
           <input
             type="password"
@@ -62,9 +62,9 @@ export function AuthForm({
             placeholder="Password (min 8 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+            className="w-full rounded-xl border border-line-strong bg-surface px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
           />
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <button
             type="submit"
             disabled={busy}
@@ -73,7 +73,7 @@ export function AuthForm({
             {busy ? '…' : submitLabel}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-ink-3">
           {altText}{' '}
           <Link to={altTo} className="font-medium text-brand-600">
             {altLabel}

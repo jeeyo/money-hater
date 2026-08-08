@@ -11,24 +11,24 @@ function UploadedImage({ initial }: { initial: ImageRecord }) {
   const { data } = useImage(initial.id);
   const image = data ?? initial;
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2">
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2">
       <ImageThumb image={image} size="size-16" />
       <div className="min-w-0 flex-1 text-sm">
         {image.status === 'analyzed' ? (
           <>
-            <p className="truncate font-medium text-slate-800">
+            <p className="truncate font-medium text-ink">
               {image.analysis?.caption ?? image.place?.name ?? 'Logged'}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-3">
               {image.analysis?.kind ?? 'photo'}
               {image.place && <> · {image.place.name}</>}
               {image.has_expense && <> · expense recorded</>}
             </p>
           </>
         ) : image.status === 'failed' ? (
-          <p className="text-xs text-rose-600">{image.error ?? 'Analysis failed'}</p>
+          <p className="text-xs text-danger">{image.error ?? 'Analysis failed'}</p>
         ) : (
-          <p className="flex items-center gap-2 text-xs text-slate-500">
+          <p className="flex items-center gap-2 text-xs text-ink-3">
             <Loader2 className="size-3.5 animate-spin" /> Analyzing…
           </p>
         )}
@@ -60,7 +60,7 @@ export function UploadPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-lg font-bold text-slate-900">Add photos</h1>
+      <h1 className="text-lg font-bold text-ink">Add photos</h1>
 
       <div
         onDragOver={(e) => {
@@ -70,10 +70,10 @@ export function UploadPage() {
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={`rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${
-          dragOver ? 'border-brand-500 bg-brand-50' : 'border-slate-300 bg-white'
+          dragOver ? 'border-brand-500 bg-brand-50' : 'border-line-strong bg-surface'
         }`}
       >
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-3">
           Anything from your day — a place, food, an item, a receipt. EXIF time and GPS are read
           automatically.
         </p>
@@ -88,7 +88,7 @@ export function UploadPage() {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 active:bg-slate-50"
+            className="flex items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-5 py-3 text-sm font-semibold text-ink-2 active:bg-surface-2"
           >
             <ImagePlus className="size-4" /> Choose photos
           </button>
@@ -112,18 +112,18 @@ export function UploadPage() {
       </div>
 
       {upload.isPending && (
-        <p className="flex items-center gap-2 text-sm text-slate-500">
+        <p className="flex items-center gap-2 text-sm text-ink-3">
           <Loader2 className="size-4 animate-spin" /> Uploading…
         </p>
       )}
-      {upload.isError && <p className="text-sm text-rose-600">{upload.error.message}</p>}
+      {upload.isError && <p className="text-sm text-danger">{upload.error.message}</p>}
       {upload.isSuccess && upload.data.length === 0 && (
-        <p className="text-sm text-slate-500">Those photos were already in your log.</p>
+        <p className="text-sm text-ink-3">Those photos were already in your log.</p>
       )}
 
       {uploaded.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-500">Just uploaded</h2>
+          <h2 className="text-sm font-semibold text-ink-3">Just uploaded</h2>
           {uploaded.map((image) => (
             <UploadedImage key={image.id} initial={image} />
           ))}
