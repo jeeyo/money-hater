@@ -15,6 +15,43 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 - Installs as a **PWA**: add it to your home screen and it opens standalone, with the shell available
   offline.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/timeline.webp" alt="Day timeline of visits with photos and spend" />
+      <sub><b>Timeline</b> — your day rebuilt from photos: each stop, when you were there, what you spent.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trip-detail.webp" alt="Trip detail with a route map through the stops" />
+      <sub><b>Trip</b> — the route through the day's stops, with the total for the trip.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/expenses.webp" alt="Expenses rolled up into the base currency" />
+      <sub><b>Expenses</b> — everything in your base currency, with what was actually paid alongside.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/confirm-rate.webp" alt="Confirming the exchange rate for a foreign expense" />
+      <sub><b>Confirm a rate</b> — foreign spend is converted at the day's rate, then waits for you to agree.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/add-expense.webp" alt="Adding an expense with place suggestions" />
+      <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/upload.webp" alt="Uploading photos from camera or gallery" />
+      <sub><b>Upload</b> — shoot or pick photos; analysis runs in the background.</sub>
+    </td>
+  </tr>
+</table>
+
+<img src="docs/screenshots/desktop.webp" alt="Desktop layout with a sidebar" />
+
+<sub>The same app on a wide screen — the bottom tab bar becomes a sidebar.</sub>
+
 ## Tech stack
 
 | Layer      | Choice                                                                 |
@@ -32,9 +69,9 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 
 ### Devcontainer (recommended)
 
-Open the repo in VS Code and choose **Reopen in Container**. The devcontainer starts a
-Python + Node workspace and a PostgreSQL 17 service, installs dependencies, and applies
-migrations. Then:
+Open the repo in VS Code and choose **Reopen in Container**. It starts a Python + Node workspace
+alongside PostgreSQL 17, installs dependencies, and — on **every container start** — applies
+migrations and makes sure the demo account exists, so there is always something on screen.
 
 ```bash
 # terminal 1 — API (http://localhost:8000)
@@ -46,6 +83,27 @@ cd backend && uv run python -m app.worker.run
 # terminal 3 — frontend (http://localhost:5173, proxies /api to :8000)
 cd frontend && npm run dev
 ```
+
+#### Demo login
+
+| Email                  | Password       |
+| ---------------------- | -------------- |
+| `demo@moneyhater.dev`  | `demodemo123`  |
+
+The account is seeded with two days of fabricated itinerary — a day around Bangkok (with a
+receipt, a couple of hand-entered fares and a foreign-currency expense waiting for its rate to be
+confirmed) and a weekend in Chiang Mai. Dates are always relative to today, so the demo lands on
+"today" and "last weekend" whenever you spin the container up.
+
+Seeding is a no-op once the account exists, so restarts never clobber what you've been poking at.
+To throw it away and rebuild:
+
+```bash
+cd backend && uv run python -m app.dev.seed --reset
+```
+
+The seeder is development-only: it writes a known password and fabricated data. Don't point it at
+anything real.
 
 ### Docker Compose
 
