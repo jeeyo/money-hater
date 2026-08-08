@@ -105,6 +105,11 @@ Not everything comes with paper. **Expenses → Add** records an amount, currenc
 the expense attaches to that stop automatically and counts toward that trip's total; re-clustering
 keeps the link.
 
+Every expense can be edited afterwards — **Edit** on any row reopens the same form, receipts
+included, since the vision model does misread things. Correcting the time moves the expense to
+whichever stop it now falls inside (or off the timeline entirely), and changing the currency
+re-converts it rather than reusing the old rate.
+
 The **Where** field suggests places from your own itinerary, ranked by distance from wherever you
 actually were at that time — pick a lunchtime and the restaurant you ate at is metres away and top
 of the list; pick the evening and the night market is. Those suggestions cost nothing (they come

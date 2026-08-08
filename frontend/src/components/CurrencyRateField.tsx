@@ -13,12 +13,15 @@ export function CurrencyRateField({
   currency,
   baseCurrency,
   rate,
+  autoAdopt = true,
   onRateChange,
 }: {
   amount: number;
   currency: string;
   baseCurrency: string;
   rate: number | null;
+  /** False when editing an expense whose rate was already settled. */
+  autoAdopt?: boolean;
   onRateChange: (rate: number | null, edited: boolean) => void;
 }) {
   const { data: quote, isLoading, refetch } = useRateQuote(currency, baseCurrency);
@@ -26,8 +29,8 @@ export function CurrencyRateField({
 
   // Adopt the fetched rate until the user types their own
   useEffect(() => {
-    if (!edited && quote?.rate != null) onRateChange(quote.rate, false);
-  }, [quote?.rate, edited, onRateChange]);
+    if (autoAdopt && !edited && quote?.rate != null) onRateChange(quote.rate, false);
+  }, [quote?.rate, edited, autoAdopt, onRateChange]);
 
   if (currency === baseCurrency) return null;
 

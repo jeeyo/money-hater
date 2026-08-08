@@ -1,6 +1,6 @@
 import { AlertTriangle, MapPin, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { AddExpenseSheet } from '../components/AddExpenseSheet';
+import { ExpenseSheet } from '../components/ExpenseSheet';
 import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
 import { ImageModal } from '../components/ImageModal';
 import { useAuth } from '../context/AuthContext';
@@ -33,7 +33,15 @@ function MerchantBars({ merchants }: { merchants: MerchantTotal[] }) {
   );
 }
 
-function ExpenseRow({ expense, onConfirm }: { expense: Expense; onConfirm: () => void }) {
+function ExpenseRow({
+  expense,
+  onConfirm,
+  onEdit,
+}: {
+  expense: Expense;
+  onConfirm: () => void;
+  onEdit: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const { data: image } = useImage(showReceipt ? expense.image_id : null);
@@ -140,13 +148,20 @@ function ExpenseRow({ expense, onConfirm }: { expense: Expense; onConfirm: () =>
           )}
           {expense.note && <p className="mt-1 text-xs text-slate-500">{expense.note}</p>}
           <div className="mt-2 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-1 text-xs font-medium text-brand-600"
+            >
+              <Pencil className="size-3.5" /> Edit
+            </button>
             {expense.image_id != null && (
               <button
                 type="button"
                 onClick={() => setShowReceipt(true)}
                 className="text-xs font-medium text-brand-600"
               >
-                View receipt photo →
+                Receipt photo →
               </button>
             )}
             <button
@@ -172,6 +187,7 @@ export function ExpensesPage() {
   const { data: summary } = useExpenseSummary();
   const { data: expenses, isLoading } = useExpenses();
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
 
   const needsReview = expenses?.filter((e) => e.needs_review) ?? [];
@@ -244,13 +260,19 @@ export function ExpensesPage() {
               key={expense.id}
               expense={expense}
               onConfirm={() => setConfirming(expense)}
+              onEdit={() => setEditing(expense)}
             />
           ))}
         </ul>
       </section>
 
-      {adding && (
-        <AddExpenseSheet baseCurrency={baseCurrency} onClose={() => setAdding(false)} />
+      {adding && <ExpenseSheet baseCurrency={baseCurrency} onClose={() => setAdding(false)} />}
+      {editing && (
+        <ExpenseSheet
+          baseCurrency={baseCurrency}
+          expense={editing}
+          onClose={() => setEditing(null)}
+        />
       )}
       {confirming && (
         <ConfirmRateSheet expense={confirming} onClose={() => setConfirming(null)} />

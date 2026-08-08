@@ -42,10 +42,20 @@ async def apply_conversion(
     expense.needs_review = not rate_is_manual
 
 
-async def attach_to_visit(db: AsyncSession, expense: Expense) -> None:
-    """Link a manual expense to whichever visit covers the time it was spent."""
-    if expense.spent_at is None or expense.visit_id is not None:
+async def attach_to_visit(
+    db: AsyncSession, expense: Expense, *, reattach: bool = False
+) -> None:
+    """Link an expense to whichever visit covers the time it was spent.
+
+    `reattach` recomputes an existing link — needed when the time changes,
+    otherwise an edited expense would keep pointing at the old stop (or none).
+    """
+    if expense.spent_at is None:
         return
+    if expense.visit_id is not None:
+        if not reattach:
+            return
+        expense.visit_id = None
     visit_id = await db.scalar(
         sa.select(Visit.id)
         .where(
@@ -68,6 +78,7 @@ async def resolve_where(
     keeps working whether or not the user chose from the suggestions.
     """
     if place_id is None:
+        # Unlinking keeps the name that was recorded, so history stays readable
         return None, merchant
     place = await db.get(Place, place_id)
     if place is None:

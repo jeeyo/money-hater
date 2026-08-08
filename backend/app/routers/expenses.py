@@ -195,36 +195,45 @@ async def update_expense(
     expense_id: int, body: ExpenseUpdate, user: CurrentUser, db: DbSession
 ):
     expense = await _get_owned(db, user.id, expense_id)
-    if body.description is not None:
+    # `null` means "clear this" only when the key was actually sent; an absent
+    # key leaves the field alone.
+    sent = body.model_fields_set
+    if body.description is not None or "description" in sent:
         expense.description = body.description or None
-    if body.place_id is not None:
+    if "place_id" in sent:
+        where_name = body.merchant if body.merchant is not None else expense.merchant
         expense.place_id, expense.merchant = await resolve_where(
-            db, user, body.place_id, body.merchant
+            db, user, body.place_id, where_name
         )
     elif body.merchant is not None:
         expense.merchant = body.merchant or None
     if body.spent_at is not None:
         expense.spent_at = body.spent_at
-        await attach_to_visit(db, expense)
+        await attach_to_visit(db, expense, reattach=True)
+    currency_changed = body.currency is not None and body.currency.upper() != expense.currency
     if body.currency is not None:
         expense.currency = body.currency.upper()
     if body.total is not None:
         expense.total_minor = to_minor(body.total, expense.currency) or 0
-    if body.note is not None:
+    if body.note is not None or "note" in sent:
         expense.note = body.note or None
-    # Any change to amount, currency or rate re-derives the base-currency total
-    if body.currency is not None or body.total is not None or body.fx_rate is not None:
+    # Any change to amount, currency or rate re-derives the base-currency total.
+    # A new currency invalidates the stored rate, so look a fresh one up unless
+    # the user supplied theirs.
+    if currency_changed or body.total is not None or body.fx_rate is not None:
+        if body.fx_rate is not None:
+            rate, manual = body.fx_rate, True
+        elif currency_changed:
+            rate, manual = None, False
+        else:
+            rate, manual = expense.fx_rate, expense.fx_rate_source == "manual"
         await apply_conversion(
-            db,
-            expense,
-            user.preferred_currency,
-            rate=body.fx_rate if body.fx_rate is not None else expense.fx_rate,
-            rate_is_manual=body.fx_rate is not None or expense.fx_rate_source == "manual",
+            db, expense, user.preferred_currency, rate=rate, rate_is_manual=manual
         )
     await db.commit()
-    if body.place_id is not None:
-        # The session keeps objects unexpired on commit, so a newly linked
-        # place would otherwise serialize from the stale relationship
+    if "place_id" in sent:
+        # The session keeps objects unexpired on commit, so a changed link
+        # would otherwise serialize from the stale relationship
         await db.refresh(expense, attribute_names=["place"])
     return expense_out(expense)
 
