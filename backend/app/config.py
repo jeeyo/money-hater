@@ -32,8 +32,16 @@ class Settings(BaseSettings):
 
     media_root: Path = Path("./data/media")
 
-    openai_api_key: str = ""
-    openai_vision_model: str = "gpt-4.1-mini"
+    # Image understanding goes through LiteLLM, so any provider it supports
+    # works: "openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-5",
+    # "gemini/gemini-2.5-flash", "ollama/llava", ...
+    llm_model: str = "openai/gpt-4.1-mini"
+    # Optional. Left blank, LiteLLM reads the provider's own env var
+    # (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, …).
+    llm_api_key: str = ""
+    # Optional. A LiteLLM proxy, an Ollama host, or any OpenAI-compatible server.
+    llm_api_base: str = ""
+
     google_maps_api_key: str = ""
 
     daily_analysis_cap: int = 200

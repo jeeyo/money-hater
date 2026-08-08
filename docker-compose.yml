@@ -26,7 +26,12 @@ services:
       QUEUE_DATABASE_URL: postgresql://moneyhater:moneyhater@db:5432/moneyhater
       MEDIA_ROOT: /data/media
       JWT_SECRET: ${JWT_SECRET:-insecure-dev-secret-change-me-in-production}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-4.1-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     volumes:
       - media:/data/media

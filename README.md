@@ -5,7 +5,8 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 
 - Reads **timestamps, EXIF and GPS coordinates** from each image.
 - Maps coordinates to **Google Places** so stops get real names.
-- Understands image content with a **vision model** (OpenAI Agents SDK): place, food, item, or receipt.
+- Understands image content with a **vision model** — OpenAI Agents SDK routed through **LiteLLM**,
+  so OpenAI, Anthropic, Gemini, a local Ollama or your own vLLM are all a config change.
 - Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
 - Groups images into **stops** and days automatically — no set-up, no tagging.
 - **Trips are optional**: when you want to group some days together, name a trip and pick the
@@ -102,7 +103,7 @@ pins it to light or dark.
 | Backend    | Python 3.11+, FastAPI, SQLAlchemy 2 (async), Alembic                    |
 | Jobs       | Procrastinate (PostgreSQL-native task queue — no Redis)                 |
 | Database   | PostgreSQL 17 (CloudNativePG in Kubernetes)                             |
-| AI         | OpenAI Agents SDK (vision classification + receipt parsing)             |
+| AI         | OpenAI Agents SDK + LiteLLM (any provider: vision + receipt parsing)    |
 | Geo        | Google Geocoding + Places API (cached in Postgres, stubbed without key) |
 | Frontend   | React 19 + TypeScript + Vite, TanStack Query, Tailwind CSS v4           |
 | Map        | MapLibre GL + OpenStreetMap tiles                                       |
@@ -151,14 +152,30 @@ anything real.
 ### Docker Compose
 
 ```bash
-cp .env.example .env   # add OPENAI_API_KEY / GOOGLE_MAPS_API_KEY if you have them
+cp .env.example .env   # add a model provider key / GOOGLE_MAPS_API_KEY if you have them
 docker compose up --build
 ```
 
 Frontend at http://localhost:5173, API at http://localhost:8000.
 
-Without `OPENAI_API_KEY` and `GOOGLE_MAPS_API_KEY` the app still works: places fall back to
+Without a model provider and `GOOGLE_MAPS_API_KEY` the app still works: places fall back to
 raw coordinates and image understanding is skipped (images are logged by time/location only).
+
+### Choosing a model
+
+Image analysis runs through [LiteLLM](https://docs.litellm.ai/), so the provider is configuration
+rather than code. Set `LLM_MODEL` to `provider/model` and supply that provider's key:
+
+```bash
+LLM_MODEL=anthropic/claude-sonnet-4-5   ANTHROPIC_API_KEY=sk-ant-…
+LLM_MODEL=gemini/gemini-2.5-flash       GEMINI_API_KEY=…
+LLM_MODEL=ollama/llava                  # local, no key needed
+LLM_MODEL=hosted_vllm/Qwen2-VL-7B-Instruct  LLM_API_BASE=http://vllm.internal:8000/v1
+```
+
+`LLM_API_KEY` and `LLM_API_BASE` override per-provider variables when you want an explicit key or
+a proxy. Each stored analysis records the model that produced it, so switching later stays
+traceable. The model must be able to see images — a text-only one will fail every analysis.
 
 ## Tests & checks
 

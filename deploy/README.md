@@ -20,6 +20,7 @@ kubectl apply -k deploy/
 # 2. Application secrets (after the namespace exists)
 kubectl -n money-hater create secret generic money-hater-secrets \
   --from-literal=JWT_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LLM_MODEL="openai/gpt-4.1-mini" \
   --from-literal=OPENAI_API_KEY="sk-..." \
   --from-literal=GOOGLE_MAPS_API_KEY="AIza..."
 ```
@@ -46,8 +47,13 @@ tag in `kustomization.yaml`.
   api + worker are colocated deliberately: a ReadWriteOnce PVC can only be
   mounted by one node. `strategy: Recreate` prevents rollouts from deadlocking
   on the volume.
-- Vision analysis (OpenAI) and place naming (Google) degrade gracefully: leave
-  either key empty in the secret and the rest keeps working.
+- Vision analysis and place naming (Google) degrade gracefully: leave either
+  out of the secret and the rest keeps working.
+- The model goes through LiteLLM, so `LLM_MODEL` picks the provider
+  (`anthropic/claude-sonnet-4-5`, `gemini/gemini-2.5-flash`, `ollama/llava`, …)
+  and you add that provider's key — or `LLM_API_BASE` to point at a LiteLLM
+  proxy or a model you host in the same cluster, which keeps image data inside
+  it.
 
 ## Scaling up later
 

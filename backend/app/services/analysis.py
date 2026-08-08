@@ -134,7 +134,7 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
                     caption=vision.caption,
                     labels=vision.labels,
                     raw=vision.model_dump(mode="json"),
-                    model=settings.openai_vision_model,
+                    model=settings.llm_model,
                 )
             )
             await _apply_receipt(db, image, vision, user)
