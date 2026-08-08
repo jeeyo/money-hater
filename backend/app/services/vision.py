@@ -1,18 +1,16 @@
-"""Image understanding via the OpenAI Agents SDK, routed through LiteLLM.
+"""Image understanding via the OpenAI Agents SDK.
 
 One agent run per image returns a structured VisionResult: what the photo shows
 (place / food / item / receipt / ...), a caption, labels, and — for receipts —
 merchant, currency, totals, and line items.
 
-The model is named `provider/model` (LLM_MODEL), so switching from OpenAI to
-Anthropic, Gemini, a self-hosted vLLM or a local Ollama is a config change, not
-a code change. With no provider configured the step is skipped entirely and
-images are logged by time and location only.
+`LLM_MODEL` picks the model; it must be one that can see images. With no key
+configured the step is skipped entirely and images are logged by time and
+location only.
 """
 
 import base64
 import logging
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -20,6 +18,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.services.llm import llm_enabled, prepare_sdk
 
 log = logging.getLogger(__name__)
 
@@ -88,65 +87,19 @@ def parse_receipt_datetime(value: str | None) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
-# The env var each provider reads when no explicit key is configured. Used only
-# to decide whether analysis is worth attempting — LiteLLM does the real lookup.
-PROVIDER_ENV_KEYS = {
-    "openai": "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-    "vertex_ai": "GOOGLE_APPLICATION_CREDENTIALS",
-    "azure": "AZURE_API_KEY",
-    "bedrock": "AWS_ACCESS_KEY_ID",
-    "groq": "GROQ_API_KEY",
-    "mistral": "MISTRAL_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY",
-    "together_ai": "TOGETHER_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
-    "xai": "XAI_API_KEY",
-}
-
-# Providers that run on your own machine and need no credential
-LOCAL_PROVIDERS = {"ollama", "ollama_chat", "lm_studio", "hosted_vllm", "openai_like"}
-
-
-def model_provider() -> str:
-    """The provider half of `provider/model`; bare names mean OpenAI."""
-    return settings.llm_model.split("/", 1)[0] if "/" in settings.llm_model else "openai"
-
-
-def vision_enabled() -> bool:
-    """Whether a model is reachable — an explicit key, a base URL, a local
-    provider, or the provider's own env var being present."""
-    if settings.llm_api_key or settings.llm_api_base:
-        return True
-    provider = model_provider()
-    if provider in LOCAL_PROVIDERS:
-        return True
-    env_key = PROVIDER_ENV_KEYS.get(provider)
-    return bool(env_key and os.environ.get(env_key))
-
-
 async def analyze_image_content(image_path: Path, mime: str) -> VisionResult | None:
-    if not vision_enabled():
+    if not llm_enabled():
         return None
-    # Imported lazily so the app runs without a provider (and tests never touch it)
-    from agents import Agent, Runner, set_tracing_disabled
-    from agents.extensions.models.litellm_model import LitellmModel
+    # Imported lazily so the app runs without a key (and tests never touch it)
+    from agents import Agent, Runner
 
-    # The SDK exports traces to OpenAI by default. On a self-hosted logger that
-    # is a surprise, and with another provider behind LiteLLM it would ship your
-    # photos' metadata to a vendor you are not even using.
-    set_tracing_disabled(True)
+    prepare_sdk()
 
     data_url = f"data:{mime};base64,{base64.b64encode(image_path.read_bytes()).decode()}"
     agent = Agent(
         name="image-analyst",
         instructions=INSTRUCTIONS,
-        model=LitellmModel(
-            model=settings.llm_model,
-            api_key=settings.llm_api_key or None,
-            base_url=settings.llm_api_base or None,
-        ),
+        model=settings.llm_model,
         output_type=VisionResult,
     )
     result = await Runner.run(

@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 import app.dev.seed as seed_mod
 from app.config import settings
 from app.dev.seed import DEMO_EMAIL, DEMO_PASSWORD, build, main
-from app.models import Base, Expense, Image, Trip, User, Visit
+from app.models import Base, Expense, Image, Place, Trip, TripRecommendation, User, Visit
 from app.security import verify_password
 
 
@@ -32,6 +32,22 @@ async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
         trips = (await db.execute(sa.select(Trip))).scalars().all()
         assert {trip.title for trip in trips} == {"Chiang Mai weekend", "Out in Bangkok"}
         assert [trip.title for trip in trips if trip.end_expense_id is None] == ["Out in Bangkok"]
+
+        # A ready "what next?" set for the ongoing trip, so the panel has
+        # something to show without an OPENAI_API_KEY
+        recommendation = await db.scalar(sa.select(TripRecommendation))
+        assert recommendation is not None
+        assert recommendation.status == "ready"
+        assert recommendation.model == "demo"
+        assert recommendation.anchor_visit_id is not None
+        assert await db.get(Visit, recommendation.anchor_visit_id) is not None
+        assert len(recommendation.items) >= 3
+        for item in recommendation.items:
+            place = await db.scalar(
+                sa.select(Place).where(Place.google_place_id == item["google_place_id"])
+            )
+            assert place is not None, "every card must point at a real seeded place"
+            assert (place.raw or {}).get("reviews"), "so opening a card shows comments"
 
         expenses = (await db.execute(sa.select(Expense))).scalars().all()
         # Receipt-backed, hand-entered, and one foreign awaiting confirmation

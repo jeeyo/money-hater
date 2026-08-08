@@ -7,7 +7,7 @@ UI shows raw coordinates.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import sqlalchemy as sa
@@ -21,7 +21,28 @@ log = logging.getLogger(__name__)
 
 NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"
 TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
+DETAILS_URL = "https://places.googleapis.com/v1/places/{place_id}"
 FIELD_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.types"
+
+# Recommendations need to tell a good place from a bad one, so they ask for
+# ratings and price. Deliberately a separate mask: FIELD_MASK above is used by
+# the keystroke-driven suggest endpoint, and these extra fields move a call into
+# a pricier Google SKU — one worth paying a few times an afternoon, not once
+# per character typed.
+RECOMMEND_FIELD_MASK = (
+    FIELD_MASK
+    + ",places.rating,places.userRatingCount,places.priceLevel"
+    + ",places.currentOpeningHours.openNow,places.googleMapsUri,places.editorialSummary"
+)
+# Reviews are Google's most expensive field group, so they are fetched for one
+# place at a time, only when the user opens a card.
+DETAILS_FIELD_MASK = (
+    "id,displayName,formattedAddress,location,types,rating,userRatingCount,priceLevel"
+    ",currentOpeningHours.openNow,currentOpeningHours.weekdayDescriptions"
+    ",googleMapsUri,websiteUri,editorialSummary,reviews"
+)
+DETAILS_TTL_HOURS = 24
+
 SEARCH_RADIUS_M = 150.0
 # Reuse a cached place if it's within this distance of the photo
 CACHE_RADIUS_M = 120.0
@@ -258,6 +279,119 @@ async def suggest_places(
         if place is not None:
             results.append((place, distance(place), "google"))
     return results[:limit]
+
+
+async def search_for_recommendations(
+    db: AsyncSession,
+    anchor: tuple[float, float],
+    kinds: list[str] | None = None,
+    keyword: str | None = None,
+    radius_m: float = 1500.0,
+    limit: int = 10,
+) -> list[Place]:
+    """Candidate places near the user, for the recommender's tool to offer.
+
+    A keyword goes to text search ("dessert cafe"), bare types to nearby search.
+    Everything found is cached as a `Place`, so a recommendation the user acts
+    on is already a row we can attach an expense to.
+    """
+    if not settings.google_maps_api_key:
+        return []
+    lat, lng = anchor
+    circle = {"center": {"latitude": lat, "longitude": lng}, "radius": radius_m}
+    if keyword:
+        url = TEXT_URL
+        body: dict = {
+            "textQuery": keyword,
+            "maxResultCount": limit,
+            "locationBias": {"circle": circle},
+        }
+        if kinds:
+            # Text search takes one type, not a list
+            body["includedType"] = kinds[0]
+    else:
+        url = NEARBY_URL
+        body = {
+            "maxResultCount": limit,
+            "rankPreference": "POPULARITY",
+            "locationRestriction": {"circle": circle},
+        }
+        if kinds:
+            body["includedTypes"] = kinds
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                url,
+                json=body,
+                headers={
+                    "X-Goog-Api-Key": settings.google_maps_api_key,
+                    "X-Goog-FieldMask": RECOMMEND_FIELD_MASK,
+                },
+            )
+            response.raise_for_status()
+            items = response.json().get("places", [])
+    except httpx.HTTPError as exc:
+        # A bad type name from the model lands here as a 400; an empty list
+        # tells it to try something else rather than failing the whole run.
+        log.warning("Places recommendation search failed: %s", exc)
+        return []
+
+    found: list[Place] = []
+    for item in items:
+        place = await _upsert_place(db, item)
+        if place is not None:
+            found.append(place)
+    return found
+
+
+def _details_are_fresh(place: Place, now: datetime) -> bool:
+    """Cached details still usable? Ratings and reviews drift slowly."""
+    raw = place.raw or {}
+    if "reviews" not in raw:
+        return False
+    fetched = place.fetched_at
+    if fetched is None:
+        return False
+    if fetched.tzinfo is None:
+        fetched = fetched.replace(tzinfo=UTC)  # sqlite hands back naive datetimes
+    return fetched >= now - timedelta(hours=DETAILS_TTL_HOURS)
+
+
+async def place_details(db: AsyncSession, google_place_id: str) -> Place | None:
+    """Full detail for one place, including recent reviews.
+
+    Cached in `Place.raw` — this is what `Place.fetched_at` is for. Called when
+    a recommendation card is opened, never for a whole list of candidates.
+    """
+    place = await db.scalar(sa.select(Place).where(Place.google_place_id == google_place_id))
+    now = datetime.now(UTC)
+    if place is not None and _details_are_fresh(place, now):
+        return place
+    if not settings.google_maps_api_key:
+        return place  # whatever we already know beats nothing
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                DETAILS_URL.format(place_id=google_place_id),
+                headers={
+                    "X-Goog-Api-Key": settings.google_maps_api_key,
+                    "X-Goog-FieldMask": DETAILS_FIELD_MASK,
+                },
+            )
+            response.raise_for_status()
+            item = response.json()
+    except httpx.HTTPError as exc:
+        log.warning("Place details failed for %s: %s", google_place_id, exc)
+        return place
+
+    if place is None:
+        return await _upsert_place(db, item)
+    place.raw = item
+    place.fetched_at = now
+    await db.flush()
+    return place
 
 
 async def search_place_by_text(db: AsyncSession, query: str) -> Place | None:

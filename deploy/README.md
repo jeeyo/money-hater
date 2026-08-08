@@ -20,7 +20,7 @@ kubectl apply -k deploy/
 # 2. Application secrets (after the namespace exists)
 kubectl -n money-hater create secret generic money-hater-secrets \
   --from-literal=JWT_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LLM_MODEL="openai/gpt-4.1-mini" \
+  --from-literal=LLM_MODEL="gpt-4.1-mini" \
   --from-literal=OPENAI_API_KEY="sk-..." \
   --from-literal=GOOGLE_MAPS_API_KEY="AIza..."
 ```
@@ -49,11 +49,15 @@ tag in `kustomization.yaml`.
   on the volume.
 - Vision analysis and place naming (Google) degrade gracefully: leave either
   out of the secret and the rest keeps working.
-- The model goes through LiteLLM, so `LLM_MODEL` picks the provider
-  (`anthropic/claude-sonnet-4-5`, `gemini/gemini-2.5-flash`, `ollama/llava`, …)
-  and you add that provider's key — or `LLM_API_BASE` to point at a LiteLLM
-  proxy or a model you host in the same cluster, which keeps image data inside
-  it.
+- **Next-stop suggestions need both keys.** They run an OpenAI agent with the
+  hosted web search tool (for what is on locally today) plus Google Places (for
+  real, nearby candidates), so they are switched off unless `OPENAI_API_KEY` and
+  `GOOGLE_MAPS_API_KEY` are both present. `DAILY_RECOMMENDATION_CAP` bounds the
+  spend per user per day.
+- The web search tool only exists on OpenAI's Responses API, which is why
+  `LLM_MODEL` is an OpenAI model name rather than any provider you like.
+- Suggestions run on the **worker**, on its own `recommend` queue, so a slow
+  model call never holds an HTTP request open through the ingress.
 
 ## Scaling up later
 

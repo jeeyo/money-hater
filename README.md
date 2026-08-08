@@ -5,14 +5,15 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
 
 - Reads **timestamps, EXIF and GPS coordinates** from each image.
 - Maps coordinates to **Google Places** so stops get real names.
-- Understands image content with a **vision model** — OpenAI Agents SDK routed through **LiteLLM**,
-  so OpenAI, Anthropic, Gemini, a local Ollama or your own vLLM are all a config change.
+- Understands image content with a **vision model** through the **OpenAI Agents SDK**.
 - Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
 - Groups images into **stops** and days automatically — no set-up, no tagging.
 - **Trips are optional**: when you want to group some days together, name a trip and pick the
   expense it started with and the one it ended with. Nothing is ever grouped for you.
 - **Name a trip while you're on it**: leave the end open and it runs to today, growing as you go,
   until you tap *End trip now*.
+- **Suggests where to go next** while a trip is open — from your last stop, what you have liked so
+  far on this trip, the time of day, and what is actually on locally today.
 - Handles **multiple currencies**: everything rolls up into your base currency (THB by default), and
   foreign spend asks you to confirm the rate before it counts.
 - Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
@@ -47,9 +48,20 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
       <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
     </td>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/trip-open.webp" alt="A trip that is still running, with an End trip now button" />
-      <sub><b>Still going</b> — a trip named on the way out runs to today until you end it.</sub>
+      <img src="docs/screenshots/trip-open.webp" alt="A trip that is still running, with suggestions for where to go next" />
+      <sub><b>Still going</b> — runs to today until you end it, and suggests where to go next.</sub>
     </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/recommendation.webp" alt="A suggested place, with why it was picked and recent comments" />
+      <sub><b>What next?</b> — why this one, given your trip and the hour, plus what people say.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trips.webp" alt="List of trips the user has created" />
+      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+    </td>
+    <td width="33%"></td>
   </tr>
 </table>
 
@@ -88,9 +100,20 @@ pins it to light or dark.
       <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
     </td>
     <td width="33%" valign="top">
-      <img src="docs/screenshots/trip-open-dark.webp" alt="A trip that is still running, with an End trip now button" />
-      <sub><b>Still going</b> — a trip named on the way out runs to today until you end it.</sub>
+      <img src="docs/screenshots/trip-open-dark.webp" alt="A trip that is still running, with suggestions for where to go next" />
+      <sub><b>Still going</b> — runs to today until you end it, and suggests where to go next.</sub>
     </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/recommendation-dark.webp" alt="A suggested place, with why it was picked and recent comments" />
+      <sub><b>What next?</b> — why this one, given your trip and the hour, plus what people say.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trips-dark.webp" alt="List of trips the user has created" />
+      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+    </td>
+    <td width="33%"></td>
   </tr>
 </table>
 
@@ -105,7 +128,7 @@ pins it to light or dark.
 | Backend    | Python 3.11+, FastAPI, SQLAlchemy 2 (async), Alembic                    |
 | Jobs       | Procrastinate (PostgreSQL-native task queue — no Redis)                 |
 | Database   | PostgreSQL 17 (CloudNativePG in Kubernetes)                             |
-| AI         | OpenAI Agents SDK + LiteLLM (any provider: vision + receipt parsing)    |
+| AI         | OpenAI Agents SDK — vision, receipt parsing, next-stop suggestions      |
 | Geo        | Google Geocoding + Places API (cached in Postgres, stubbed without key) |
 | Frontend   | React 19 + TypeScript + Vite, TanStack Query, Tailwind CSS v4           |
 | Map        | MapLibre GL + OpenStreetMap tiles                                       |
@@ -166,19 +189,20 @@ raw coordinates and image understanding is skipped (images are logged by time/lo
 
 ### Choosing a model
 
-Image analysis runs through [LiteLLM](https://docs.litellm.ai/), so the provider is configuration
-rather than code. Set `LLM_MODEL` to `provider/model` and supply that provider's key:
-
 ```bash
-LLM_MODEL=anthropic/claude-sonnet-4-5   ANTHROPIC_API_KEY=sk-ant-…
-LLM_MODEL=gemini/gemini-2.5-flash       GEMINI_API_KEY=…
-LLM_MODEL=ollama/llava                  # local, no key needed
-LLM_MODEL=hosted_vllm/Qwen2-VL-7B-Instruct  LLM_API_BASE=http://vllm.internal:8000/v1
+OPENAI_API_KEY=sk-…      # or LLM_API_KEY, which overrides it
+LLM_MODEL=gpt-4.1-mini   # must be able to see images
 ```
 
-`LLM_API_KEY` and `LLM_API_BASE` override per-provider variables when you want an explicit key or
-a proxy. Each stored analysis records the model that produced it, so switching later stays
-traceable. The model must be able to see images — a text-only one will fail every analysis.
+Both AI features run on OpenAI: photo analysis needs a model that can see images, and next-stop
+suggestions use the Agents SDK's **hosted web search tool**, which exists only on OpenAI's
+Responses API. That tool is the reason the app is not model-portable — swapping in Anthropic,
+Gemini or a local Ollama would mean giving up live web search or wiring in a separate search API.
+Each stored analysis records the model that produced it, so changing `LLM_MODEL` later stays
+traceable.
+
+Tracing is disabled explicitly: the SDK uploads traces to OpenAI's dashboard by default, and a
+self-hosted logger shipping your itinerary off the box is not a sensible default.
 
 ## Tests & checks
 
@@ -233,6 +257,27 @@ today, so no other trip can overlap that stretch; the error names the trip in th
 
 Ending it is one tap — **End trip now** closes it at the most recent expense inside it. If it
 actually finished earlier, pick that expense instead and the days after it drop back out.
+
+## What next?
+
+While a trip is open, it can suggest where to go from here. Tap **Suggest somewhere** and an agent
+is given four things: your **last stop** and its coordinates, the **stops and spending already in
+this trip**, the **local date and time**, and two tools — web search, for what is actually on
+around you today, and Google Places, for real candidates nearby.
+
+Nothing about meal times is coded. The prompt states the local time and the model works out what it
+calls for, including which kinds of place to look for; it answers with its own words for the moment
+("late afternoon, after the temples") and three to five cards.
+
+Suggestions are **grounded, not generated**: every card must carry a `place_id` that the Places
+tool actually returned during that run, and any the model invents are dropped before they are
+stored. A confident hallucination is worse than one fewer suggestion, because you walk there.
+
+Cards stay compact — name, rating, how far. Tap one for **why it was picked**, anything on locally,
+and **recent comments**; those reviews are Google's priciest field, so they are bought for the card
+you opened and never for the whole row. A set is cached for 90 minutes and expires the moment you
+arrive somewhere new, and **Refresh** forces another run. It needs `OPENAI_API_KEY` and
+`GOOGLE_MAPS_API_KEY`; without them the panel says so instead of guessing.
 
 ## Money and currencies
 

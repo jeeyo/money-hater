@@ -2,6 +2,7 @@ import { ArrowLeft, Check, Flag, Pencil, Trash2 } from 'lucide-react';
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { EndTripSheet } from '../components/EndTripSheet';
+import { RecommendationsPanel } from '../components/RecommendationsPanel';
 import { VisitCard } from '../components/VisitCard';
 import { useDeleteTrip, useEndTrip, useTrip, useUpdateTrip } from '../hooks/useData';
 import { dayColor } from '../lib/dayColors';
@@ -124,6 +125,7 @@ export function TripDetailPage() {
           {endTrip.isError && (
             <p className="text-center text-sm text-danger">{endTrip.error.message}</p>
           )}
+          <RecommendationsPanel tripId={trip.id} />
         </div>
       )}
 

@@ -47,6 +47,28 @@ class PlaceSuggestion(PlaceOut):
     source: str  # visited|google
 
 
+class PlaceReview(BaseModel):
+    author: str | None
+    rating: float | None
+    text: str
+    relative_time: str | None
+
+
+class PlaceDetailsOut(PlaceOut):
+    """The pricier half of a place, fetched only when a card is opened."""
+
+    google_place_id: str
+    rating: float | None
+    user_rating_count: int | None
+    price_level: str | None
+    open_now: bool | None
+    opening_hours: list[str] | None
+    summary: str | None
+    website: str | None
+    maps_uri: str | None
+    reviews: list[PlaceReview]
+
+
 # --- Images ---
 class AnalysisOut(BaseModel):
     kind: str
@@ -246,6 +268,37 @@ class TripEnd(BaseModel):
     """Close an open trip. Omit the expense to end it at the latest one."""
 
     end_expense_id: int | None = None
+
+
+class RecommendationOut(BaseModel):
+    google_place_id: str
+    name: str
+    category: str | None
+    why: str | None
+    event: str | None
+    address: str | None
+    lat: float | None
+    lng: float | None
+    rating: float | None = None
+    user_rating_count: int | None = None
+    price_level: str | None = None
+    open_now: bool | None = None
+    distance_m: int | None = None
+
+
+class RecommendationsOut(BaseModel):
+    # none = nothing generated yet (or it went stale); the UI offers the button
+    status: str  # none|pending|ready|failed
+    moment: str | None = None
+    generated_at: datetime | None = None
+    anchor_label: str | None = None
+    items: list[RecommendationOut] = []
+    error: str | None = None
+
+
+class RecommendationRequest(BaseModel):
+    # Force a new run even when a fresh set exists
+    refresh: bool = False
 
 
 class TimelineDayOut(BaseModel):

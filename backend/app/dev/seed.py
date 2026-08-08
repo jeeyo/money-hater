@@ -34,14 +34,18 @@ from app.models import (
     ImageAnalysis,
     Place,
     Trip,
+    TripRecommendation,
     User,
     Visit,
 )
 from app.security import hash_password
+from app.serialize import visit_label
 from app.services import storage
 from app.services.clustering import recluster_user
 from app.services.expenses import create_expense
+from app.services.geo import haversine_m
 from app.services.money import to_minor
+from app.services.trips import latest_visit_in, window_of
 
 DEMO_EMAIL = "demo@moneyhater.dev"
 DEMO_PASSWORD = "demodemo123"
@@ -171,6 +175,55 @@ PLACES = {
         "Ratvithi Ln, Chiang Mai Old City", 18.7930, 98.9853, ["cafe"],
     ),
 }
+
+# Places the demo *recommends* rather than visits. They carry the fields a real
+# Google reply would — rating, price, reviews — so the recommendation cards and
+# their detail sheet render fully with no API key and no model.
+# (google_place_id, name, address, lat, lng, types, rating, count, price, reviews)
+RECOMMENDABLE = [
+    (
+        "demo-rec-1", "Mango Sticky Rice Corner",
+        "Maha Rat Rd, Phra Nakhon, Bangkok", 13.7452, 100.4915,
+        ["dessert_shop", "food"], 4.7, 2841, "PRICE_LEVEL_INEXPENSIVE",
+        [
+            ("Nok P.", 5, "Best mango sticky rice near the old town. Queue moves fast.",
+             "2 weeks ago"),
+            ("Daniel R.", 4, "Sweet, cheap, and two minutes from Wat Pho. Cash only.",
+             "a month ago"),
+        ],
+    ),
+    (
+        "demo-rec-2", "Tha Tien Pier Coffee",
+        "Tha Tien, Phra Nakhon, Bangkok", 13.7437, 100.4921,
+        ["cafe", "food"], 4.4, 612, "PRICE_LEVEL_MODERATE",
+        [
+            ("Aom S.", 5, "Iced latte with a river view after the temples. Worth the walk.",
+             "3 days ago"),
+            ("Marta L.", 4, "Small and busy at sunset, but the terrace is lovely.", "2 months ago"),
+        ],
+    ),
+    (
+        "demo-rec-3", "Wat Arun",
+        "158 Thanon Wang Doem, Bangkok Yai", 13.7437, 100.4889,
+        ["tourist_attraction", "place_of_worship"], 4.6, 51204, None,
+        [
+            ("Ken T.", 5, "Cross on the ferry from Tha Tien — two minutes, four baht.",
+             "a week ago"),
+            ("Priya M.", 5, "Go late afternoon; the light on the porcelain is unreal.",
+             "a month ago"),
+        ],
+    ),
+    (
+        "demo-rec-4", "Wang Lang Market",
+        "Wang Lang Rd, Bangkok Noi", 13.7576, 100.4855,
+        ["market", "food"], 4.3, 8930, "PRICE_LEVEL_INEXPENSIVE",
+        [
+            ("Siriporn K.", 4, "Grilled squid and hoy tod stalls from about 5pm.", "5 days ago"),
+            ("Tom H.", 4, "Locals' market, not a tourist one. Bring small notes.", "3 weeks ago"),
+        ],
+    ),
+]
+
 
 # (key, place, taken_at, kind, description|None, caption, labels, photo, expense|None)
 # expense = (merchant, total_minor, currency, [(item, qty, amount_minor)], spent_at)
@@ -409,11 +462,123 @@ async def build(db) -> User:
         .order_by(sa.func.coalesce(Expense.spent_at, Expense.created_at))
         .limit(1)
     )
+    open_trip = None
     if today_start is not None:
-        db.add(Trip(user_id=user.id, title="Out in Bangkok", start_expense_id=today_start.id))
+        open_trip = Trip(user_id=user.id, title="Out in Bangkok", start_expense_id=today_start.id)
+        db.add(open_trip)
 
     await db.commit()
+    if open_trip is not None:
+        await seed_recommendations(db, user, open_trip)
     return user
+
+
+def _google_review(author: str, rating: int, text: str, when: str) -> dict:
+    """The shape Places API (New) returns, so the real code path reads it."""
+    return {
+        "authorAttribution": {"displayName": author},
+        "rating": rating,
+        "text": {"text": text},
+        "relativePublishTimeDescription": when,
+    }
+
+
+async def seed_recommendations(db, user: User, trip: Trip) -> None:
+    """A ready-made "what next?" set for the ongoing trip.
+
+    Generating one for real needs OPENAI_API_KEY and GOOGLE_MAPS_API_KEY, which
+    a fresh devcontainer has neither of, so the panel would only ever show its
+    empty state. These rows are fabricated — `model` says "demo" so they are
+    never mistaken for something a model produced.
+
+    It is fresh for RECOMMENDATION_TTL_MINUTES like any other set; leave the
+    container running past that and the panel goes back to offering the button,
+    which then does need the keys. It also expires if the browser's timezone is
+    far enough from the machine's that they disagree about which stop is the
+    trip's latest — the panel then just offers to generate, same as any trip.
+    """
+    places: dict[str, Place] = {}
+    for gid, name, address, lat, lng, types, rating, count, price, reviews in RECOMMENDABLE:
+        place = await db.scalar(sa.select(Place).where(Place.google_place_id == gid))
+        if place is None:
+            place = Place(google_place_id=gid, name=name, formatted_address=address,
+                          lat=lat, lng=lng, types=types)
+            db.add(place)
+        place.raw = {
+            "id": gid,
+            "displayName": {"text": name},
+            "formattedAddress": address,
+            "location": {"latitude": lat, "longitude": lng},
+            "types": types,
+            "rating": rating,
+            "userRatingCount": count,
+            "priceLevel": price,
+            "currentOpeningHours": {"openNow": True},
+            "googleMapsUri": f"https://maps.google.com/?cid={gid}",
+            "reviews": [_google_review(*review) for review in reviews],
+        }
+        # Marks the details cache as warm, so opening a card costs no API call
+        place.fetched_at = datetime.now(UTC)
+        places[gid] = place
+    await db.flush()
+
+    window = window_of(trip, 0)
+    anchor = await latest_visit_in(db, user, window)
+    if anchor is None:
+        return
+
+    # The "why" refers to the day the seeder just built — the flat white, the
+    # ramen, the temples — so the demo reads like a real suggestion. It must
+    # stay true whatever the anchor turns out to be, since that depends on the
+    # time of day the container was started: no claims about how close anything
+    # is, because the rendered distance is measured from the real anchor.
+    written = {
+        "demo-rec-1": ("dessert", "You had ramen for lunch and nothing sweet since — this is the "
+                                  "mango sticky rice stall the old town queues for."),
+        "demo-rec-2": ("coffee", "Your morning started with a flat white. This one is an iced "
+                                 "one on the river, by the Tha Tien ferry."),
+        "demo-rec-3": ("temple", "A four-baht ferry from Tha Tien, and best in the late "
+                                 "afternoon light — you have been photographing temples today."),
+        "demo-rec-4": ("night market", "You spent an evening at Jodd Fairs earlier in the trip; "
+                                       "this is the local version, across the river."),
+    }
+    items = []
+    for gid, (category, why) in written.items():
+        place = places[gid]
+        raw = place.raw or {}
+        items.append({
+            "google_place_id": gid,
+            "name": place.name,
+            "category": category,
+            "why": why,
+            "event": ("Sunset ferry runs until 9pm tonight" if gid == "demo-rec-3" else None),
+            "address": place.formatted_address,
+            "lat": place.lat,
+            "lng": place.lng,
+            "rating": raw.get("rating"),
+            "user_rating_count": raw.get("userRatingCount"),
+            "price_level": raw.get("priceLevel"),
+            "open_now": True,
+            "distance_m": round(
+                haversine_m(anchor.lat, anchor.lng, place.lat, place.lng)
+            ),
+        })
+
+    db.add(
+        TripRecommendation(
+            trip_id=trip.id,
+            user_id=user.id,
+            anchor_visit_id=anchor.id,
+            status="ready",
+            tz_offset_minutes=0,
+            # Written from the anchor rather than hard-coded, so the heading
+            # can't contradict the stop it was generated from
+            moment=f"next, after {visit_label(anchor)}",
+            items=items,
+            model="demo",
+        )
+    )
+    await db.commit()
 
 
 async def main(reset: bool) -> int:

@@ -4,9 +4,12 @@ import sqlalchemy as sa
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.deps import CurrentUser, DbSession
-from app.models import Expense, Image, Trip, Visit
+from app.models import Expense, Image, Trip, TripRecommendation, Visit
 from app.schemas import (
+    RecommendationRequest,
+    RecommendationsOut,
     TripCreate,
     TripDetailOut,
     TripEnd,
@@ -15,8 +18,10 @@ from app.schemas import (
     VisitOut,
     VisitUpdate,
 )
-from app.serialize import trip_detail_out, trip_out, visit_out
+from app.serialize import trip_detail_out, trip_out, visit_label, visit_out
+from app.services import recommend as recommend_service
 from app.services import trips as trip_service
+from app.services.llm import llm_enabled
 from app.services.places import search_place_by_text
 from app.services.trips import TripWindowError
 
@@ -199,6 +204,108 @@ async def end_trip(
     await db.commit()
     await db.refresh(trip, attribute_names=["end_expense"])
     return await _render(db, user, trip, tz_offset_minutes, detail=True)
+
+
+async def _defer_recommendation(recommendation_id: int) -> None:
+    # Imported here to avoid a circular import at module load
+    from app.worker.tasks import recommend_next
+
+    await recommend_next.defer_async(recommendation_id=recommendation_id)
+
+
+def _recommendations_out(
+    row: TripRecommendation | None, anchor_label: str | None
+) -> RecommendationsOut:
+    if row is None:
+        return RecommendationsOut(status="none", anchor_label=anchor_label)
+    return RecommendationsOut(
+        status=row.status,
+        moment=row.moment,
+        generated_at=row.generated_at,
+        anchor_label=anchor_label,
+        items=row.items or [],
+        error=row.error,
+    )
+
+
+@router.get("/trips/{trip_id}/recommendations", response_model=RecommendationsOut)
+async def get_recommendations(
+    trip_id: int,
+    user: CurrentUser,
+    db: DbSession,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+):
+    """The last generated set, if it is still worth showing. Never spends money."""
+    trip = await _load(db, user, trip_id)
+    window = trip_service.window_of(trip, tz_offset_minutes)
+    anchor = await trip_service.latest_visit_in(db, user, window)
+    row = await recommend_service.newest_for_trip(db, trip.id)
+    label = visit_label(anchor) if anchor is not None else None
+    if row is None or not recommend_service.is_fresh(
+        row, anchor.id if anchor else None, datetime.now(UTC)
+    ):
+        return RecommendationsOut(status="none", anchor_label=label)
+    return _recommendations_out(row, label)
+
+
+@router.post("/trips/{trip_id}/recommendations", response_model=RecommendationsOut, status_code=202)
+async def create_recommendations(
+    trip_id: int,
+    user: CurrentUser,
+    db: DbSession,
+    body: RecommendationRequest | None = None,
+    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+):
+    """Queue a run. The panel polls the GET above until it turns ready."""
+    trip = await _load(db, user, trip_id)
+    # Suggestions are for a trip you are on: a finished one has no "next".
+    if not trip_service.is_open(trip):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "That trip has ended — there is no next stop to suggest"
+        )
+    if not llm_enabled():
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "No model configured (set OPENAI_API_KEY)"
+        )
+    if not settings.google_maps_api_key:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "No GOOGLE_MAPS_API_KEY, so places can't be found"
+        )
+
+    window = trip_service.window_of(trip, tz_offset_minutes)
+    anchor = await trip_service.latest_visit_in(db, user, window)
+    if anchor is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "No stop with a location yet — add a photo with GPS first",
+        )
+    label = visit_label(anchor)
+
+    existing = await recommend_service.newest_for_trip(db, trip.id)
+    refresh = bool(body and body.refresh)
+    if existing is not None and recommend_service.is_fresh(existing, anchor.id, datetime.now(UTC)):
+        if not refresh:
+            return _recommendations_out(existing, label)
+        # "Regenerate" is the same path as "generate", minus the stale row
+        await db.delete(existing)
+        await db.flush()
+
+    if not await recommend_service.within_daily_cap(db, user):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "Daily recommendation limit reached"
+        )
+
+    row = TripRecommendation(
+        trip_id=trip.id,
+        user_id=user.id,
+        anchor_visit_id=anchor.id,
+        status="pending",
+        tz_offset_minutes=tz_offset_minutes,
+    )
+    db.add(row)
+    await db.commit()
+    await _defer_recommendation(row.id)
+    return _recommendations_out(row, label)
 
 
 @router.delete("/trips/{trip_id}", status_code=204)

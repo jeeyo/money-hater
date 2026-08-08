@@ -6,10 +6,12 @@ import type {
   Expense,
   ExpenseSummary,
   ImageRecord,
+  PlaceDetails,
   RateQuote,
   TimelineDay,
   Trip,
   TripDetail,
+  TripRecommendations,
   User,
 } from '../types';
 
@@ -69,6 +71,43 @@ export function useEndTrip(tripId: number) {
         body,
       ),
     onSuccess: invalidateItinerary,
+  });
+}
+
+/** Cached suggestions for an open trip. Polls only while a run is in flight. */
+export function useRecommendations(tripId: number, enabled = true) {
+  return useQuery({
+    queryKey: ['trips', tripId, 'recommendations'],
+    queryFn: () =>
+      apiJson<TripRecommendations>(
+        `/api/trips/${tripId}/recommendations?tz_offset_minutes=${tzOffsetMinutes()}`,
+      ),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.status === 'pending' ? 2000 : false),
+  });
+}
+
+export function useGenerateRecommendations(tripId: number) {
+  return useMutation({
+    mutationFn: (body: { refresh?: boolean } = {}) =>
+      postJson<TripRecommendations>(
+        `/api/trips/${tripId}/recommendations?tz_offset_minutes=${tzOffsetMinutes()}`,
+        body,
+      ),
+    onSuccess: (data) => {
+      // Seed the cache so the pending state (and its polling) starts at once
+      queryClient.setQueryData(['trips', tripId, 'recommendations'], data);
+    },
+  });
+}
+
+/** Ratings, hours and comments — fetched only when a card is opened. */
+export function usePlaceDetails(googlePlaceId: string | null) {
+  return useQuery({
+    queryKey: ['places', googlePlaceId],
+    queryFn: () => apiJson<PlaceDetails>(`/api/places/${googlePlaceId}/details`),
+    enabled: googlePlaceId != null,
+    staleTime: 60 * 60 * 1000,
   });
 }
 

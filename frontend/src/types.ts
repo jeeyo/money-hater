@@ -98,6 +98,58 @@ export interface TripDetail extends Trip {
   expenses: Expense[];
 }
 
+export interface Recommendation {
+  google_place_id: string;
+  name: string;
+  category: string | null;
+  why: string | null;
+  event: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  rating: number | null;
+  user_rating_count: number | null;
+  price_level: string | null;
+  open_now: boolean | null;
+  distance_m: number | null;
+}
+
+export interface TripRecommendations {
+  /** none = nothing fresh; the panel offers to generate */
+  status: 'none' | 'pending' | 'ready' | 'failed';
+  moment: string | null;
+  generated_at: string | null;
+  anchor_label: string | null;
+  items: Recommendation[];
+  error: string | null;
+}
+
+export interface PlaceReview {
+  author: string | null;
+  rating: number | null;
+  text: string;
+  relative_time: string | null;
+}
+
+export interface PlaceDetails {
+  id: number;
+  google_place_id: string;
+  name: string;
+  formatted_address: string | null;
+  lat: number;
+  lng: number;
+  types: string[] | null;
+  rating: number | null;
+  user_rating_count: number | null;
+  price_level: string | null;
+  open_now: boolean | null;
+  opening_hours: string[] | null;
+  summary: string | null;
+  website: string | null;
+  maps_uri: string | null;
+  reviews: PlaceReview[];
+}
+
 export interface TripRef {
   id: number;
   title: string;

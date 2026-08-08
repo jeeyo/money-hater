@@ -118,6 +118,31 @@ async def latest_expense_in(db: AsyncSession, user: User, window: TripWindow) ->
     )
 
 
+async def latest_visit_in(
+    db: AsyncSession, user: User, window: TripWindow, now: datetime | None = None
+) -> Visit | None:
+    """The last stop with coordinates — where "what's near me?" starts from.
+
+    Clamped to now as well as to the window: you cannot be standing somewhere
+    you have not been to yet, and a photo stamped later today would otherwise
+    make the trip look like it had already moved on.
+    """
+    moment = now or datetime.now(UTC)
+    return await db.scalar(
+        sa.select(Visit)
+        .where(
+            Visit.user_id == user.id,
+            Visit.started_at <= window.ended_at,
+            Visit.ended_at >= window.started_at,
+            Visit.started_at <= moment,
+            Visit.lat.isnot(None),
+        )
+        .order_by(Visit.started_at.desc())
+        .options(selectinload(Visit.place))
+        .limit(1)
+    )
+
+
 async def assert_no_other_open_trip(
     db: AsyncSession, user: User, exclude_id: int | None = None
 ) -> None:

@@ -32,20 +32,22 @@ class Settings(BaseSettings):
 
     media_root: Path = Path("./data/media")
 
-    # Image understanding goes through LiteLLM, so any provider it supports
-    # works: "openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-5",
-    # "gemini/gemini-2.5-flash", "ollama/llava", ...
-    llm_model: str = "openai/gpt-4.1-mini"
-    # Optional. Left blank, LiteLLM reads the provider's own env var
-    # (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, …).
+    # An OpenAI model that can see images (photo analysis) and use the hosted
+    # web search tool (next-stop recommendations).
+    llm_model: str = "gpt-4.1-mini"
+    # Optional. Left blank, the SDK reads OPENAI_API_KEY from the environment.
     llm_api_key: str = ""
-    # Optional. A LiteLLM proxy, an Ollama host, or any OpenAI-compatible server.
-    llm_api_base: str = ""
 
     google_maps_api_key: str = ""
 
     daily_analysis_cap: int = 200
     max_upload_bytes: int = 25 * 1024 * 1024
+
+    # Next-stop recommendations: how long a set stays fresh before the panel
+    # offers to generate again. Arriving somewhere new invalidates it anyway.
+    recommendation_ttl_minutes: int = 90
+    # Cost guard, like daily_analysis_cap; 0 = unlimited
+    daily_recommendation_cap: int = 50
 
     # ECB reference rates via Frankfurter; no API key. Blank disables FX lookup
     # (foreign expenses then wait for a manually entered rate).

@@ -167,6 +167,38 @@ class ImageAnalysis(Base):
     image: Mapped[Image] = relationship(back_populates="analysis")
 
 
+class TripRecommendation(Base):
+    """A generated "what next?" set for a trip the user is still on.
+
+    Kept rather than recomputed because each set costs a model call plus Google
+    lookups. A set stays usable while the trip's last stop is unchanged and it
+    is younger than RECOMMENDATION_TTL_MINUTES — walk somewhere new and it is
+    stale by definition, which is the behaviour you want anyway.
+    """
+
+    __tablename__ = "trip_recommendations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trip_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("trips.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # The stop it was generated from; SET NULL so re-clustering can't erase it
+    anchor_visit_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("visits.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(sa.String(16), default="pending")  # pending|ready|failed
+    # The browser's UTC offset, recorded because the worker runs later and
+    # elsewhere: "what time is it there" is the whole point of the prompt.
+    tz_offset_minutes: Mapped[int] = mapped_column(sa.Integer, default=0)
+    # The model's own words for the time of day, e.g. "late afternoon"
+    moment: Mapped[str | None] = mapped_column(sa.String(120))
+    items: Mapped[list | None] = mapped_column(JSONType)
+    model: Mapped[str | None] = mapped_column(sa.String(64))
+    error: Mapped[str | None] = mapped_column(sa.Text)
+    generated_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
+
+
 class Expense(Base):
     __tablename__ = "expenses"
     __table_args__ = (sa.Index("ix_expenses_user_spent_at", "user_id", "spent_at"),)
