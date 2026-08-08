@@ -46,6 +46,41 @@ async def test_non_image_rejected(client):
     assert response.status_code == 415
 
 
+async def test_a_rejected_batch_leaves_nothing_behind(client, db_sessionmaker):
+    """A phone selection is many files at once; one bad one must not litter.
+
+    The whole batch is validated before anything is written, so a rejection
+    cannot leave saved originals on disk with no rows pointing at them.
+    """
+    from app.config import settings
+
+    await register(client)
+    response = await client.post(
+        "/api/images",
+        files=[
+            ("files", ("good.jpg", make_jpeg(color=(4, 5, 6)), "image/jpeg")),
+            ("files", ("evil.txt", b"not an image", "text/plain")),
+        ],
+    )
+    assert response.status_code == 415
+
+    async with db_sessionmaker() as db:
+        assert await db.scalar(sa.select(sa.func.count()).select_from(Image)) == 0
+    originals = list(settings.media_root.rglob("*")) if settings.media_root.exists() else []
+    assert [p for p in originals if p.is_file()] == []
+
+
+async def test_a_photo_with_no_content_type_is_still_accepted(client):
+    """Gallery and share-sheet files often arrive with an empty MIME type."""
+    await register(client)
+    response = await client.post(
+        "/api/images", files=[("files", ("IMG_0001.HEIC", make_jpeg(color=(7, 7, 7)), ""))]
+    )
+    assert response.status_code == 201, response.text
+    # The bytes are what decide it, not the label the phone attached
+    assert response.json()[0]["mime"] == "image/jpeg"
+
+
 async def test_analysis_extracts_exif_and_builds_timeline(client, db_sessionmaker):
     await register(client)
     taken = datetime(2026, 8, 8, 12, 30, tzinfo=UTC)

@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { apiJson, postJson } from '../lib/api';
 import { tzOffsetMinutes } from '../lib/format';
 import { queryClient } from '../lib/queryClient';
@@ -191,20 +192,72 @@ function invalidateItinerary() {
   queryClient.invalidateQueries({ queryKey: ['expenses'] });
 }
 
+export interface UploadOutcome {
+  name: string;
+  status: 'added' | 'duplicate' | 'failed';
+  image?: ImageRecord;
+  error?: string;
+}
+
+/** How many photos go up at once. Phone uploads are slow and phone photos are
+ *  big; three keeps the link busy without stalling on a bad connection. */
+const UPLOAD_CONCURRENCY = 3;
+
+async function uploadOne(file: File): Promise<UploadOutcome> {
+  const form = new FormData();
+  form.append('files', file);
+  try {
+    const response = await fetch('/api/images', { method: 'POST', body: form });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.detail ?? response.statusText);
+    }
+    const created = (await response.json()) as ImageRecord[];
+    // An empty list means the server already had this exact photo
+    return created.length
+      ? { name: file.name, status: 'added', image: created[0] }
+      : { name: file.name, status: 'duplicate' };
+  } catch (error) {
+    return { name: file.name, status: 'failed', error: (error as Error).message };
+  }
+}
+
+/**
+ * Upload a selection one photo at a time, a few in flight at once.
+ *
+ * One request per photo rather than one for the batch: picking twenty photos
+ * out of a gallery and having the whole lot rejected because one of them is a
+ * 30MB panorama is the wrong failure. This way each photo succeeds, is skipped
+ * as a duplicate, or fails on its own, and the page can say which.
+ */
 export function useUploadImages() {
-  return useMutation({
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  const mutation = useMutation({
     mutationFn: async (files: File[]) => {
-      const form = new FormData();
-      for (const file of files) form.append('files', file);
-      const response = await fetch('/api/images', { method: 'POST', body: form });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.detail ?? response.statusText);
+      setProgress({ done: 0, total: files.length });
+      const outcomes: UploadOutcome[] = new Array(files.length);
+      let next = 0;
+      let done = 0;
+
+      async function worker() {
+        while (next < files.length) {
+          const index = next++;
+          outcomes[index] = await uploadOne(files[index]);
+          done += 1;
+          setProgress({ done, total: files.length });
+        }
       }
-      return (await response.json()) as ImageRecord[];
+
+      await Promise.all(
+        Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, worker),
+      );
+      return outcomes;
     },
     onSuccess: invalidateItinerary,
   });
+
+  return { ...mutation, progress };
 }
 
 export function useUpdateTrip(tripId: number) {

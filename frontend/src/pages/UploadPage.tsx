@@ -1,9 +1,12 @@
-import { Camera, ImagePlus, Loader2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { AlertTriangle, Camera, Check, ImagePlus, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageThumb } from '../components/ImageThumb';
 import { useImage, useUploadImages } from '../hooks/useData';
+import type { UploadOutcome } from '../hooks/useData';
+import { looksLikeImage } from '../lib/files';
+import { takeSharedFiles } from '../lib/sharedFiles';
 import type { ImageRecord } from '../types';
 
 function UploadedImage({ initial }: { initial: ImageRecord }) {
@@ -40,23 +43,61 @@ function UploadedImage({ initial }: { initial: ImageRecord }) {
 export function UploadPage() {
   const upload = useUploadImages();
   const [uploaded, setUploaded] = useState<ImageRecord[]>([]);
+  const [skipped, setSkipped] = useState<UploadOutcome[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
+  // `upload` is recreated each render, so keep the callback out of the effect's
+  // dependencies — the shared photos must be claimed exactly once.
+  const uploadRef = useRef(upload);
+  uploadRef.current = upload;
+
+  function record(outcomes: UploadOutcome[]) {
+    const added = outcomes
+      .filter((o) => o.status === 'added' && o.image)
+      .map((o) => o.image as ImageRecord);
+    setUploaded((prev) => [...added, ...prev]);
+    setSkipped(outcomes.filter((o) => o.status !== 'added'));
+  }
+
   function handleFiles(files: FileList | File[] | null) {
-    const list = Array.from(files ?? []).filter((f) => f.type.startsWith('image/'));
-    if (list.length === 0) return;
-    upload.mutate(list, {
-      onSuccess: (created) => setUploaded((prev) => [...created, ...prev]),
+    const all = Array.from(files ?? []);
+    const list = all.filter(looksLikeImage);
+    const rejected: UploadOutcome[] = all
+      .filter((file) => !looksLikeImage(file))
+      .map((file) => ({ name: file.name, status: 'failed', error: 'Not an image' }));
+    if (list.length === 0) {
+      setSkipped(rejected);
+      return;
+    }
+    uploadRef.current.mutate(list, {
+      onSuccess: (outcomes) => record([...outcomes, ...rejected]),
     });
   }
+
+  // Photos sent from the phone's share sheet are parked by the service worker;
+  // collect them on arrival so sharing lands straight in the log.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const shared = await takeSharedFiles();
+      if (cancelled || shared.length === 0) return;
+      handleFiles(shared);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Runs once: takeSharedFiles consumes the cache, so a re-run finds nothing
+  }, []);
 
   function onDrop(event: DragEvent) {
     event.preventDefault();
     setDragOver(false);
     handleFiles(event.dataTransfer.files);
   }
+
+  const { done, total } = upload.progress;
 
   return (
     <div className="space-y-5">
@@ -93,6 +134,10 @@ export function UploadPage() {
             <ImagePlus className="size-4" /> Choose photos
           </button>
         </div>
+        <p className="mt-3 text-xs text-ink-4">
+          Pick as many as you like. Installed on a phone, Money Hater also shows up in the share
+          sheet — send photos to it straight from your gallery.
+        </p>
         <input
           ref={cameraInput}
           type="file"
@@ -112,18 +157,47 @@ export function UploadPage() {
       </div>
 
       {upload.isPending && (
-        <p className="flex items-center gap-2 text-sm text-ink-3">
-          <Loader2 className="size-4 animate-spin" /> Uploading…
-        </p>
+        <div className="space-y-1">
+          <p className="flex items-center gap-2 text-sm text-ink-3">
+            <Loader2 className="size-4 animate-spin" />
+            {total > 1 ? `Uploading ${done + 1} of ${total}…` : 'Uploading…'}
+          </p>
+          {total > 1 && (
+            <div className="h-1 w-full overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="h-full rounded-full bg-brand-600 transition-[width]"
+                style={{ width: `${Math.round((done / total) * 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
       )}
       {upload.isError && <p className="text-sm text-danger">{upload.error.message}</p>}
-      {upload.isSuccess && upload.data.length === 0 && (
-        <p className="text-sm text-ink-3">Those photos were already in your log.</p>
+
+      {!upload.isPending && skipped.length > 0 && (
+        <section className="space-y-1.5 rounded-xl border border-line bg-surface p-3">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-2">
+            <AlertTriangle className="size-4 text-money" aria-hidden />
+            {skipped.length} not added
+          </h2>
+          <ul className="space-y-1 text-xs text-ink-3">
+            {skipped.map((outcome, index) => (
+              <li key={`${outcome.name}-${index}`} className="flex gap-2">
+                <span className="min-w-0 flex-1 truncate">{outcome.name}</span>
+                <span className={outcome.status === 'failed' ? 'text-danger' : 'text-ink-4'}>
+                  {outcome.status === 'duplicate' ? 'already logged' : outcome.error}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {uploaded.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-ink-3">Just uploaded</h2>
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-3">
+            <Check className="size-4 text-brand-600" aria-hidden /> Just uploaded
+          </h2>
           {uploaded.map((image) => (
             <UploadedImage key={image.id} initial={image} />
           ))}

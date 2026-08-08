@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icon-192.png', 'icon-512.png'],
+      includeAssets: ['icon-192.png', 'icon-512.png', 'share-target.js'],
       manifest: {
         name: 'Money Hater — Trip Logger',
         short_name: 'Money Hater',
@@ -31,8 +31,21 @@ export default defineConfig({
           { name: 'Add photos', short_name: 'Upload', url: '/upload' },
           { name: 'Add expense', short_name: 'Expense', url: '/expenses' },
         ],
+        // Installed, the app appears in the phone's share sheet, so photos can
+        // be sent straight from the gallery instead of hunting for them in a
+        // file picker. Files need POST + multipart, which means the service
+        // worker has to answer it (see public/share-target.js).
+        share_target: {
+          action: '/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [{ name: 'files', accept: ['image/*'] }],
+          },
+        },
       },
       workbox: {
+        importScripts: ['/share-target.js'],
         // The API is private and mutable — never let the SW answer for it.
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [

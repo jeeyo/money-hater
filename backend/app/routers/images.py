@@ -41,7 +41,11 @@ async def _defer_analysis(image_id: int) -> None:
 async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSession):
     if not files:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No files provided")
-    created: list[Image] = []
+
+    # Check the whole batch before writing any of it. Rejecting halfway used to
+    # leave the already-saved originals on disk with no rows to reference them,
+    # since the commit never happened.
+    accepted: list[tuple[bytes, str]] = []
     for upload in files:
         data = await upload.read()
         if len(data) == 0:
@@ -57,6 +61,10 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
                 status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 f"{upload.filename or 'file'} is not a recognized image",
             )
+        accepted.append((data, mime))
+
+    created: list[Image] = []
+    for data, mime in accepted:
         sha256 = storage.sha256_hex(data)
         duplicate = await db.scalar(
             sa.select(Image).where(Image.user_id == user.id, Image.sha256 == sha256)

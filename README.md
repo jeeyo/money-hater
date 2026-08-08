@@ -18,7 +18,7 @@ a plate of food, an item you bought, a receipt — and it reconstructs your itin
   foreign spend asks you to confirm the rate before it counts.
 - Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
 - Installs as a **PWA**: add it to your home screen and it opens standalone, with the shell available
-  offline.
+  offline — and it joins the **share sheet**, so photos go straight from your gallery into the log.
 - **Dark mode** in true black for OLED, following your system unless you pin it.
 
 ## Screenshots
@@ -290,6 +290,24 @@ arrive somewhere new, and **Refresh** forces another run. It needs `OPENAI_API_K
   reference rate, so you can accept the suggestion or type the rate you actually got.
 - Rates are cached in Postgres and fetched at most once per currency pair per day. If the rate
   service is unreachable, the amount stays unconverted rather than wrong, and waits for you.
+
+## Getting photos in
+
+Three ways, all of them multi-photo:
+
+- **Choose photos** opens the gallery picker — select as many as you like in one go.
+- **Take a photo** goes straight to the camera on a phone.
+- **Share to Money Hater.** Once installed, the app registers as a *share target*: select photos in
+  your gallery, hit share, pick Money Hater, and they upload without you opening the app first.
+  A share is a `POST` with a multipart body, which an SPA's `index.html` cannot answer, so the
+  service worker takes it, parks the photos in the cache and hands them to the upload page
+  (`frontend/public/share-target.js`). **Android and desktop Chrome/Edge only** — iOS Safari does
+  not implement Web Share Target, so on an iPhone the picker is the way in.
+
+Each photo is uploaded as its own request, three at a time, so picking twenty and having the whole
+batch rejected because one of them is a 30MB panorama cannot happen. The page counts them off as
+they go and lists anything that did not make it, saying whether it was already logged or why it
+failed. Duplicates are detected by SHA-256, so re-sharing the same photo costs nothing.
 
 ## Adding expenses without a receipt
 
