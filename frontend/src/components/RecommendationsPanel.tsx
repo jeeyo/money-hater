@@ -14,10 +14,21 @@ export function formatWalk(distanceM: number | null): string | null {
   return `${(distanceM / 1000).toFixed(1)} km`;
 }
 
+// Its own card, matching the end-trip one above it rather than the full-bleed
+// band a carousel would otherwise want: consistency with the rest of the page
+// wins over the extra millimetre of overhang.
+const PANEL = 'space-y-2 rounded-2xl border border-line bg-surface px-4 py-3';
+// `-mx-4` cancels that padding so the row scrolls the full width of the card,
+// while `px-4`/`scroll-px-4` keep the first card — and every snapped one —
+// aligned with the heading instead of jammed against the border.
+const ROW = '-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scroll-px-4';
+// Fixed rather than a percentage: 68% of a wide screen was a 500px card.
+const CARD_WIDTH = 'w-52 shrink-0 snap-start sm:w-56';
+
 function Card({ item, onOpen }: { item: Recommendation; onOpen: () => void }) {
   const walk = formatWalk(item.distance_m);
   return (
-    <li className="w-[68%] max-w-64 shrink-0 snap-start">
+    <li className={CARD_WIDTH}>
       <button
         type="button"
         onClick={onOpen}
@@ -54,12 +65,9 @@ function Card({ item, onOpen }: { item: Recommendation; onOpen: () => void }) {
 
 function Skeletons() {
   return (
-    <ul className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1">
+    <ul className={ROW}>
       {[0, 1, 2].map((i) => (
-        <li
-          key={i}
-          className="h-28 w-[68%] max-w-64 shrink-0 animate-pulse snap-start rounded-2xl bg-surface-2"
-        />
+        <li key={i} className={`h-28 animate-pulse rounded-2xl bg-surface-2 ${CARD_WIDTH}`} />
       ))}
     </ul>
   );
@@ -76,7 +84,7 @@ export function RecommendationsPanel({ tripId }: { tripId: number }) {
   const items = data?.items ?? [];
 
   return (
-    <section className="space-y-2 border-t border-line-soft pt-3">
+    <section className={PANEL}>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-2">
           <Compass className="size-4 text-brand-600" aria-hidden />
@@ -98,7 +106,7 @@ export function RecommendationsPanel({ tripId }: { tripId: number }) {
       {pending && <Skeletons />}
 
       {!pending && status === 'ready' && items.length > 0 && (
-        <ul className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1">
+        <ul className={ROW}>
           {items.map((item) => (
             <Card key={item.google_place_id} item={item} onOpen={() => setOpened(item)} />
           ))}

@@ -103,30 +103,35 @@ export function TripDetailPage() {
       </header>
 
       {isOpenTrip(trip) && (
-        <div className="space-y-2 rounded-2xl border border-line bg-surface p-3">
-          <p className="text-sm text-ink-3">
-            This trip is still running — today and everything you log from here joins it.
-          </p>
-          <button
-            type="button"
-            onClick={() => endTrip.mutate({})}
-            disabled={endTrip.isPending}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white active:bg-brand-700 disabled:opacity-50"
-          >
-            <Flag className="size-4" /> {endTrip.isPending ? 'Ending…' : 'End trip now'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setChoosingEnd(true)}
-            className="w-full text-center text-xs text-ink-3 underline underline-offset-2"
-          >
-            Ended earlier? Pick the expense it ended with
-          </button>
-          {endTrip.isError && (
-            <p className="text-center text-sm text-danger">{endTrip.error.message}</p>
-          )}
+        <>
+          <div className="space-y-2 rounded-2xl border border-line bg-surface p-3">
+            <p className="text-sm text-ink-3">
+              This trip is still running — today and everything you log from here joins it.
+            </p>
+            <button
+              type="button"
+              onClick={() => endTrip.mutate({})}
+              disabled={endTrip.isPending}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white active:bg-brand-700 disabled:opacity-50"
+            >
+              <Flag className="size-4" /> {endTrip.isPending ? 'Ending…' : 'End trip now'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setChoosingEnd(true)}
+              className="w-full text-center text-xs text-ink-3 underline underline-offset-2"
+            >
+              Ended earlier? Pick the expense it ended with
+            </button>
+            {endTrip.isError && (
+              <p className="text-center text-sm text-danger">{endTrip.error.message}</p>
+            )}
+          </div>
+
+          {/* Its own card: ending the trip and deciding where to go next are
+              different jobs, and the suggestions want the full width. */}
           <RecommendationsPanel tripId={trip.id} />
-        </div>
+        </>
       )}
 
       {hasMapPoints && (
