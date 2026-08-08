@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: money-hater
+  namespace: money-hater
+spec:
+  selector:
+    app: money-hater
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

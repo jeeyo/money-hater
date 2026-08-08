@@ -1,0 +1,37 @@
+# Requires the CloudNativePG operator: https://cloudnative-pg.io/documentation/current/installation_upgrade/
+# The operator creates Secret `money-hater-db-app` containing the app user's
+# connection URI (key: uri), which the Deployment consumes as DATABASE_URL.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: money-hater-db
+  namespace: money-hater
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: moneyhater
+      owner: moneyhater
+  storage:
+    size: 10Gi
+    # storageClass: <your-storage-class>
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  # Uncomment for WAL archiving + scheduled backups to object storage:
+  # backup:
+  #   barmanObjectStore:
+  #     destinationPath: s3://my-bucket/money-hater
+  #     s3Credentials:
+  #       accessKeyId:
+  #         name: backup-credentials
+  #         key: ACCESS_KEY_ID
+  #       secretAccessKey:
+  #         name: backup-credentials
+  #         key: SECRET_ACCESS_KEY
+  #   retentionPolicy: 30d

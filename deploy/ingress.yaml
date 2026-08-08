@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: money-hater
+  namespace: money-hater
+  annotations:
+    # cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: moneyhater.example.com # <- change me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: money-hater
+                port:
+                  name: http
+  # tls:
+  #   - hosts: [moneyhater.example.com]
+  #     secretName: money-hater-tls
