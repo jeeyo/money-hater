@@ -1,5 +1,5 @@
-import { LocateFixed, LogOut, Monitor, Moon, Sun } from 'lucide-react';
-import { useState } from 'react';
+import { Loader2, LocateFixed, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -12,6 +12,26 @@ const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: 'dark', label: 'Dark', icon: Moon },
 ];
 
+const GEOLOCATION_TIMEOUT_MS = 15000;
+
+/** Why the browser would not say where we are, in words worth reading.
+ *
+ * The failure is normally the user's to fix — a denied prompt, a self-hosted
+ * install reached over plain http — so the reason has to reach the screen.
+ */
+function geolocationMessage(error: GeolocationPositionError): string {
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      return 'Location permission was denied. Allow it for this site in your browser settings, then try again.';
+    case error.POSITION_UNAVAILABLE:
+      return 'Your device could not get a location fix right now. Try again outdoors or with GPS on.';
+    case error.TIMEOUT:
+      return 'Timed out waiting for a location fix. Try again.';
+    default:
+      return error.message || 'Could not get your location.';
+  }
+}
+
 export function SettingsPage() {
   const { user, logout, refreshUser } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -21,6 +41,11 @@ export function SettingsPage() {
   const [homeLat, setHomeLat] = useState(user?.home_lat?.toString() ?? '');
   const [homeLng, setHomeLng] = useState(user?.home_lng?.toString() ?? '');
   const [saved, setSaved] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const waitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => clearTimeout(waitTimer.current), []);
 
   function save(event: FormEvent) {
     event.preventDefault();
@@ -41,11 +66,48 @@ export function SettingsPage() {
     );
   }
 
+  function finish(message: string | null) {
+    clearTimeout(waitTimer.current);
+    setLocating(false);
+    setLocationError(message);
+  }
+
   function useCurrentLocation() {
-    navigator.geolocation?.getCurrentPosition((position) => {
-      setHomeLat(position.coords.latitude.toFixed(6));
-      setHomeLng(position.coords.longitude.toFixed(6));
-    });
+    setLocationError(null);
+    // Browsers hand out geolocation only on a secure origin, and a blocked
+    // call never reaches either callback — so it has to be caught here, or
+    // the button looks broken.
+    if (!window.isSecureContext) {
+      setLocationError('Location needs a secure connection — open this site over https.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      setLocationError('This browser cannot report your location.');
+      return;
+    }
+    setLocating(true);
+
+    // getCurrentPosition's own `timeout` only starts once permission has been
+    // decided, so a prompt that is dismissed rather than answered leaves both
+    // callbacks unfired and the button spinning for good. This is the wall
+    // clock that always stops it; a real answer arriving later still wins.
+    waitTimer.current = setTimeout(
+      () =>
+        finish(
+          'Still waiting for your browser to allow this. Look for the location prompt, then try again.',
+        ),
+      GEOLOCATION_TIMEOUT_MS,
+    );
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setHomeLat(position.coords.latitude.toFixed(6));
+        setHomeLng(position.coords.longitude.toFixed(6));
+        finish(null);
+      },
+      (error) => finish(geolocationMessage(error)),
+      { enableHighAccuracy: true, timeout: GEOLOCATION_TIMEOUT_MS, maximumAge: 60000 },
+    );
   }
 
   const inputClass =
@@ -120,10 +182,24 @@ export function SettingsPage() {
           <button
             type="button"
             onClick={useCurrentLocation}
-            className="flex items-center gap-2 text-sm font-medium text-brand-600"
+            disabled={locating}
+            className="flex items-center gap-2 text-sm font-medium text-brand-600 disabled:opacity-60"
           >
-            <LocateFixed className="size-4" /> Use current location
+            {locating ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> Locating…
+              </>
+            ) : (
+              <>
+                <LocateFixed className="size-4" /> Use current location
+              </>
+            )}
           </button>
+          {locationError && (
+            <p role="alert" className="text-xs text-danger">
+              {locationError}
+            </p>
+          )}
         </fieldset>
 
         <button

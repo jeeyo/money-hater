@@ -26,8 +26,9 @@ class UserOut(BaseModel):
 
 class SettingsUpdate(BaseModel):
     preferred_currency: str | None = Field(default=None, min_length=3, max_length=3)
-    home_lat: float | None = None
-    home_lng: float | None = None
+    # Bounded, which also turns away NaN — it compares false against everything
+    home_lat: float | None = Field(default=None, ge=-90, le=90)
+    home_lng: float | None = Field(default=None, ge=-180, le=180)
     home_label: str | None = None
 
 
@@ -320,3 +321,14 @@ class VisitUpdate(BaseModel):
 
 class ImageAssignRequest(BaseModel):
     visit_id: int | None
+
+
+class ImageUpdate(BaseModel):
+    """Corrections to what was read off a photo. Omitted fields are left alone.
+
+    `place_id` is an id, not free text: the picker already turns a search into
+    a cached Place row (see /places/suggest), and an image's place is a link to
+    one rather than a name of its own.
+    """
+
+    place_id: int | None = None

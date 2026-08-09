@@ -8,11 +8,11 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.deps import CurrentUser, DbSession
-from app.models import Image
-from app.schemas import ImageAssignRequest, ImageOut
+from app.models import Image, Place
+from app.schemas import ImageAssignRequest, ImageOut, ImageUpdate
 from app.serialize import image_out
 from app.services import storage
-from app.services.clustering import recluster_user
+from app.services.clustering import recluster_user, refresh_visit_place
 from app.services.exif import extract_exif
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -26,7 +26,13 @@ _LOADS = (
 
 async def _get_owned_image(db: DbSession, user_id: int, image_id: int) -> Image:
     image = await db.scalar(
-        sa.select(Image).where(Image.id == image_id, Image.user_id == user_id).options(*_LOADS)
+        sa.select(Image)
+        .where(Image.id == image_id, Image.user_id == user_id)
+        .options(*_LOADS)
+        # Re-read a row the session already holds, so a handler that reloads
+        # after writing sees its own change rather than the identity map's
+        # copy of the relationships from before it.
+        .execution_options(populate_existing=True)
     )
     if image is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
@@ -118,6 +124,34 @@ async def reanalyze_image(image_id: int, user: CurrentUser, db: DbSession):
     await db.commit()
     await _defer_analysis(image.id)
     return image_out(image)
+
+
+@router.patch("/{image_id}", response_model=ImageOut)
+async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: DbSession):
+    """Correct what the pipeline read off a photo — today, its place.
+
+    Reverse geocoding picks the nearest match to the GPS fix, which indoors or
+    in a dense block is often the shop next door. Rather than make the user
+    re-analyze and hope for a different answer, let them say which place it was.
+    """
+    image = await _get_owned_image(db, user.id, image_id)
+    sent = body.model_dump(exclude_unset=True)
+
+    if "place_id" in sent:
+        if body.place_id is None:
+            image.place_id = None
+        else:
+            place = await db.get(Place, body.place_id)
+            if place is None:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "Place not found")
+            image.place_id = place.id
+        await db.commit()
+        # A stop is named after the places of its photos, so the correction
+        # has to reach the stop too.
+        if image.visit_id is not None:
+            await refresh_visit_place(db, image.visit_id)
+
+    return image_out(await _get_owned_image(db, user.id, image_id))
 
 
 @router.post("/{image_id}/assign", response_model=ImageOut)

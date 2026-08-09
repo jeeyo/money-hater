@@ -1,5 +1,6 @@
 """ORM -> API schema mapping (relationships must be eagerly loaded by callers)."""
 
+import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
@@ -22,13 +23,23 @@ from app.schemas import (
 )
 
 
+def coord(value: float | None) -> float | None:
+    """A coordinate, or None if it is not a number JSON can carry.
+
+    EXIF parsing rejects NaN now, but rows written before it did still hold
+    one, and a single NaN would fail the encoding of a whole day's timeline
+    rather than of the one photo it came from.
+    """
+    return value if value is not None and math.isfinite(value) else None
+
+
 def user_out(user) -> UserOut:
     return UserOut(
         id=user.id,
         email=user.email,
         preferred_currency=user.preferred_currency,
-        home_lat=user.home_lat,
-        home_lng=user.home_lng,
+        home_lat=coord(user.home_lat),
+        home_lng=coord(user.home_lng),
         home_label=user.home_label,
     )
 
@@ -53,8 +64,8 @@ def image_out(image: Image) -> ImageOut:
         mime=image.mime,
         taken_at=image.taken_at,
         taken_at_source=image.taken_at_source,
-        lat=image.lat,
-        lng=image.lng,
+        lat=coord(image.lat),
+        lng=coord(image.lng),
         status=image.status,
         error=image.error,
         uploaded_at=image.uploaded_at,
@@ -142,8 +153,8 @@ def visit_out(visit: Visit, base_currency: str) -> VisitOut:
         place=place_out(visit.place),
         started_at=visit.started_at,
         ended_at=visit.ended_at,
-        lat=visit.lat,
-        lng=visit.lng,
+        lat=coord(visit.lat),
+        lng=coord(visit.lng),
         pinned=visit.pinned,
         images=[image_out(image) for image in visit.images],
         spend=spend_out(_visit_expenses(visit), base_currency),

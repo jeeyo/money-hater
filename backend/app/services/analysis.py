@@ -120,7 +120,7 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
             except Exception:
                 log.exception("vision analysis failed for image %s", image_id)
 
-        if image.lat is not None:
+        if image.lat is not None and image.lng is not None:
             hint = vision.kind if vision else None
             place = await resolve_place(db, image.lat, image.lng, hint=hint)
             if place:

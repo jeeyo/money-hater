@@ -1,11 +1,117 @@
-import { RefreshCw, Trash2, X } from 'lucide-react';
-import { useDeleteImage, useReanalyzeImage } from '../hooks/useData';
+import { MapPin, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
+import { useDeleteImage, useImage, useReanalyzeImage, useUpdateImage } from '../hooks/useData';
 import { formatTime } from '../lib/format';
 import type { ImageRecord } from '../types';
+import { PlaceAutocomplete } from './PlaceAutocomplete';
 
-export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: () => void }) {
+/** The place a photo was taken at, as read by the pipeline and as correctable.
+ *
+ * Reverse geocoding answers with the nearest match to the GPS fix, which
+ * indoors or on a dense street is regularly the shop next door. Re-analyzing
+ * asks the same question and gets the same answer, so the fix has to be the
+ * user naming the place.
+ */
+function PlaceRow({ image }: { image: ImageRecord }) {
+  const update = useUpdateImage();
+  const [editing, setEditing] = useState(false);
+  const [query, setQuery] = useState('');
+
+  function save(placeId: number | null) {
+    update.mutate(
+      { id: image.id, place_id: placeId },
+      { onSuccess: () => setEditing(false) },
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-ink-3">Place</span>
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => {
+              // Empty, not the current name: prefilling it filters the list
+              // down to the one place the user opened this to get away from.
+              setQuery('');
+              setEditing(true);
+            }}
+            className="flex items-center gap-1 text-xs font-medium text-brand-600"
+          >
+            <Pencil className="size-3.5" /> {image.place ? 'Change' : 'Set place'}
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="space-y-1.5">
+          <PlaceAutocomplete
+            value={query}
+            // Always null: the field is a search here, and its own unlink
+            // button would be a second, silent way to do what "Remove place"
+            // does explicitly below.
+            placeId={null}
+            at={image.taken_at}
+            onChange={(name, placeId) => {
+              setQuery(name);
+              // Only a picked suggestion is a place; free text alone is not
+              if (placeId != null) save(placeId);
+            }}
+          />
+          <p className="text-xs text-ink-4">Pick one of the suggestions to save it.</p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-xs font-medium text-ink-3"
+            >
+              Cancel
+            </button>
+            {image.place && (
+              <button
+                type="button"
+                onClick={() => save(null)}
+                className="text-xs font-medium text-danger"
+              >
+                Remove place
+              </button>
+            )}
+          </div>
+          {update.isError && (
+            <p className="text-xs text-danger">{update.error.message}</p>
+          )}
+        </div>
+      ) : (
+        <p className="flex items-start gap-1.5 text-sm text-ink-2">
+          <MapPin className="mt-0.5 size-3.5 shrink-0 text-ink-4" aria-hidden />
+          <span className="min-w-0">
+            {image.place ? (
+              <>
+                {image.place.name}
+                {image.place.formatted_address && (
+                  <span className="block text-xs text-ink-4">
+                    {image.place.formatted_address}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-ink-4">Not set</span>
+            )}
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function ImageModal({ image: initial, onClose }: { image: ImageRecord; onClose: () => void }) {
   const reanalyze = useReanalyzeImage();
   const remove = useDeleteImage();
+  // The caller's copy is a snapshot of the list it came from; follow the
+  // record itself so an edit made here shows without closing the modal.
+  const { data } = useImage(initial.id);
+  const image = data ?? initial;
 
   return (
     <div
@@ -41,6 +147,9 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
               </span>
             ))}
           </div>
+
+          <PlaceRow image={image} />
+
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-3">
             {image.taken_at && (
               <>
@@ -49,12 +158,6 @@ export function ImageModal({ image, onClose }: { image: ImageRecord; onClose: ()
                   {formatTime(image.taken_at)}{' '}
                   <span className="text-ink-4">({image.taken_at_source})</span>
                 </dd>
-              </>
-            )}
-            {image.place && (
-              <>
-                <dt>Place</dt>
-                <dd>{image.place.name}</dd>
               </>
             )}
             {image.lat != null && (

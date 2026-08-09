@@ -6,6 +6,7 @@ flag low-confidence times.
 """
 
 import io
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -25,9 +26,15 @@ class ExifData:
 
 def _to_float(value) -> float | None:
     try:
-        return float(value)
+        result = float(value)
     except (TypeError, ValueError, ZeroDivisionError):
         return None
+    # Pillow turns a rational with a zero denominator — what a phone writes when
+    # the GPS never got a fix — into NaN instead of raising. A NaN coordinate is
+    # worse than a missing one: it survives every "do we have a location?" check
+    # and then fails much later, where NaN cannot be encoded as JSON (the Places
+    # request, the API response). Treat it as absent right here.
+    return result if math.isfinite(result) else None
 
 
 def _dms_to_degrees(dms, ref: str | None) -> float | None:
@@ -40,6 +47,26 @@ def _dms_to_degrees(dms, ref: str | None) -> float | None:
     if ref in ("S", "W"):
         degrees = -degrees
     return round(degrees, 7)
+
+
+def _valid_coords(lat: float | None, lng: float | None) -> tuple[float | None, float | None]:
+    """A half-read or out-of-range fix is no fix at all — drop both halves."""
+    if lat is None or lng is None:
+        return None, None
+    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lng <= 180.0):
+        return None, None
+    return lat, lng
+
+
+def _json_safe(value):
+    """An EXIF value a JSON column can hold, or None to skip the tag.
+
+    NaN and the infinities are floats that json.dumps refuses, and `raw` is
+    written straight into a JSON column — one of them would fail the whole row.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    return value if isinstance(value, (int, str)) else None
 
 
 def _parse_exif_datetime(value: str | None) -> datetime | None:
@@ -77,16 +104,14 @@ def extract_exif(data: bytes) -> ExifData:
     lng = _dms_to_degrees(
         gps_ifd.get(ExifTags.GPS.GPSLongitude), gps_ifd.get(ExifTags.GPS.GPSLongitudeRef)
     )
+    lat, lng = _valid_coords(lat, lng)
 
     raw: dict = {}
-    for tag_id, value in exif.items():
+    for tag_id, value in list(exif.items()) + list(exif_ifd.items()):
         name = ExifTags.TAGS.get(tag_id, str(tag_id))
-        if isinstance(value, (str, int, float)):
-            raw[name] = value
-    for tag_id, value in exif_ifd.items():
-        name = ExifTags.TAGS.get(tag_id, str(tag_id))
-        if isinstance(value, (str, int, float)):
-            raw[name] = value
+        safe = _json_safe(value)
+        if safe is not None:
+            raw[name] = safe
 
     return ExifData(
         taken_at=taken_at,

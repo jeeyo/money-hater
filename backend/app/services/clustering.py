@@ -11,6 +11,7 @@ A pinned visit is one the user has edited, so it and its images are left out
 of re-clustering entirely.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -65,11 +66,12 @@ def _centroid(points: list[Point]) -> tuple[float | None, float | None]:
     return sum(p[0] for p in gps) / len(gps), sum(p[1] for p in gps) / len(gps)
 
 
-def _dominant_place(points: list[Point]) -> int | None:
+def dominant_place(place_ids: Iterable[int | None]) -> int | None:
+    """The place a group of photos is mostly of — what names the stop."""
     counts: dict[int, int] = {}
-    for point in points:
-        if point.place_id is not None:
-            counts[point.place_id] = counts.get(point.place_id, 0) + 1
+    for place_id in place_ids:
+        if place_id is not None:
+            counts[place_id] = counts.get(place_id, 0) + 1
     return max(counts, key=counts.get) if counts else None  # type: ignore[arg-type]
 
 
@@ -77,6 +79,24 @@ def effective_ts(image: Image) -> datetime:
     # sqlite returns naive datetimes; normalize so comparisons never mix awareness
     ts = image.taken_at or image.uploaded_at
     return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
+
+
+async def refresh_visit_place(db: AsyncSession, visit_id: int) -> None:
+    """Re-derive one stop's place from the places of the photos in it.
+
+    The narrow counterpart to recluster_user, for when only a place changed:
+    grouping is decided by time and GPS alone, so no photo can move between
+    stops and rebuilding them all would only hand out fresh ids for stops that
+    did not change. Pinned stops are the user's own edit and stay untouched.
+    """
+    visit = await db.get(Visit, visit_id)
+    if visit is None or visit.pinned:
+        return
+    place_ids = (
+        await db.execute(sa.select(Image.place_id).where(Image.visit_id == visit_id))
+    ).scalars()
+    visit.place_id = dominant_place(place_ids)
+    await db.commit()
 
 
 async def recluster_user(db: AsyncSession, user: User) -> None:
@@ -132,7 +152,7 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
         lat, lng = _centroid(group)
         visit = Visit(
             user_id=user.id,
-            place_id=_dominant_place(group),
+            place_id=dominant_place(p.place_id for p in group),
             started_at=group[0].ts,
             ended_at=group[-1].ts,
             lat=lat,
