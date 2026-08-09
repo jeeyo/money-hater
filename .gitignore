@@ -1,40 +1,31 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
 
-node_modules
-dist
-dist-ssr
-*.local
+# Node
+node_modules/
+frontend/dist/
+backend/static/
 
-# Editor directories and files
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Media & data
+data/
+*.db
+
+# Editors / OS
+.DS_Store
+.idea/
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
 
-.wrangler
-.dev.vars*
-
-# Environment variables
-.env
-.env.local
-.env.production
-
-# Database files
-*.db
-*.db-journal
-prisma/dev.db
-
-# Prisma
-/src/generated/prisma
+# TS incremental build info
+*.tsbuildinfo

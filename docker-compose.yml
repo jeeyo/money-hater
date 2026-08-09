@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: moneyhater
+      POSTGRES_PASSWORD: moneyhater
+      POSTGRES_DB: moneyhater
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U moneyhater']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  api:
+    build: .
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.worker.apply_schema &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment: &app_env
+      DATABASE_URL: postgresql://moneyhater:moneyhater@db:5432/moneyhater
+      QUEUE_DATABASE_URL: postgresql://moneyhater:moneyhater@db:5432/moneyhater
+      MEDIA_ROOT: /data/media
+      JWT_SECRET: ${JWT_SECRET:-insecure-dev-secret-change-me-in-production}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    volumes:
+      - media:/data/media
+    ports:
+      - '8000:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python -m app.worker.run
+    environment: *app_env
+    volumes:
+      - media:/data/media
+    depends_on:
+      api:
+        condition: service_started
+
+  # Vite dev server with HMR; the production image serves the built SPA itself,
+  # so this service is for development only.
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host"
+    environment:
+      VITE_API_PROXY: http://api:8000
+    volumes:
+      - ./frontend:/app
+    ports:
+      - '5173:5173'
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  media:

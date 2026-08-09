@@ -1,0 +1,16 @@
+# Holds original images + thumbnails. With a ReadWriteOnce class the api and
+# worker containers must share one pod (see deployment.yaml). If your cluster
+# has a ReadWriteMany class (NFS/CephFS/EFS), switch accessModes and you can
+# split api and worker into separate scalable Deployments.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: money-hater-media
+  namespace: money-hater
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  # storageClassName: <your-storage-class>

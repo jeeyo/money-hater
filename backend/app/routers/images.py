@@ -1,0 +1,170 @@
+import asyncio
+from pathlib import Path
+
+import sqlalchemy as sa
+from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import selectinload
+
+from app.config import settings
+from app.deps import CurrentUser, DbSession
+from app.models import Image
+from app.schemas import ImageAssignRequest, ImageOut
+from app.serialize import image_out
+from app.services import storage
+from app.services.clustering import recluster_user
+from app.services.exif import extract_exif
+
+router = APIRouter(prefix="/images", tags=["images"])
+
+_LOADS = (
+    selectinload(Image.place),
+    selectinload(Image.analysis),
+    selectinload(Image.expense),
+)
+
+
+async def _get_owned_image(db: DbSession, user_id: int, image_id: int) -> Image:
+    image = await db.scalar(
+        sa.select(Image).where(Image.id == image_id, Image.user_id == user_id).options(*_LOADS)
+    )
+    if image is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+    return image
+
+
+async def _defer_analysis(image_id: int) -> None:
+    from app.worker.tasks import analyze_image
+
+    await analyze_image.defer_async(image_id=image_id)
+
+
+@router.post("", response_model=list[ImageOut], status_code=201)
+async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSession):
+    if not files:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No files provided")
+
+    # Check the whole batch before writing any of it. Rejecting halfway used to
+    # leave the already-saved originals on disk with no rows to reference them,
+    # since the commit never happened.
+    accepted: list[tuple[bytes, str]] = []
+    for upload in files:
+        data = await upload.read()
+        if len(data) == 0:
+            continue
+        if len(data) > settings.max_upload_bytes:
+            raise HTTPException(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                f"{upload.filename or 'file'} exceeds the {settings.max_upload_bytes} byte limit",
+            )
+        mime = storage.sniff_mime(data, fallback=upload.content_type or "")
+        if not mime.startswith("image/"):
+            raise HTTPException(
+                status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                f"{upload.filename or 'file'} is not a recognized image",
+            )
+        # Location is what makes a photo an itinerary entry rather than just a
+        # picture: without it there is no stop, no place, no map pin, and
+        # nothing for the recommender to work from. Checked here, at upload,
+        # so the answer is immediate and names the file — not in the worker,
+        # minutes later, with the photo already in the log.
+        exif = await asyncio.to_thread(extract_exif, data)
+        if exif.lat is None or exif.lng is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"{upload.filename or 'file'} has no location in its EXIF",
+            )
+        accepted.append((data, mime))
+
+    created: list[Image] = []
+    for data, mime in accepted:
+        sha256 = storage.sha256_hex(data)
+        duplicate = await db.scalar(
+            sa.select(Image).where(Image.user_id == user.id, Image.sha256 == sha256)
+        )
+        if duplicate:
+            continue
+        ext = storage.EXT_BY_MIME.get(mime, "bin")
+        path = storage.save_original(user.id, sha256, ext, data)
+        image = Image(
+            user_id=user.id,
+            sha256=sha256,
+            original_path=str(path),
+            mime=mime,
+            size_bytes=len(data),
+            status="pending",
+        )
+        db.add(image)
+        created.append(image)
+    await db.commit()
+    for image in created:
+        await _defer_analysis(image.id)
+    result = await db.execute(
+        sa.select(Image).where(Image.id.in_([i.id for i in created])).options(*_LOADS)
+    )
+    return [image_out(image) for image in result.scalars()]
+
+
+@router.get("/{image_id}", response_model=ImageOut)
+async def get_image(image_id: int, user: CurrentUser, db: DbSession):
+    return image_out(await _get_owned_image(db, user.id, image_id))
+
+
+@router.post("/{image_id}/reanalyze", response_model=ImageOut)
+async def reanalyze_image(image_id: int, user: CurrentUser, db: DbSession):
+    image = await _get_owned_image(db, user.id, image_id)
+    image.status = "pending"
+    image.error = None
+    await db.commit()
+    await _defer_analysis(image.id)
+    return image_out(image)
+
+
+@router.post("/{image_id}/assign", response_model=ImageOut)
+async def assign_image(
+    image_id: int, body: ImageAssignRequest, user: CurrentUser, db: DbSession
+):
+    """Manually attach an image to a visit (or detach with visit_id=null)."""
+    image = await _get_owned_image(db, user.id, image_id)
+    if body.visit_id is not None:
+        from app.models import Visit
+
+        visit = await db.scalar(
+            sa.select(Visit).where(Visit.id == body.visit_id, Visit.user_id == user.id)
+        )
+        if visit is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Visit not found")
+        visit.pinned = True  # manual placement must survive re-clustering
+    image.visit_id = body.visit_id
+    await db.commit()
+    return image_out(image)
+
+
+@router.delete("/{image_id}", status_code=204)
+async def delete_image(image_id: int, user: CurrentUser, db: DbSession):
+    image = await _get_owned_image(db, user.id, image_id)
+    for path_str in (image.original_path, image.thumb_path):
+        if path_str:
+            Path(path_str).unlink(missing_ok=True)
+    await db.delete(image)
+    await db.commit()
+    await recluster_user(db, user)
+
+
+def _serve_file(path_str: str | None, mime: str) -> FileResponse:
+    if not path_str or not Path(path_str).is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File missing on disk")
+    headers = {"Cache-Control": "private, max-age=86400"}
+    return FileResponse(path_str, media_type=mime, headers=headers)
+
+
+@router.get("/{image_id}/file")
+async def get_image_file(image_id: int, user: CurrentUser, db: DbSession):
+    image = await _get_owned_image(db, user.id, image_id)
+    return _serve_file(image.original_path, image.mime)
+
+
+@router.get("/{image_id}/thumb")
+async def get_image_thumb(image_id: int, user: CurrentUser, db: DbSession):
+    image = await _get_owned_image(db, user.id, image_id)
+    return _serve_file(image.thumb_path, "image/jpeg")

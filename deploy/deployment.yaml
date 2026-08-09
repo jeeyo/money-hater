@@ -1,0 +1,88 @@
+# api + worker share one pod so both can mount the RWO media PVC.
+# strategy: Recreate avoids two pods fighting over the volume during rollout.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: money-hater
+  namespace: money-hater
+  labels:
+    app: money-hater
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: money-hater
+  template:
+    metadata:
+      labels:
+        app: money-hater
+    spec:
+      initContainers:
+        - name: migrate
+          image: ghcr.io/jeeyo/money-hater:latest
+          command: ['sh', '-c', 'alembic upgrade head && python -m app.worker.apply_schema']
+          envFrom: &app_env
+            - secretRef:
+                name: money-hater-secrets
+          env: &db_env
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: money-hater-db-app
+                  key: uri
+            - name: QUEUE_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: money-hater-db-app
+                  key: uri
+            - name: MEDIA_ROOT
+              value: /data/media
+            - name: COOKIE_SECURE
+              value: 'true'
+      containers:
+        - name: api
+          image: ghcr.io/jeeyo/money-hater:latest
+          ports:
+            - containerPort: 8000
+          envFrom: *app_env
+          env: *db_env
+          volumeMounts:
+            - name: media
+              mountPath: /data/media
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8000
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+        - name: worker
+          image: ghcr.io/jeeyo/money-hater:latest
+          command: ['python', '-m', 'app.worker.run']
+          envFrom: *app_env
+          env: *db_env
+          volumeMounts:
+            - name: media
+              mountPath: /data/media
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: money-hater-media

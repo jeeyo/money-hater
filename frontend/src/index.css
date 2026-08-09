@@ -1,0 +1,87 @@
+@import 'tailwindcss';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+/* Dark mode is a class on <html>, set from the stored preference before paint
+   (see index.html) so there is no flash of the wrong theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic tokens: components name the role, and only this file knows the
+   colour. Dark mode then swaps the values in one place rather than needing a
+   `dark:` variant on every utility. */
+@theme {
+  --color-brand-50: #ecfdf5;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+
+  --color-canvas: #f8fafc; /* page background */
+  --color-surface: #ffffff; /* cards, sheets, bars */
+  --color-surface-2: #f1f5f9; /* subtle panels, image placeholders */
+
+  --color-line: #e2e8f0;
+  --color-line-soft: #f1f5f9;
+  --color-line-strong: #cbd5e1;
+
+  --color-ink: #0f172a; /* primary text */
+  --color-ink-2: #334155; /* secondary text */
+  --color-ink-3: #64748b; /* muted */
+  --color-ink-4: #94a3b8; /* subtle: timestamps, placeholders */
+
+  --color-money-bg: #fffbeb; /* spend badges */
+  --color-money: #b45309;
+  --color-danger: #e11d48;
+  --color-danger-bg: #fff1f2;
+  --color-danger-line: #fecdd3;
+}
+
+.dark {
+  /* Pure black for OLED: the page and the cards are #000, so unlit pixels stay
+     unlit. Separation comes from borders rather than raised grey surfaces —
+     a lifted card colour would light up most of the screen and defeat it.
+     Greys are neutral rather than slate, to sit cleanly on true black. */
+  --color-brand-50: #062b20;
+  --color-brand-500: #34d399;
+  --color-brand-600: #10b981;
+  --color-brand-700: #34d399;
+
+  --color-canvas: #000000;
+  --color-surface: #000000;
+  --color-surface-2: #131313; /* inputs and placeholders still need a fill */
+
+  --color-line: #2a2a2a;
+  --color-line-soft: #1c1c1c;
+  --color-line-strong: #3d3d3d;
+
+  --color-ink: #fafafa;
+  --color-ink-2: #d4d4d4;
+  --color-ink-3: #a1a1a1;
+  --color-ink-4: #737373;
+
+  --color-money-bg: #221803;
+  --color-money: #fbbf24;
+  --color-danger: #fb7185;
+  --color-danger-bg: #240d13;
+  --color-danger-line: #4a1a25;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* The basemap itself is dimmed via MapLibre's raster paint properties (see
+   MapView), which leaves the route colours untouched. Only the chrome needs
+   flipping here. */
+.dark .maplibregl-ctrl-attrib,
+.dark .maplibregl-ctrl-group {
+  filter: invert(1) hue-rotate(180deg);
+}

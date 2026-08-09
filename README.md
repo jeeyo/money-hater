@@ -1,229 +1,350 @@
-# Money Hater - Expense Tracker
+# Money Hater — Trip Logger
 
-A modern, full-stack expense tracking application built with React, TypeScript, Cloudflare Workers, and D1 database.
+Money Hater is a self-hosted trip logger. Upload the photos you take during the day — a place,
+a plate of food, an item you bought, a receipt — and it reconstructs your itinerary:
 
-## 🚀 Tech Stack
+- Reads **timestamps, EXIF and GPS coordinates** from each image. **Location is required** — a
+  photo that doesn't know where it was taken can't be a stop, so it's refused at upload.
+- Maps coordinates to **Google Places** so stops get real names.
+- Understands image content with a **vision model** through the **OpenAI Agents SDK**.
+- Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
+- Groups images into **stops** and days automatically — no set-up, no tagging.
+- **Trips are optional**: when you want to group some days together, name a trip and pick the
+  expense it started with and the one it ended with. Nothing is ever grouped for you.
+- **Name a trip while you're on it**: leave the end open and it runs to today, growing as you go,
+  until you tap *End trip now*.
+- **Suggests where to go next** while a trip is open — from your last stop, what you have liked so
+  far on this trip, the time of day, and what is actually on locally today.
+- Handles **multiple currencies**: everything rolls up into your base currency (THB by default), and
+  foreign spend asks you to confirm the rate before it counts.
+- Lets you **add expenses by hand** when there is no receipt — cash, a fare, a tip, your share of a bill.
+- Installs as a **PWA**: add it to your home screen and it opens standalone, with the shell available
+  offline — and it joins the **share sheet**, so photos go straight from your gallery into the log.
+- **Dark mode** in true black for OLED, following your system unless you pin it.
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Backend**: Cloudflare Workers + Hono
-- **Database**: Cloudflare D1 (SQLite)
-- **Storage**: Cloudflare R2 (Object Storage)
-- **ORM**: Prisma with D1 Adapter
-- **Styling**: Custom CSS with modern design
-- **Charts**: Recharts
-- **Icons**: Lucide React
+## Screenshots
 
-## ✨ Features
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/timeline.webp" alt="Day timeline of stops with photos and spend" />
+      <sub><b>Timeline</b> — your day rebuilt from photos: each stop, when you were there, what you spent.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trip-detail.webp" alt="Trip detail showing its days, stops and route map" />
+      <sub><b>Trip</b> — the days you grouped, their stops, and a route per day on the map.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/expenses.webp" alt="Expenses rolled up into the base currency" />
+      <sub><b>Expenses</b> — everything in your base currency, with what was actually paid alongside.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/confirm-rate.webp" alt="Confirming the exchange rate for a foreign expense" />
+      <sub><b>Confirm a rate</b> — foreign spend is converted at the day's rate, then waits for you to agree.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/add-expense.webp" alt="Adding an expense with place suggestions" />
+      <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trip-open.webp" alt="A trip that is still running, with suggestions for where to go next" />
+      <sub><b>Still going</b> — runs to today until you end it, and suggests where to go next.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/recommendation.webp" alt="A suggested place, with why it was picked and recent comments" />
+      <sub><b>What next?</b> — why this one, given your trip and the hour, plus what people say.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trips.webp" alt="List of trips the user has created" />
+      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+    </td>
+    <td width="33%"></td>
+  </tr>
+</table>
 
-- 📊 Track income and expenses
-- 📈 Visual analytics and charts
-- 🏷️ Category-based organization
-- 🔐 **Secure authentication** with JWT tokens
-- 🔒 **Password hashing** using PBKDF2
-- 👤 **User-specific data** - Each user sees only their own expenses
-- 💾 Persistent storage with D1
-- 🌐 Serverless architecture
-- ⚡ Fast and responsive UI
-- 📎 **File attachments** for receipts and invoices (R2 storage)
-- 🗄️ **Optimized database** with indexes
+<img src="docs/screenshots/desktop.webp" alt="Desktop layout with a sidebar" />
 
-## 🛠️ Development Setup
+<sub>The same app on a wide screen — the bottom tab bar becomes a sidebar.</sub>
 
-### Prerequisites
+### Dark mode
 
-- Node.js 18+ 
-- npm or yarn
-- Cloudflare account (for deployment)
+True black for OLED — the page and the cards are `#000`, separated by borders rather than raised
+grey surfaces, so unlit pixels stay unlit. Follows your system by default; **Settings → Appearance**
+pins it to light or dark.
 
-### Installation
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/timeline-dark.webp" alt="Day timeline of stops with photos and spend" />
+      <sub><b>Timeline</b> — your day rebuilt from photos: each stop, when you were there, what you spent.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trip-detail-dark.webp" alt="Trip detail showing its days, stops and route map" />
+      <sub><b>Trip</b> — the days you grouped, their stops, and a route per day on the map.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/expenses-dark.webp" alt="Expenses rolled up into the base currency" />
+      <sub><b>Expenses</b> — everything in your base currency, with what was actually paid alongside.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/confirm-rate-dark.webp" alt="Confirming the exchange rate for a foreign expense" />
+      <sub><b>Confirm a rate</b> — foreign spend is converted at the day's rate, then waits for you to agree.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/add-expense-dark.webp" alt="Adding an expense with place suggestions" />
+      <sub><b>Add an expense</b> — no receipt needed; <i>Where</i> suggests places from where you actually were.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trip-open-dark.webp" alt="A trip that is still running, with suggestions for where to go next" />
+      <sub><b>Still going</b> — runs to today until you end it, and suggests where to go next.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/recommendation-dark.webp" alt="A suggested place, with why it was picked and recent comments" />
+      <sub><b>What next?</b> — why this one, given your trip and the hour, plus what people say.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/trips-dark.webp" alt="List of trips the user has created" />
+      <sub><b>Trips</b> — optional groupings you make yourself; days stand alone without one.</sub>
+    </td>
+    <td width="33%"></td>
+  </tr>
+</table>
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd money-hater
-   ```
+<img src="docs/screenshots/desktop-dark.webp" alt="Desktop layout in dark mode" />
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+<sub>The basemap is dimmed rather than inverted, so each day's route keeps its exact colour.</sub>
 
-3. **Set up Prisma**
-   ```bash
-   npx prisma generate
-   ```
+## Tech stack
 
-### Running the Application
+| Layer      | Choice                                                                 |
+| ---------- | ---------------------------------------------------------------------- |
+| Backend    | Python 3.11+, FastAPI, SQLAlchemy 2 (async), Alembic                    |
+| Jobs       | Procrastinate (PostgreSQL-native task queue — no Redis)                 |
+| Database   | PostgreSQL 17 (CloudNativePG in Kubernetes)                             |
+| AI         | OpenAI Agents SDK — vision, receipt parsing, next-stop suggestions      |
+| Geo        | Google Geocoding + Places API (cached in Postgres, stubbed without key) |
+| Frontend   | React 19 + TypeScript + Vite, TanStack Query, Tailwind CSS v4           |
+| Map        | MapLibre GL + OpenStreetMap tiles                                       |
+| Images     | Filesystem (`MEDIA_ROOT`) — a PVC in Kubernetes                         |
 
-You need to run **TWO** development servers:
+## Local development
 
-1. **Start the backend (Cloudflare Worker)**
-   ```bash
-   npm run dev:worker
-   ```
-   This runs on `http://localhost:8787`
+### Devcontainer (recommended)
 
-2. **Start the frontend (Vite)** (in a new terminal)
-   ```bash
-   npm run dev
-   ```
-   This runs on `http://localhost:5174`
-
-The frontend automatically proxies API requests to the backend.
-
-## 📚 Database
-
-This project uses **Cloudflare D1** with **Prisma ORM**. See [PRISMA_D1_SETUP.md](./PRISMA_D1_SETUP.md) for detailed documentation on:
-
-- Database schema
-- Making schema changes
-- Running migrations
-- Querying the database
-- Production deployment
-
-### Quick Database Commands
-
-```bash
-# View users in local database
-npx wrangler d1 execute money-hater-db --local --command "SELECT * FROM User"
-
-# Apply migrations locally
-npx wrangler d1 migrations apply money-hater-db --local
-
-# Apply migrations to production
-npx wrangler d1 migrations apply money-hater-db --remote
-
-# Regenerate Prisma Client
-npx prisma generate
-```
-
-## 🏗️ Project Structure
-
-```
-money-hater/
-├── src/                    # Frontend source code
-│   ├── components/         # React components
-│   ├── context/           # React context (Auth, etc.)
-│   ├── pages/             # Page components
-│   ├── services/          # API services
-│   └── types.ts           # TypeScript types
-├── worker/                # Cloudflare Worker (backend)
-│   └── index.ts          # API routes with Prisma
-├── prisma/               # Database schema and config
-│   └── schema.prisma     # Database models
-├── migrations/           # D1 migration files
-└── wrangler.jsonc       # Cloudflare configuration
-```
-
-## 🔌 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-
-### Expenses
-- `GET /api/expenses` - Get all expenses
-- `POST /api/expenses` - Create expense
-- `PUT /api/expenses/:id` - Update expense
-- `DELETE /api/expenses/:id` - Delete expense
-
-### File Storage
-- `POST /api/upload` - Upload file to R2
-- `GET /api/attachments/:key` - Get file from R2
-
-📚 **See [R2_SETUP.md](./R2_SETUP.md)** for R2 object storage setup and usage.
-
-### Automated Deployment with GitHub Actions (Recommended)
-
-The project includes a GitHub Actions workflow for automated CI/CD:
-
-1. **Set up GitHub Secrets** (one-time setup):
-   - `CLOUDFLARE_API_TOKEN` - Your Cloudflare API token
-   - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
-
-2. **Push to main branch**:
-   ```bash
-   git push origin main
-   ```
-
-The workflow will automatically:
-- ✅ Install dependencies
-- ✅ Generate Prisma Client
-- ✅ Build frontend
-- ✅ Apply database migrations
-- ✅ Deploy to Cloudflare Workers
-
-📚 **See [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md)** for detailed setup instructions.
-
-### Manual Deployment
-
-If you prefer manual deployment:
+Open the repo in VS Code and choose **Reopen in Container**. It starts a Python + Node workspace
+alongside PostgreSQL 17, installs dependencies, and — on **every container start** — applies
+migrations and makes sure the demo account exists, so there is always something on screen.
 
 ```bash
-# Build frontend and deploy to Cloudflare
-npm run deploy
+# terminal 1 — API (http://localhost:8000)
+cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0
+
+# terminal 2 — worker (image analysis pipeline)
+cd backend && uv run python -m app.worker.run
+
+# terminal 3 — frontend (http://localhost:5173, proxies /api to :8000)
+cd frontend && npm run dev
 ```
 
-This will:
-1. Build the frontend (`npm run build`)
-2. Deploy the worker and assets to Cloudflare
+#### Demo login
 
-### Before First Deployment
+| Email                  | Password       |
+| ---------------------- | -------------- |
+| `demo@moneyhater.dev`  | `demodemo123`  |
 
-1. **Apply migrations to production database**
-   ```bash
-   npx wrangler d1 migrations apply money-hater-db --remote
-   ```
+The account is seeded with two days of fabricated itinerary — a day around Bangkok (with a
+receipt, a couple of hand-entered fares and a foreign-currency expense waiting for its rate to be
+confirmed) and a weekend in Chiang Mai. Both kinds of trip are there: the Chiang Mai weekend is
+finished, today's is still running. Dates are always relative to today, so the demo lands on
+"today" and "last weekend" whenever you spin the container up.
 
-2. **Set JWT_SECRET** (for production security)
-   ```bash
-   npx wrangler secret put JWT_SECRET
-   ```
+Seeding is a no-op once the account exists, so restarts never clobber what you've been poking at.
+To throw it away and rebuild:
 
-3. **Deploy**
-   ```bash
-   npm run deploy
-   ```
-   Or push to main branch if using GitHub Actions.
+```bash
+cd backend && uv run python -m app.dev.seed --reset
+```
 
-## 🔐 Security
+The seeder is development-only: it writes a known password and fabricated data. Don't point it at
+anything real.
 
-✅ **Production-Ready Security Features:**
+### Docker Compose
 
-- ✅ **Password Hashing** - PBKDF2 with 100,000 iterations
-- ✅ **JWT Authentication** - Secure token-based auth with 7-day expiration
-- ✅ **User-Specific Data** - Users can only access their own expenses
-- ✅ **Database Indexes** - Optimized query performance
-- ✅ **Cascade Delete** - Automatic cleanup of user data
+```bash
+cp .env.example .env   # add a model provider key / GOOGLE_MAPS_API_KEY if you have them
+docker compose up --build
+```
 
-📚 **See [SECURITY.md](./SECURITY.md)** for detailed security documentation.
+Frontend at http://localhost:5173, API at http://localhost:8000.
 
-**Additional Recommendations for Production:**
+Without a model provider and `GOOGLE_MAPS_API_KEY` the app still works: places fall back to
+raw coordinates and image understanding is skipped (images are logged by time/location only).
 
-- [ ] Set JWT_SECRET environment variable (don't use default)
-- [ ] Implement rate limiting
-- [ ] Add email verification
+### Choosing a model
 
-## 📝 Available Scripts
+```bash
+OPENAI_API_KEY=sk-…      # or LLM_API_KEY, which overrides it
+LLM_MODEL=gpt-4.1-mini   # must be able to see images
+```
 
-- `npm run dev` - Start frontend dev server
-- `npm run dev:worker` - Start backend worker
-- `npm run build` - Build for production
-- `npm run deploy` - Build and deploy to Cloudflare
-- `npm run lint` - Run ESLint
-- `npm run preview` - Preview production build
+Both AI features run on OpenAI: photo analysis needs a model that can see images, and next-stop
+suggestions use the Agents SDK's **hosted web search tool**, which exists only on OpenAI's
+Responses API. That tool is the reason the app is not model-portable — swapping in Anthropic,
+Gemini or a local Ollama would mean giving up live web search or wiring in a separate search API.
+Each stored analysis records the model that produced it, so changing `LLM_MODEL` later stays
+traceable.
 
-## 🤝 Contributing
+Tracing is disabled explicitly: the SDK uploads traces to OpenAI's dashboard by default, and a
+self-hosted logger shipping your itinerary off the box is not a sensible default.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Tests & checks
 
-## 📄 License
+```bash
+cd backend && uv run pytest          # backend tests
+cd backend && uv run ruff check .    # lint
+cd frontend && npm run typecheck     # tsc
+cd frontend && npm test              # vitest
+cd frontend && npm run build         # production build
+```
 
-This project is open source and available under the MIT License.
+## Deployment (Kubernetes + CloudNativePG)
 
-## 🙏 Acknowledgments
+See [deploy/README.md](deploy/README.md). In short: a CloudNativePG `Cluster` provides
+PostgreSQL, a PVC holds the media files, and a single Deployment runs the API and the
+worker as two containers sharing that PVC (RWO-friendly). `kubectl apply -k deploy/`.
 
-- Built with [Vite](https://vitejs.dev/)
-- Powered by [Cloudflare Workers](https://workers.cloudflare.com/)
-- Database by [Cloudflare D1](https://developers.cloudflare.com/d1/)
-- ORM by [Prisma](https://www.prisma.io/)
+## How itinerary reconstruction works
+
+1. **Upload** — images are deduplicated by SHA-256 and stored under `MEDIA_ROOT`; a job is queued.
+2. **EXIF** — `taken_at` (falls back to upload time), GPS coordinates, camera info; thumbnail generated.
+3. **Places** — GPS is reverse-geocoded and matched to nearby Google Places (cached by `place_id`).
+4. **Vision** — an OpenAI agent classifies the image (place / food / item / receipt / …), captions it,
+   and for receipts extracts merchant, currency, totals, and line items into expenses.
+5. **Clustering** — images become **stops** (≤ 45 min and ≤ 300 m apart), and stops make up your
+   day. Stops you rename or correct are pinned and survive re-clustering.
+
+## Trips are optional
+
+Days are automatic; grouping them is not. Nothing decides on your behalf that a holiday happened.
+
+When you *do* want a group — a weekend away, a work visit — make a trip and pick **the expense it
+started with and the one it ended with**: the airport taxi out and the taxi home. Every day, stop,
+photo and expense between those two belongs to the trip, and its total is the sum of them.
+
+Bounding by expenses rather than dates means the edges are things you actually remember, and the
+window follows them: correct the time on the outbound fare and the trip's first day moves with it.
+The window covers whole days, so a photo taken minutes before its own receipt still counts. A day
+belongs to at most one trip, and deleting a trip only ungroups — the days and spending stay.
+
+### Trips you are still on
+
+<img src="docs/screenshots/trips.webp" alt="Trip list with one trip marked ongoing" width="300" align="right" />
+
+You rarely know the last expense when the trip begins. Tick **Still going** instead and the trip
+has a start and no end: its window runs from that first expense to **today** and keeps moving, so
+each new day, stop and receipt joins it as it happens.
+
+Because "the trip I'm on right now" is singular, only one trip can be open at a time — enforced by
+a partial unique index, not just a check in the service. While it is open it claims every day up to
+today, so no other trip can overlap that stretch; the error names the trip in the way.
+
+Ending it is one tap — **End trip now** closes it at the most recent expense inside it. If it
+actually finished earlier, pick that expense instead and the days after it drop back out.
+
+## What next?
+
+While a trip is open, it can suggest where to go from here. Tap **Suggest somewhere** and an agent
+is given four things: your **last stop** and its coordinates, the **stops and spending already in
+this trip**, the **local date and time**, and two tools — web search, for what is actually on
+around you today, and Google Places, for real candidates nearby.
+
+Nothing about meal times is coded. The prompt states the local time and the model works out what it
+calls for, including which kinds of place to look for; it answers with its own words for the moment
+("late afternoon, after the temples") and three to five cards.
+
+Suggestions are **grounded, not generated**: every card must carry a `place_id` that the Places
+tool actually returned during that run, and any the model invents are dropped before they are
+stored. A confident hallucination is worse than one fewer suggestion, because you walk there.
+
+Cards stay compact — name, rating, how far. Tap one for **why it was picked**, anything on locally,
+and **recent comments**; those reviews are Google's priciest field, so they are bought for the card
+you opened and never for the whole row. A set is cached for 90 minutes and expires the moment you
+arrive somewhere new, and **Refresh** forces another run. It needs `OPENAI_API_KEY` and
+`GOOGLE_MAPS_API_KEY`; without them the panel says so instead of guessing.
+
+## Money and currencies
+
+- Amounts are stored as integers in each currency's minor unit (satang, yen) next to its ISO 4217
+  code — no floating-point money.
+- Every expense also carries a conversion into your **base currency** (Settings → base currency,
+  THB out of the box), so a day, a trip and the dashboard each show one honest number.
+- When a receipt is in another currency, the day's reference rate is fetched and applied, and the
+  expense is **flagged for confirmation** — your card or a money changer rarely matches the
+  reference rate, so you can accept the suggestion or type the rate you actually got.
+- Rates are cached in Postgres and fetched at most once per currency pair per day. If the rate
+  service is unreachable, the amount stays unconverted rather than wrong, and waits for you.
+
+## Getting photos in
+
+Three ways, all of them multi-photo:
+
+- **Choose photos** opens the gallery picker — select as many as you like in one go.
+- **Take a photo** goes straight to the camera on a phone.
+- **Share to Money Hater.** Once installed, the app registers as a *share target*: select photos in
+  your gallery, hit share, pick Money Hater, and they upload without you opening the app first.
+  A share is a `POST` with a multipart body, which an SPA's `index.html` cannot answer, so the
+  service worker takes it, parks the photos in the cache and hands them to the upload page
+  (`frontend/public/share-target.js`). **Android and desktop Chrome/Edge only** — iOS Safari does
+  not implement Web Share Target, so on an iPhone the picker is the way in.
+
+Each photo is uploaded as its own request, three at a time, so picking twenty and having the whole
+batch rejected because one of them is a 30MB panorama cannot happen. The page counts them off as
+they go and lists anything that did not make it, saying whether it was already logged or why it
+failed. Duplicates are detected by SHA-256, so re-sharing the same photo costs nothing.
+
+### Photos must carry their location
+
+A photo with no GPS in its EXIF is **rejected at upload** with a 422 naming the file. Without
+coordinates there is no stop to place it at, no name to look up and no pin on the map — it would
+land on the timeline as an "Unknown stop" and stay that way.
+
+The catch is that photos lose their location more often than people expect:
+
+| | keeps location? |
+| --- | --- |
+| Taken with the camera, location permission on | yes |
+| Shared from iOS Photos | only with *Options → Location* switched on |
+| Shared from Google Photos | not if *Settings → Sharing → Remove geo location* is on |
+| Received over WhatsApp/Telegram/LINE | **no** — they re-compress and drop the EXIF |
+| Screenshots | **no**, there was never one to keep |
+
+The upload screen says so up front, and when a photo is rejected for this it offers **"How do I
+keep the location on my photos?"** — a sheet with the camera and sharing settings for whichever
+phone you are on, and the warning about chat apps.
+
+## Adding expenses without a receipt
+
+Not everything comes with paper. **Expenses → Add** records an amount, currency, **what** it was
+(“Extra gyoza”) and **where** it was, plus when. If the time falls inside a stop on your timeline
+the expense attaches to that stop automatically and counts toward that trip's total; re-clustering
+keeps the link.
+
+Every expense can be edited afterwards — **Edit** on any row reopens the same form, receipts
+included, since the vision model does misread things. Correcting the time moves the expense to
+whichever stop it now falls inside (or off the timeline entirely), and changing the currency
+re-converts it rather than reusing the old rate.
+
+The **Where** field suggests places from your own itinerary, ranked by distance from wherever you
+actually were at that time — pick a lunchtime and the restaurant you ate at is metres away and top
+of the list; pick the evening and the night market is. Those suggestions cost nothing (they come
+from places already in your database), and Google is queried only when your itinerary has no match
+and you have typed at least two characters. Free text is always allowed: a stall with no listing is
+just a name.
