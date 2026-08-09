@@ -3,8 +3,8 @@
 Money Hater is a self-hosted trip logger. Upload the photos you take during the day — a place,
 a plate of food, an item you bought, a receipt — and it reconstructs your itinerary:
 
-- Reads **timestamps, EXIF and GPS coordinates** from each image. **Location is required** — a
-  photo that doesn't know where it was taken can't be a stop, so it's refused at upload.
+- Reads **timestamps, EXIF and GPS coordinates** from each image. **Location is optional** — a
+  photo without it, a screenshot of a receipt say, is placed by its clock instead.
 - Maps coordinates to **Google Places** so stops get real names.
 - Understands image content with a **vision model** through the **OpenAI Agents SDK**.
 - Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
@@ -226,10 +226,13 @@ worker as two containers sharing that PVC (RWO-friendly). `kubectl apply -k depl
 1. **Upload** — images are deduplicated by SHA-256 and stored under `MEDIA_ROOT`; a job is queued.
 2. **EXIF** — `taken_at` (falls back to upload time), GPS coordinates, camera info; thumbnail generated.
 3. **Places** — GPS is reverse-geocoded and matched to nearby Google Places (cached by `place_id`).
+   Only a photo with a fix of its own can be looked up; one without keeps whatever place you gave it.
 4. **Vision** — an OpenAI agent classifies the image (place / food / item / receipt / …), captions it,
    and for receipts extracts merchant, currency, totals, and line items into expenses.
 5. **Clustering** — images become **stops** (≤ 45 min and ≤ 300 m apart), and stops make up your
-   day. Stops you rename or correct are pinned and survive re-clustering.
+   day. A photo without GPS uses its place's coordinates if it has one; with neither, it is attached
+   afterwards to the stop nearest in time, so it can join a stop but never move or reshape one.
+   Stops you rename or correct are pinned and survive re-clustering.
 
 ## Trips are optional
 
@@ -310,11 +313,16 @@ batch rejected because one of them is a 30MB panorama cannot happen. The page co
 they go and lists anything that did not make it, saying whether it was already logged or why it
 failed. Duplicates are detected by SHA-256, so re-sharing the same photo costs nothing.
 
-### Photos must carry their location
+### Photos that don't know where they were
 
-A photo with no GPS in its EXIF is **rejected at upload** with a 422 naming the file. Without
-coordinates there is no stop to place it at, no name to look up and no pin on the map — it would
-land on the timeline as an "Unknown stop" and stay that way.
+Plenty of photos arrive with no GPS at all, and a screenshot of a receipt never had any. They are
+logged all the same. A photo without coordinates is placed by its clock: it joins the stop it was
+taken during, and only sits on its own under **Not yet placed** when nothing that day is near it in
+time. Give it a place — tap the photo, then **Set place** — and it takes that place's coordinates,
+forms or joins a stop, and appears on the map like any other.
+
+What it will not do is invent a location. A photo placed this way never contributes to where a stop
+is, so a stop is only ever positioned by the photos that actually knew.
 
 The catch is that photos lose their location more often than people expect:
 
@@ -326,9 +334,9 @@ The catch is that photos lose their location more often than people expect:
 | Received over WhatsApp/Telegram/LINE | **no** — they re-compress and drop the EXIF |
 | Screenshots | **no**, there was never one to keep |
 
-The upload screen says so up front, and when a photo is rejected for this it offers **"How do I
-keep the location on my photos?"** — a sheet with the camera and sharing settings for whichever
-phone you are on, and the warning about chat apps.
+Keeping it is still worth doing — it is what puts a photo on the map with no effort from you — so
+the upload screen links **"How to keep it"**: a sheet with the camera and sharing settings for
+whichever phone you are on, and the warning about chat apps.
 
 ## Adding expenses without a receipt
 
