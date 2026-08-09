@@ -195,8 +195,17 @@ function invalidateItinerary() {
 export interface UploadOutcome {
   name: string;
   status: 'added' | 'duplicate' | 'failed';
+  /** Why it failed, as a value rather than a message to match on */
+  code?: 'no_location' | 'too_large' | 'not_an_image' | 'error';
   image?: ImageRecord;
   error?: string;
+}
+
+function codeFor(httpStatus: number): UploadOutcome['code'] {
+  if (httpStatus === 422) return 'no_location';
+  if (httpStatus === 413) return 'too_large';
+  if (httpStatus === 415) return 'not_an_image';
+  return 'error';
 }
 
 /** How many photos go up at once. Phone uploads are slow and phone photos are
@@ -206,9 +215,11 @@ const UPLOAD_CONCURRENCY = 3;
 async function uploadOne(file: File): Promise<UploadOutcome> {
   const form = new FormData();
   form.append('files', file);
+  let code: UploadOutcome['code'];
   try {
     const response = await fetch('/api/images', { method: 'POST', body: form });
     if (!response.ok) {
+      code = codeFor(response.status);
       const body = await response.json().catch(() => null);
       throw new Error(body?.detail ?? response.statusText);
     }
@@ -218,7 +229,12 @@ async function uploadOne(file: File): Promise<UploadOutcome> {
       ? { name: file.name, status: 'added', image: created[0] }
       : { name: file.name, status: 'duplicate' };
   } catch (error) {
-    return { name: file.name, status: 'failed', error: (error as Error).message };
+    return {
+      name: file.name,
+      status: 'failed',
+      code: code ?? 'error',
+      error: (error as Error).message,
+    };
   }
 }
 

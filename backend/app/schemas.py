@@ -311,7 +311,11 @@ class TimelineDayOut(BaseModel):
 
 class VisitUpdate(BaseModel):
     label_override: str | None = None
-    google_place_id: str | None = None
+    # Free text, not an id: it is searched for ("Menya Itto"), and the place it
+    # resolves to becomes the stop's. Named `google_place_id` until now, which
+    # invited callers to send a `ChIJ…` id that would have been searched for as
+    # a literal string and found nothing.
+    place_query: str | None = None
 
 
 class ImageAssignRequest(BaseModel):

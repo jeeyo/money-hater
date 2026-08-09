@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageThumb } from '../components/ImageThumb';
+import { LocationHelpSheet } from '../components/LocationHelpSheet';
 import { useImage, useUploadImages } from '../hooks/useData';
 import type { UploadOutcome } from '../hooks/useData';
 import { looksLikeImage } from '../lib/files';
@@ -52,6 +53,7 @@ export function UploadPage() {
   const [uploaded, setUploaded] = useState<ImageRecord[]>([]);
   const [skipped, setSkipped] = useState<UploadOutcome[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
@@ -73,7 +75,12 @@ export function UploadPage() {
     const list = all.filter(looksLikeImage);
     const rejected: UploadOutcome[] = all
       .filter((file) => !looksLikeImage(file))
-      .map((file) => ({ name: file.name, status: 'failed', error: 'Not an image' }));
+      .map((file) => ({
+        name: file.name,
+        status: 'failed',
+        code: 'not_an_image',
+        error: 'Not an image',
+      }));
     if (list.length === 0) {
       setSkipped(rejected);
       return;
@@ -128,8 +135,14 @@ export function UploadPage() {
         <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-money-bg px-3 py-2 text-left text-xs text-money">
           <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>
-            Photos need location data. Turn on location for your camera, and when sharing from
-            Photos switch <b>Location</b> on in the share options — phones strip it by default.
+            Photos need location data — it is what puts them on your timeline.{' '}
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="font-semibold underline underline-offset-2"
+            >
+              How to keep it
+            </button>
           </span>
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -204,6 +217,15 @@ export function UploadPage() {
               </li>
             ))}
           </ul>
+          {skipped.some((outcome) => outcome.code === 'no_location') && (
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="text-xs font-medium text-brand-600 underline underline-offset-2"
+            >
+              How do I keep the location on my photos?
+            </button>
+          )}
         </section>
       )}
 
@@ -220,6 +242,8 @@ export function UploadPage() {
           </Link>
         </section>
       )}
+
+      {helpOpen && <LocationHelpSheet onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }

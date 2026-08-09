@@ -333,8 +333,8 @@ async def update_visit(visit_id: int, body: VisitUpdate, user: CurrentUser, db: 
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Visit not found")
     if body.label_override is not None:
         visit.label_override = body.label_override or None
-    if body.google_place_id is not None:
-        place = await search_place_by_text(db, body.google_place_id)
+    if body.place_query is not None:
+        place = await search_place_by_text(db, body.place_query)
         if place is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "No matching place found")
         visit.place_id = place.id

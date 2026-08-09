@@ -316,17 +316,19 @@ A photo with no GPS in its EXIF is **rejected at upload** with a 422 naming the 
 coordinates there is no stop to place it at, no name to look up and no pin on the map — it would
 land on the timeline as an "Unknown stop" and stay that way.
 
-The catch is that phones strip location more often than people expect:
+The catch is that photos lose their location more often than people expect:
 
 | | keeps location? |
 | --- | --- |
 | Taken with the camera, location permission on | yes |
-| Shared from iOS Photos | **no** unless you switch on *Options → Location* |
-| Received over WhatsApp/Telegram, or downloaded | **no**, stripped by the sender |
-| Screenshots | **no**, there is nothing to strip |
+| Shared from iOS Photos | only with *Options → Location* switched on |
+| Shared from Google Photos | not if *Settings → Sharing → Remove geo location* is on |
+| Received over WhatsApp/Telegram/LINE | **no** — they re-compress and drop the EXIF |
+| Screenshots | **no**, there was never one to keep |
 
-So the share-sheet route needs *Location* enabled in the iOS share options, or every photo bounces.
-The upload screen says this up front rather than letting you find out twenty photos in.
+The upload screen says so up front, and when a photo is rejected for this it offers **"How do I
+keep the location on my photos?"** — a sheet with the camera and sharing settings for whichever
+phone you are on, and the warning about chat apps.
 
 ## Adding expenses without a receipt
 
