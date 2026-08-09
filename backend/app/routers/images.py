@@ -13,7 +13,7 @@ from app.schemas import ImageAssignRequest, ImageOut, ImageUpdate
 from app.serialize import image_out
 from app.services import storage
 from app.services.clustering import recluster_user, refresh_visit_place
-from app.services.exif import extract_exif
+from app.services.exif import ExifData, extract_exif
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -53,7 +53,7 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
     # Check the whole batch before writing any of it. Rejecting halfway used to
     # leave the already-saved originals on disk with no rows to reference them,
     # since the commit never happened.
-    accepted: list[tuple[bytes, str]] = []
+    accepted: list[tuple[bytes, str, ExifData]] = []
     for upload in files:
         data = await upload.read()
         if len(data) == 0:
@@ -80,10 +80,10 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 f"{upload.filename or 'file'} has no location in its EXIF",
             )
-        accepted.append((data, mime))
+        accepted.append((data, mime, exif))
 
     created: list[Image] = []
-    for data, mime in accepted:
+    for data, mime, exif in accepted:
         sha256 = storage.sha256_hex(data)
         duplicate = await db.scalar(
             sa.select(Image).where(Image.user_id == user.id, Image.sha256 == sha256)
@@ -92,6 +92,10 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
             continue
         ext = storage.EXT_BY_MIME.get(mime, "bin")
         path = storage.save_original(user.id, sha256, ext, data)
+        # Keep what the check above already read. Deriving it again in the
+        # worker meant the location lived only inside the analysis transaction:
+        # any failure rolled it back, and the photo — still in the log —
+        # resurfaced on the timeline with no place and today's date on it.
         image = Image(
             user_id=user.id,
             sha256=sha256,
@@ -99,6 +103,11 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
             mime=mime,
             size_bytes=len(data),
             status="pending",
+            lat=exif.lat,
+            lng=exif.lng,
+            taken_at=exif.taken_at,
+            taken_at_source="exif" if exif.taken_at else "upload",
+            exif=exif.raw or None,
         )
         db.add(image)
         created.append(image)

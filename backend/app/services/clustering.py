@@ -122,7 +122,14 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
         (
             await db.execute(
                 sa.select(Image).where(
-                    Image.user_id == user.id, Image.status != "pending", unprotected
+                    Image.user_id == user.id,
+                    Image.status != "pending",
+                    # No location, no stop. Nothing reaching here should lack
+                    # one, but a row that predates the NaN check would
+                    # otherwise be clustered into whichever stop it fell next
+                    # to in time and inherit a place it was never at.
+                    Image.lat.isnot(None),
+                    unprotected,
                 )
             )
         )

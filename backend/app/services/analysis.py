@@ -108,6 +108,17 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
 
         await _apply_exif(image, data)
 
+        # The same rule the upload door enforces, applied again to what is
+        # actually on disk. Rows written before the door could recognise a NaN
+        # coordinate reach here with no location, and a photo with no location
+        # is not a stop, a pin, or anything the recommender can use — so it is
+        # told plainly rather than left to surface on the timeline.
+        if image.lat is None or image.lng is None:
+            image.status = "failed"
+            image.error = "This photo has no location in its EXIF"
+            await db.commit()
+            return
+
         if not image.thumb_path:
             thumb = await asyncio.to_thread(storage.make_thumbnail, original)
             image.thumb_path = str(thumb)
