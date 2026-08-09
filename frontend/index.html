@@ -17,7 +17,10 @@
         }
       })();
     </script>
-    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <!-- A tab sits the icon on the browser's own chrome, so transparency is right
+         there. A home screen does not: iOS fills a transparent apple-touch-icon
+         with black, which is where the black tile came from. -->
+    <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
