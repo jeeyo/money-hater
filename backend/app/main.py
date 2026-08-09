@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.queue import queue_app
@@ -36,6 +36,20 @@ if STATIC_DIR.is_dir():
     assets = STATIC_DIR / "assets"
     if assets.is_dir():
         app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    @app.post("/share-target", include_in_schema=False)
+    async def share_target_fallback():
+        """Catch a share that arrives before the service worker can answer it.
+
+        Sharing photos POSTs a multipart form here, and normally the service
+        worker intercepts it (see the frontend's public/share-target.js). It
+        cannot on the very first share after install, when no worker controls
+        the page yet, and the request reaches the server instead — where every
+        other route is a GET, so the phone's share sheet used to end at a bare
+        405. Send the user to the upload screen to pick the photos by hand;
+        the body cannot be handed on, but landing somewhere useful can.
+        """
+        return RedirectResponse("/upload?shared=0", status_code=303)
 
     @app.get("/{path:path}", include_in_schema=False)
     async def spa(path: str):

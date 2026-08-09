@@ -35,12 +35,41 @@ export default defineConfig({
         // be sent straight from the gallery instead of hunting for them in a
         // file picker. Files need POST + multipart, which means the service
         // worker has to answer it (see public/share-target.js).
+        //
+        // `accept` is what Android builds the app's intent filter from, and it
+        // is spelled out rather than left as a bare `image/*`: Chrome's own
+        // guidance is to give both concrete MIME types and file extensions
+        // because platforms disagree about which they match on, and a gallery
+        // sharing HEIC — every recent iPhone, and plenty of Android cameras —
+        // frequently offers a type this app has to name to be offered back.
         share_target: {
           action: '/share-target',
           method: 'POST',
           enctype: 'multipart/form-data',
           params: {
-            files: [{ name: 'files', accept: ['image/*'] }],
+            files: [
+              {
+                name: 'files',
+                accept: [
+                  'image/*',
+                  'image/jpeg',
+                  'image/png',
+                  'image/webp',
+                  'image/heic',
+                  'image/heif',
+                  'image/avif',
+                  'image/gif',
+                  '.jpg',
+                  '.jpeg',
+                  '.png',
+                  '.webp',
+                  '.heic',
+                  '.heif',
+                  '.avif',
+                  '.gif',
+                ],
+              },
+            ],
           },
         },
       },

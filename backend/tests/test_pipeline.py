@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from app.models import Image, Visit
 from app.services.analysis import run_image_analysis
 from tests.conftest import register
-from tests.util import make_jpeg
+from tests.util import NO_FIX_DMS, make_jpeg
 
 BKK = (13.7563, 100.5018)
 
@@ -57,6 +57,31 @@ async def test_a_photo_without_location_is_refused(client):
     assert "no-gps.jpg" in detail, "the message must name the file the user picked"
     # It has to say how to fix it: phones strip location on share by default
     assert "location" in detail.lower()
+
+
+async def test_a_photo_whose_gps_never_fixed_is_refused_the_same_way(client):
+    """GPS tags full of NaN are no location, and must be caught at the door.
+
+    They used to slip past the upload check and take the analysis down with a
+    "float values are not JSON compliant" error, minutes later, on a photo
+    already sitting in the log with no way to tell what was wrong with it.
+    """
+    await register(client)
+    response = await client.post(
+        "/api/images",
+        files=[
+            (
+                "files",
+                (
+                    "no-fix.jpg",
+                    make_jpeg(gps_dms=(NO_FIX_DMS, NO_FIX_DMS), color=(3, 4, 5)),
+                    "image/jpeg",
+                ),
+            )
+        ],
+    )
+    assert response.status_code == 422
+    assert "no-fix.jpg" in response.json()["detail"]
 
 
 async def test_a_photo_with_a_timestamp_but_no_location_is_still_refused(client):
