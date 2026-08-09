@@ -10,6 +10,8 @@ import type {
   PlaceDetails,
   RateQuote,
   TimelineDay,
+  TimelineRange,
+  TimelineSpan,
   Trip,
   TripDetail,
   TripRecommendations,
@@ -33,6 +35,18 @@ export function useTimeline(date: string) {
     queryKey: ['timeline', date],
     queryFn: () =>
       apiJson<TimelineDay>(`/api/timeline?date=${date}&tz_offset_minutes=${tzOffsetMinutes()}`),
+  });
+}
+
+/** A week or a month, one summary per day. Off unless that view is on screen. */
+export function useTimelineRange(date: string, span: TimelineSpan, enabled = true) {
+  return useQuery({
+    queryKey: ['timeline', 'range', span, date],
+    queryFn: () =>
+      apiJson<TimelineRange>(
+        `/api/timeline/range?date=${date}&span=${span}&tz_offset_minutes=${tzOffsetMinutes()}`,
+      ),
+    enabled,
   });
 }
 

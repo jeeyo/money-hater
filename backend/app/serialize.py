@@ -14,6 +14,8 @@ from app.schemas import (
     PlaceOut,
     SpendOut,
     TimelineDayOut,
+    TimelineDaySummaryOut,
+    TimelineRangeOut,
     TripDayOut,
     TripDetailOut,
     TripOut,
@@ -245,5 +247,86 @@ def timeline_day_out(
         trip=trip_ref(trip),
         visits=[visit_out(visit, base_currency) for visit in visits],
         unassigned_images=[image_out(image) for image in unassigned],
+        spend=spend_out(expenses, base_currency),
+    )
+
+
+# How many frames a day carries when seen from a week or a month away. Enough to
+# recognise the day by, few enough that a month is still a small response.
+THUMBS_PER_DAY = 6
+
+
+def image_moment(image: Image) -> datetime:
+    """When a photo counts as having happened — when it was taken, else uploaded."""
+    return image.taken_at or image.uploaded_at
+
+
+def expense_moment(expense: Expense) -> datetime:
+    return expense.spent_at or expense.created_at
+
+
+def _days_touched(visit: Visit, tz_offset_minutes: int) -> list[str]:
+    """Every local day the visit is part of — a stop over midnight is on both."""
+    first = date.fromisoformat(day_key(visit.started_at, tz_offset_minutes))
+    last = date.fromisoformat(day_key(visit.ended_at, tz_offset_minutes))
+    return [
+        (first + timedelta(days=offset)).isoformat() for offset in range((last - first).days + 1)
+    ]
+
+
+def timeline_range_out(
+    span: str,
+    days: list[date],
+    trips_by_day: dict[str, Trip],
+    visits: list[Visit],
+    images: list[Image],
+    expenses: list[Expense],
+    base_currency: str,
+    tz_offset_minutes: int,
+) -> TimelineRangeOut:
+    """A week or a month, one summary per day — empty days included.
+
+    Callers pass the whole span's rows once; the grouping happens here so the
+    router stays three queries and a date range. Empty days are kept because a
+    calendar that skips them cannot be laid out.
+    """
+    day_visits: dict[str, list[Visit]] = defaultdict(list)
+    for visit in visits:  # already ordered by start, so each day stays ordered
+        for key in _days_touched(visit, tz_offset_minutes):
+            day_visits[key].append(visit)
+
+    day_images: dict[str, list[Image]] = defaultdict(list)
+    for image in images:
+        day_images[day_key(image_moment(image), tz_offset_minutes)].append(image)
+
+    day_expenses: dict[str, list[Expense]] = defaultdict(list)
+    for expense in expenses:
+        day_expenses[day_key(expense_moment(expense), tz_offset_minutes)].append(expense)
+
+    summaries = []
+    for day in days:
+        key = day.isoformat()
+        of_day = day_visits[key]
+        photos = day_images[key]
+        summaries.append(
+            TimelineDaySummaryOut(
+                date=key,
+                trip=trip_ref(trips_by_day.get(key)),
+                stops=[visit_label(visit) for visit in of_day],
+                visit_count=len(of_day),
+                image_count=len(photos),
+                thumbs=[image_out(image) for image in photos[:THUMBS_PER_DAY]],
+                spend=spend_out(day_expenses[key], base_currency),
+            )
+        )
+
+    # Deduplicated in day order: one chip per trip the span runs through
+    trips = {trip.id: trip for trip in trips_by_day.values()}
+    return TimelineRangeOut(
+        span=span,
+        start=days[0].isoformat(),
+        end=days[-1].isoformat(),
+        days=summaries,
+        trips=[trip_ref(trip) for trip in trips.values()],
         spend=spend_out(expenses, base_currency),
     )

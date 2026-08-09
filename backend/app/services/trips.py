@@ -176,6 +176,17 @@ async def assert_no_overlap(
             raise TripWindowError(f"That overlaps your trip “{other.title}”")
 
 
+def covers(window: TripWindow, start: datetime, end: datetime) -> bool:
+    """Does the trip's span meet the half-open UTC range ``[start, end)``?
+
+    Half-open matters at the seam: a calendar day runs to the next midnight,
+    which is the same instant a trip starting the following morning is snapped
+    back to. Comparing that end inclusively put the day *before* a trip inside
+    it, so the timeline offered to show you a trip you had not left for yet.
+    """
+    return start <= window.ended_at and end > window.started_at
+
+
 def day_range(window: TripWindow, tz_offset_minutes: int) -> list[date]:
     """Local calendar days the window touches."""
     shift = timedelta(minutes=tz_offset_minutes)
@@ -232,8 +243,7 @@ async def trip_overlapping(
         .options(selectinload(Trip.start_expense), selectinload(Trip.end_expense))
     )
     for trip in (await db.execute(query)).scalars():
-        span = window_of(trip, tz_offset_minutes)
-        if start <= span.ended_at and end >= span.started_at:
+        if covers(window_of(trip, tz_offset_minutes), start, end):
             return trip
     return None
 

@@ -164,6 +164,30 @@ export interface TimelineDay {
   spend: Spend;
 }
 
+export type TimelineSpan = 'week' | 'month';
+
+/** A day seen from a week or a month away: counts and a few frames, not contents. */
+export interface TimelineDaySummary {
+  date: string;
+  trip: TripRef | null;
+  /** Visit labels in order, so a row can read "Wat Pho · Menya Itto" */
+  stops: string[];
+  visit_count: number;
+  image_count: number;
+  thumbs: ImageRecord[];
+  spend: Spend;
+}
+
+export interface TimelineRange {
+  span: TimelineSpan;
+  start: string;
+  end: string;
+  /** Every day in the span, empty ones included, so a calendar grid lines up */
+  days: TimelineDaySummary[];
+  trips: TripRef[];
+  spend: Spend;
+}
+
 export interface ExpenseItem {
   id: number;
   name: string;

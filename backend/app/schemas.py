@@ -310,6 +310,36 @@ class TimelineDayOut(BaseModel):
     spend: SpendOut
 
 
+class TimelineDaySummaryOut(BaseModel):
+    """A day as it reads from a week or month away: counts, not contents.
+
+    Zooming out means many days at once, so the full visits and their photos
+    would be a payload nobody looks at. What survives is what a cell or a row
+    can actually show — where you went, how much of it there was, what it cost,
+    and a few frames to recognise the day by.
+    """
+
+    date: str
+    trip: TripRef | None
+    # Visit labels in order, so a row can read "Wat Pho · Menya Itto"
+    stops: list[str]
+    visit_count: int
+    image_count: int
+    thumbs: list[ImageOut]
+    spend: SpendOut
+
+
+class TimelineRangeOut(BaseModel):
+    span: str  # week|month
+    # Inclusive local first and last day, YYYY-MM-DD
+    start: str
+    end: str
+    # Every day in the span, empty ones included, so a calendar grid lines up
+    days: list[TimelineDaySummaryOut]
+    trips: list[TripRef]
+    spend: SpendOut
+
+
 class VisitUpdate(BaseModel):
     label_override: str | None = None
     # Free text, not an id: it is searched for ("Menya Itto"), and the place it

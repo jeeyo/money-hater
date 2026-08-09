@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatMoney,
+  formatMoneyCompact,
+  formatSpanLabel,
   formatSpend,
   formatTripRange,
   isOpenTrip,
+  parseLocalDate,
   shiftDate,
+  shiftMonth,
+  shiftSpan,
+  spanAnchor,
+  startOfWeek,
   toMajor,
   toMinor,
 } from './format';
@@ -95,5 +102,78 @@ describe('shiftDate', () => {
   it('moves across month boundaries', () => {
     expect(shiftDate('2026-08-01', -1)).toBe('2026-07-31');
     expect(shiftDate('2026-12-31', 1)).toBe('2027-01-01');
+  });
+});
+
+describe('parseLocalDate', () => {
+  it('reads a date string as local midnight, not UTC', () => {
+    const date = parseLocalDate('2026-08-09');
+    expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 7, 9]);
+  });
+});
+
+describe('startOfWeek', () => {
+  it('backs up to the Monday whichever day it is given', () => {
+    // 2026-08-03 is a Monday, 2026-08-09 the Sunday that ends the same week
+    expect(startOfWeek('2026-08-03')).toBe('2026-08-03');
+    expect(startOfWeek('2026-08-05')).toBe('2026-08-03');
+    expect(startOfWeek('2026-08-09')).toBe('2026-08-03');
+  });
+
+  it('does not roll a Sunday into the week that follows it', () => {
+    expect(startOfWeek('2026-08-10')).toBe('2026-08-10');
+  });
+});
+
+describe('shiftMonth', () => {
+  it('clamps the day rather than spilling into the next month', () => {
+    expect(shiftMonth('2026-03-31', -1)).toBe('2026-02-28');
+    expect(shiftMonth('2026-01-31', 1)).toBe('2026-02-28');
+  });
+
+  it('crosses the year', () => {
+    expect(shiftMonth('2026-12-15', 1)).toBe('2027-01-15');
+    expect(shiftMonth('2026-01-15', -1)).toBe('2025-12-15');
+  });
+});
+
+describe('shiftSpan', () => {
+  it('steps by what the view is showing', () => {
+    expect(shiftSpan('2026-08-05', 'day', 1)).toBe('2026-08-06');
+    expect(shiftSpan('2026-08-05', 'week', -1)).toBe('2026-07-29');
+    expect(shiftSpan('2026-08-05', 'month', 1)).toBe('2026-09-05');
+  });
+});
+
+describe('spanAnchor', () => {
+  it('collapses every day of a span onto one cache key', () => {
+    expect(spanAnchor('week', '2026-08-05')).toBe(spanAnchor('week', '2026-08-09'));
+    expect(spanAnchor('month', '2026-08-31')).toBe('2026-08-01');
+  });
+});
+
+describe('formatSpanLabel', () => {
+  it('names a month', () => {
+    expect(formatSpanLabel('month', '2026-08-01', '2026-08-31')).toMatch(/2026/);
+  });
+
+  it('names both ends of a week', () => {
+    const text = formatSpanLabel('week', '2026-08-03', '2026-08-09');
+    expect(text).toContain('3');
+    expect(text).toContain('9');
+    expect(text.match(/Aug/g)).toHaveLength(2);
+  });
+
+  it('names both months when a week straddles them', () => {
+    const text = formatSpanLabel('week', '2026-07-27', '2026-08-02');
+    expect(text).toMatch(/Jul/);
+    expect(text).toMatch(/Aug/);
+  });
+});
+
+describe('formatMoneyCompact', () => {
+  it('shortens a calendar cell to something that fits', () => {
+    expect(formatMoneyCompact(124000, 'THB')).toMatch(/1\.2K/i);
+    expect(formatMoneyCompact(9500, 'THB')).toMatch(/95/);
   });
 });
