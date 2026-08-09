@@ -483,7 +483,7 @@ def _google_review(author: str, rating: int, text: str, when: str) -> dict:
     }
 
 
-async def seed_recommendations(db, user: User, trip: Trip) -> None:
+async def seed_recommendations(db, user: User, trip: Trip, now: datetime | None = None) -> None:
     """A ready-made "what next?" set for the ongoing trip.
 
     Generating one for real needs OPENAI_API_KEY and GOOGLE_MAPS_API_KEY, which
@@ -523,7 +523,11 @@ async def seed_recommendations(db, user: User, trip: Trip) -> None:
     await db.flush()
 
     window = window_of(trip, 0)
-    anchor = await latest_visit_in(db, user, window)
+    # A suggestion is anchored on the last stop you have actually reached, so
+    # spinning the container up before the demo day's first stop (08:35 local)
+    # leaves nothing to anchor on and the panel offers to generate instead.
+    # `now` is injectable so tests do not depend on the hour they run at.
+    anchor = await latest_visit_in(db, user, window, now=now)
     if anchor is None:
         return
 

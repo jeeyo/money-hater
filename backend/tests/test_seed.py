@@ -9,9 +9,10 @@ from sqlalchemy.pool import StaticPool
 
 import app.dev.seed as seed_mod
 from app.config import settings
-from app.dev.seed import DEMO_EMAIL, DEMO_PASSWORD, build, main
+from app.dev.seed import DEMO_EMAIL, DEMO_PASSWORD, build, main, seed_recommendations
 from app.models import Base, Expense, Image, Place, Trip, TripRecommendation, User, Visit
 from app.security import verify_password
+from app.services.trips import load_trip
 
 
 async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
@@ -34,7 +35,19 @@ async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
         assert [trip.title for trip in trips if trip.end_expense_id is None] == ["Out in Bangkok"]
 
         # A ready "what next?" set for the ongoing trip, so the panel has
-        # something to show without an OPENAI_API_KEY
+        # something to show without an OPENAI_API_KEY.
+        #
+        # Seeded against a pinned clock: a suggestion hangs off the last stop
+        # you have reached, so whether the demo has one at all depends on the
+        # hour the container starts, and the test must not.
+        # load_trip eager-loads the bounding expenses the window is derived from
+        open_trip = await load_trip(
+            db, user, next(t.id for t in trips if t.end_expense_id is None)
+        )
+        await db.execute(sa.delete(TripRecommendation))
+        await seed_recommendations(
+            db, user, open_trip, now=datetime.now(UTC).replace(hour=23, minute=0)
+        )
         recommendation = await db.scalar(sa.select(TripRecommendation))
         assert recommendation is not None
         assert recommendation.status == "ready"

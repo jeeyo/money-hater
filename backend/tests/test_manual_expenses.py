@@ -226,7 +226,7 @@ async def test_deleting_receipt_image_removes_its_expense(client, db_sessionmake
     created = (
         await client.post(
             "/api/images",
-            files=[("files", ("r.jpg", make_jpeg(color=(9, 9, 9)), "image/jpeg"))],
+            files=[("files", ("r.jpg", make_jpeg(*BKK, color=(9, 9, 9)), "image/jpeg"))],
         )
     ).json()
 

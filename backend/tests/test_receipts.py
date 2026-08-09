@@ -15,6 +15,8 @@ from app.services.vision import (
 from tests.conftest import register
 from tests.util import make_jpeg
 
+BKK = (13.7563, 100.5018)
+
 RECEIPT_RESULT = VisionResult(
     kind="receipt",
     caption="Receipt from a ramen shop",
@@ -54,7 +56,9 @@ async def test_receipt_creates_expense(client, db_sessionmaker, monkeypatch):
     created = (
         await client.post(
             "/api/images",
-            files=[("files", ("receipt.jpg", make_jpeg(color=(250, 250, 250)), "image/jpeg"))],
+            files=[
+                ("files", ("receipt.jpg", make_jpeg(*BKK, color=(250, 250, 250)), "image/jpeg"))
+            ],
         )
     ).json()
     image_id = created[0]["id"]
@@ -100,7 +104,9 @@ async def test_expense_manual_correction(client, db_sessionmaker, monkeypatch):
     created = (
         await client.post(
             "/api/images",
-            files=[("files", ("receipt.jpg", make_jpeg(color=(240, 240, 240)), "image/jpeg"))],
+            files=[
+                ("files", ("receipt.jpg", make_jpeg(*BKK, color=(240, 240, 240)), "image/jpeg"))
+            ],
         )
     ).json()
 
@@ -130,7 +136,7 @@ async def test_vision_skipped_without_key(client, db_sessionmaker):
     created = (
         await client.post(
             "/api/images",
-            files=[("files", ("plain.jpg", make_jpeg(color=(3, 30, 3)), "image/jpeg"))],
+            files=[("files", ("plain.jpg", make_jpeg(*BKK, color=(3, 30, 3)), "image/jpeg"))],
         )
     ).json()
     async with db_sessionmaker() as db:

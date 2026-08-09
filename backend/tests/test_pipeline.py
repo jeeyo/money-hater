@@ -22,7 +22,7 @@ async def _upload(client, filename: str, data: bytes) -> list[dict]:
 
 async def test_upload_defers_analysis_job(client, in_memory_queue):
     await register(client)
-    created = await _upload(client, "a.jpg", make_jpeg(color=(1, 2, 3)))
+    created = await _upload(client, "a.jpg", make_jpeg(*BKK, color=(1, 2, 3)))
     assert len(created) == 1
     assert created[0]["status"] == "pending"
     jobs = list(in_memory_queue.jobs.values())
@@ -33,7 +33,7 @@ async def test_upload_defers_analysis_job(client, in_memory_queue):
 
 async def test_duplicate_upload_is_skipped(client):
     await register(client)
-    data = make_jpeg(color=(9, 9, 9))
+    data = make_jpeg(*BKK, color=(9, 9, 9))
     assert len(await _upload(client, "a.jpg", data)) == 1
     assert len(await _upload(client, "again.jpg", data)) == 0
 
@@ -44,6 +44,63 @@ async def test_non_image_rejected(client):
         "/api/images", files=[("files", ("evil.txt", b"not an image", "text/plain"))]
     )
     assert response.status_code == 415
+
+
+async def test_a_photo_without_location_is_refused(client):
+    """Location is what makes a photo an itinerary entry rather than a picture."""
+    await register(client)
+    response = await client.post(
+        "/api/images", files=[("files", ("no-gps.jpg", make_jpeg(color=(3, 3, 3)), "image/jpeg"))]
+    )
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "no-gps.jpg" in detail, "the message must name the file the user picked"
+    # It has to say how to fix it: phones strip location on share by default
+    assert "location" in detail.lower()
+
+
+async def test_a_photo_with_a_timestamp_but_no_location_is_still_refused(client):
+    """EXIF alone is not enough — the GPS tags are the requirement."""
+    await register(client)
+    response = await client.post(
+        "/api/images",
+        files=[
+            (
+                "files",
+                ("timed.jpg", make_jpeg(taken_at=datetime(2026, 8, 8, 12, 0)), "image/jpeg"),
+            )
+        ],
+    )
+    assert response.status_code == 422
+
+
+async def test_a_located_photo_without_a_timestamp_is_accepted(client):
+    """Only location is mandatory; the clock falls back to the upload time."""
+    await register(client)
+    response = await client.post(
+        "/api/images", files=[("files", ("located.jpg", make_jpeg(*BKK), "image/jpeg"))]
+    )
+    assert response.status_code == 201, response.text
+
+
+async def test_one_unlocated_photo_rejects_the_whole_batch_cleanly(client, db_sessionmaker):
+    """And leaves nothing on disk — the client uploads one per request anyway."""
+    from app.config import settings
+
+    await register(client)
+    response = await client.post(
+        "/api/images",
+        files=[
+            ("files", ("located.jpg", make_jpeg(*BKK, color=(1, 1, 1)), "image/jpeg")),
+            ("files", ("no-gps.jpg", make_jpeg(color=(2, 2, 2)), "image/jpeg")),
+        ],
+    )
+    assert response.status_code == 422
+
+    async with db_sessionmaker() as db:
+        assert await db.scalar(sa.select(sa.func.count()).select_from(Image)) == 0
+    originals = list(settings.media_root.rglob("*")) if settings.media_root.exists() else []
+    assert [p for p in originals if p.is_file()] == []
 
 
 async def test_a_rejected_batch_leaves_nothing_behind(client, db_sessionmaker):
@@ -58,7 +115,7 @@ async def test_a_rejected_batch_leaves_nothing_behind(client, db_sessionmaker):
     response = await client.post(
         "/api/images",
         files=[
-            ("files", ("good.jpg", make_jpeg(color=(4, 5, 6)), "image/jpeg")),
+            ("files", ("good.jpg", make_jpeg(*BKK, color=(4, 5, 6)), "image/jpeg")),
             ("files", ("evil.txt", b"not an image", "text/plain")),
         ],
     )
@@ -74,7 +131,7 @@ async def test_a_photo_with_no_content_type_is_still_accepted(client):
     """Gallery and share-sheet files often arrive with an empty MIME type."""
     await register(client)
     response = await client.post(
-        "/api/images", files=[("files", ("IMG_0001.HEIC", make_jpeg(color=(7, 7, 7)), ""))]
+        "/api/images", files=[("files", ("IMG_0001.HEIC", make_jpeg(*BKK, color=(7, 7, 7)), ""))]
     )
     assert response.status_code == 201, response.text
     # The bytes are what decide it, not the label the phone attached
@@ -132,7 +189,7 @@ async def test_two_images_far_apart_make_two_visits(client, db_sessionmaker):
 
 async def test_reanalyze_and_delete(client, db_sessionmaker, in_memory_queue):
     await register(client)
-    created = await _upload(client, "x.jpg", make_jpeg(color=(4, 4, 4)))
+    created = await _upload(client, "x.jpg", make_jpeg(*BKK, color=(4, 4, 4)))
     image_id = created[0]["id"]
     async with db_sessionmaker() as db:
         await run_image_analysis(db, image_id)
@@ -148,7 +205,7 @@ async def test_reanalyze_and_delete(client, db_sessionmaker, in_memory_queue):
 
 async def test_image_access_is_user_scoped(client, db_sessionmaker):
     await register(client, email="alice@example.com")
-    created = await _upload(client, "a.jpg", make_jpeg(color=(7, 7, 7)))
+    created = await _upload(client, "a.jpg", make_jpeg(*BKK, color=(7, 7, 7)))
     image_id = created[0]["id"]
 
     await client.post("/api/auth/logout")

@@ -3,7 +3,8 @@
 Money Hater is a self-hosted trip logger. Upload the photos you take during the day — a place,
 a plate of food, an item you bought, a receipt — and it reconstructs your itinerary:
 
-- Reads **timestamps, EXIF and GPS coordinates** from each image.
+- Reads **timestamps, EXIF and GPS coordinates** from each image. **Location is required** — a
+  photo that doesn't know where it was taken can't be a stop, so it's refused at upload.
 - Maps coordinates to **Google Places** so stops get real names.
 - Understands image content with a **vision model** through the **OpenAI Agents SDK**.
 - Parses **receipts** into expenses (merchant, line items, totals) so it remembers how much you spent on what.
@@ -308,6 +309,24 @@ Each photo is uploaded as its own request, three at a time, so picking twenty an
 batch rejected because one of them is a 30MB panorama cannot happen. The page counts them off as
 they go and lists anything that did not make it, saying whether it was already logged or why it
 failed. Duplicates are detected by SHA-256, so re-sharing the same photo costs nothing.
+
+### Photos must carry their location
+
+A photo with no GPS in its EXIF is **rejected at upload** with a 422 naming the file. Without
+coordinates there is no stop to place it at, no name to look up and no pin on the map — it would
+land on the timeline as an "Unknown stop" and stay that way.
+
+The catch is that phones strip location more often than people expect:
+
+| | keeps location? |
+| --- | --- |
+| Taken with the camera, location permission on | yes |
+| Shared from iOS Photos | **no** unless you switch on *Options → Location* |
+| Received over WhatsApp/Telegram, or downloaded | **no**, stripped by the sender |
+| Screenshots | **no**, there is nothing to strip |
+
+So the share-sheet route needs *Location* enabled in the iOS share options, or every photo bounces.
+The upload screen says this up front rather than letting you find out twenty photos in.
 
 ## Adding expenses without a receipt
 

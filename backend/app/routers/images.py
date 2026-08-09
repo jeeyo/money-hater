@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -12,6 +13,7 @@ from app.schemas import ImageAssignRequest, ImageOut
 from app.serialize import image_out
 from app.services import storage
 from app.services.clustering import recluster_user
+from app.services.exif import extract_exif
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -60,6 +62,17 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
             raise HTTPException(
                 status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 f"{upload.filename or 'file'} is not a recognized image",
+            )
+        # Location is what makes a photo an itinerary entry rather than just a
+        # picture: without it there is no stop, no place, no map pin, and
+        # nothing for the recommender to work from. Checked here, at upload,
+        # so the answer is immediate and names the file — not in the worker,
+        # minutes later, with the photo already in the log.
+        exif = await asyncio.to_thread(extract_exif, data)
+        if exif.lat is None or exif.lng is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"{upload.filename or 'file'} has no location in its EXIF",
             )
         accepted.append((data, mime))
 

@@ -108,7 +108,9 @@ async def test_stored_analysis_names_the_model_that_produced_it(
     created = (
         await client.post(
             "/api/images",
-            files=[("files", ("a.jpg", make_jpeg(color=(7, 8, 9)), "image/jpeg"))],
+            files=[
+                ("files", ("a.jpg", make_jpeg(13.7563, 100.5018, color=(7, 8, 9)), "image/jpeg"))
+            ],
         )
     ).json()
     async with db_sessionmaker() as db:

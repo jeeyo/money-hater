@@ -214,7 +214,7 @@ async def test_editing_a_receipt_expense_is_allowed(client, db_sessionmaker, mon
     created = (
         await client.post(
             "/api/images",
-            files=[("files", ("r.jpg", make_jpeg(color=(250, 250, 250)), "image/jpeg"))],
+            files=[("files", ("r.jpg", make_jpeg(*BKK, color=(250, 250, 250)), "image/jpeg"))],
         )
     ).json()
 

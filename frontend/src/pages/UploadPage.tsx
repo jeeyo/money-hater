@@ -1,4 +1,4 @@
-import { AlertTriangle, Camera, Check, ImagePlus, Loader2 } from 'lucide-react';
+import { AlertTriangle, Camera, Check, ImagePlus, Loader2, MapPin } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,6 +8,13 @@ import type { UploadOutcome } from '../hooks/useData';
 import { looksLikeImage } from '../lib/files';
 import { takeSharedFiles } from '../lib/sharedFiles';
 import type { ImageRecord } from '../types';
+
+/** The server prefixes its errors with the filename; the row already shows it. */
+function reasonFor(outcome: UploadOutcome): string {
+  if (outcome.status === 'duplicate') return 'already logged';
+  const error = outcome.error ?? 'failed';
+  return error.startsWith(outcome.name) ? error.slice(outcome.name.length).trimStart() : error;
+}
 
 function UploadedImage({ initial }: { initial: ImageRecord }) {
   // Poll each uploaded image until analysis completes
@@ -115,8 +122,15 @@ export function UploadPage() {
         }`}
       >
         <p className="text-sm text-ink-3">
-          Anything from your day — a place, food, an item, a receipt. EXIF time and GPS are read
-          automatically.
+          Anything from your day — a place, food, an item, a receipt. The time and location are
+          read from the photo itself.
+        </p>
+        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-money-bg px-3 py-2 text-left text-xs text-money">
+          <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>
+            Photos need location data. Turn on location for your camera, and when sharing from
+            Photos switch <b>Location</b> on in the share options — phones strip it by default.
+          </span>
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
@@ -180,12 +194,12 @@ export function UploadPage() {
             <AlertTriangle className="size-4 text-money" aria-hidden />
             {skipped.length} not added
           </h2>
-          <ul className="space-y-1 text-xs text-ink-3">
+          <ul className="space-y-1.5 text-xs text-ink-3">
             {skipped.map((outcome, index) => (
-              <li key={`${outcome.name}-${index}`} className="flex gap-2">
-                <span className="min-w-0 flex-1 truncate">{outcome.name}</span>
+              <li key={`${outcome.name}-${index}`}>
+                <span className="block truncate">{outcome.name}</span>
                 <span className={outcome.status === 'failed' ? 'text-danger' : 'text-ink-4'}>
-                  {outcome.status === 'duplicate' ? 'already logged' : outcome.error}
+                  {reasonFor(outcome)}
                 </span>
               </li>
             ))}
