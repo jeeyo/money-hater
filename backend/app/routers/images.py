@@ -50,9 +50,10 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
     if not files:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No files provided")
 
-    # Check the whole batch before writing any of it. Rejecting halfway used to
-    # leave the already-saved originals on disk with no rows to reference them,
-    # since the commit never happened.
+    # Check the whole batch before writing any of it. Rejecting halfway — on
+    # size or on a file that is not an image — used to leave the already-saved
+    # originals on disk with no rows to reference them, since the commit never
+    # happened.
     accepted: list[tuple[bytes, str, ExifData]] = []
     for upload in files:
         data = await upload.read()
@@ -69,17 +70,11 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
                 status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 f"{upload.filename or 'file'} is not a recognized image",
             )
-        # Location is what makes a photo an itinerary entry rather than just a
-        # picture: without it there is no stop, no place, no map pin, and
-        # nothing for the recommender to work from. Checked here, at upload,
-        # so the answer is immediate and names the file — not in the worker,
-        # minutes later, with the photo already in the log.
+        # A location is worth having but not worth refusing a photo over: a
+        # screenshot of a receipt carries no GPS and is still the record of
+        # what was spent. What it does have is a time, which is enough to put
+        # it on the right day and, usually, in the right stop.
         exif = await asyncio.to_thread(extract_exif, data)
-        if exif.lat is None or exif.lng is None:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
-                f"{upload.filename or 'file'} has no location in its EXIF",
-            )
         accepted.append((data, mime, exif))
 
     created: list[Image] = []
@@ -92,7 +87,7 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
             continue
         ext = storage.EXT_BY_MIME.get(mime, "bin")
         path = storage.save_original(user.id, sha256, ext, data)
-        # Keep what the check above already read. Deriving it again in the
+        # Keep what the loop above already read. Deriving it again in the
         # worker meant the location lived only inside the analysis transaction:
         # any failure rolled it back, and the photo — still in the log —
         # resurfaced on the timeline with no place and today's date on it.
@@ -155,9 +150,16 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
                 raise HTTPException(status.HTTP_404_NOT_FOUND, "Place not found")
             image.place_id = place.id
         await db.commit()
-        # A stop is named after the places of its photos, so the correction
-        # has to reach the stop too.
-        if image.visit_id is not None:
+        if image.lat is None or image.lng is None:
+            # A photo with no GPS borrows the coordinates of its place, so
+            # naming one gives it a location it never had. Rebuild the stops
+            # rather than only renaming one: it can now form or join a stop,
+            # and that is what puts it on the map.
+            await recluster_user(db, user)
+        elif image.visit_id is not None:
+            # A stop is named after the places of its photos, so the correction
+            # has to reach the stop too. Grouping is decided by time and GPS,
+            # which have not changed, so no photo can move between stops.
             await refresh_visit_place(db, image.visit_id)
 
     return image_out(await _get_owned_image(db, user.id, image_id))

@@ -9,7 +9,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icon-192.png', 'icon-512.png', 'share-target.js'],
+      includeAssets: [
+        'logo.png',
+        'icon-192.png',
+        'icon-512.png',
+        'icon-maskable-512.png',
+        'share-target.js',
+      ],
       manifest: {
         name: 'Money Hater — Trip Logger',
         short_name: 'Money Hater',
@@ -22,10 +28,18 @@ export default defineConfig({
         background_color: '#f8fafc',
         theme_color: '#0f172a',
         categories: ['travel', 'finance', 'lifestyle'],
+        // Installed icons are opaque on purpose. A maskable one is cropped to a
+        // circle on Android, so it gets its own file with the art pulled inside
+        // the safe zone rather than running to the edges.
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          {
+            src: '/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
         shortcuts: [
           { name: 'Add photos', short_name: 'Upload', url: '/upload' },

@@ -130,16 +130,17 @@ export function UploadPage() {
       >
         <p className="text-sm text-ink-3">
           Anything from your day — a place, food, an item, a receipt. The time and location are
-          read from the photo itself.
+          read from the photo where it has them.
         </p>
-        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-money-bg px-3 py-2 text-left text-xs text-money">
+        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-left text-xs text-ink-3">
           <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>
-            Photos need location data — it is what puts them on your timeline.{' '}
+            No location on a photo is fine — it lands on your timeline by its time, and gets a
+            map pin once you give it a place.{' '}
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
-              className="font-semibold underline underline-offset-2"
+              className="font-medium text-brand-600 underline underline-offset-2"
             >
               How to keep it
             </button>
@@ -217,15 +218,6 @@ export function UploadPage() {
               </li>
             ))}
           </ul>
-          {skipped.some((outcome) => outcome.code === 'no_location') && (
-            <button
-              type="button"
-              onClick={() => setHelpOpen(true)}
-              className="text-xs font-medium text-brand-600 underline underline-offset-2"
-            >
-              How do I keep the location on my photos?
-            </button>
-          )}
         </section>
       )}
 

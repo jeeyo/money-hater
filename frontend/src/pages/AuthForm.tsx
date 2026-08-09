@@ -38,7 +38,7 @@ export function AuthForm({
   return (
     <div className="flex min-h-dvh flex-col justify-center bg-surface-2 px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
-        <img src="/icon-192.png" alt="" className="mx-auto size-24" />
+        <img src="/logo.png" alt="" className="mx-auto size-24" />
         <h1 className="mt-3 text-center text-2xl font-bold text-ink">Money Hater</h1>
         <p className="mt-1 text-center text-sm text-ink-3">
           Trip logger — photos in, itinerary and spending out.

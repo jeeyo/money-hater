@@ -46,7 +46,7 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* Sidebar on ≥md */}
       <aside className="hidden md:flex md:w-56 md:flex-col md:gap-1 md:border-r md:border-line md:bg-surface md:p-4">
         <div className="mb-4 flex items-center gap-2.5 px-3">
-          <img src="/icon-192.png" alt="" className="size-10" />
+          <img src="/logo.png" alt="" className="size-10" />
           <div>
             <h1 className="text-lg font-bold leading-tight text-ink">Money Hater</h1>
             <p className="text-xs text-ink-4">trip logger</p>

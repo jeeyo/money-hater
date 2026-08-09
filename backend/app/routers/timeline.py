@@ -66,11 +66,6 @@ async def get_timeline(
                 .where(
                     Image.user_id == user.id,
                     Image.visit_id.is_(None),
-                    # A day is a record of where you were, so a photo with no
-                    # location has nothing to say in it. Upload refuses these
-                    # now; this keeps the ones that got in before it did from
-                    # sitting on today under "not yet placed" for good.
-                    Image.lat.isnot(None),
                     effective >= start,
                     effective < end,
                 )
