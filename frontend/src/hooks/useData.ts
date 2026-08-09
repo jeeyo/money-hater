@@ -196,13 +196,12 @@ export interface UploadOutcome {
   name: string;
   status: 'added' | 'duplicate' | 'failed';
   /** Why it failed, as a value rather than a message to match on */
-  code?: 'no_location' | 'too_large' | 'not_an_image' | 'error';
+  code?: 'too_large' | 'not_an_image' | 'error';
   image?: ImageRecord;
   error?: string;
 }
 
 function codeFor(httpStatus: number): UploadOutcome['code'] {
-  if (httpStatus === 422) return 'no_location';
   if (httpStatus === 413) return 'too_large';
   if (httpStatus === 415) return 'not_an_image';
   return 'error';

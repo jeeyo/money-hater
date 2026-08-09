@@ -135,7 +135,8 @@ export function UploadPage() {
         <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-money-bg px-3 py-2 text-left text-xs text-money">
           <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>
-            Photos need location data — it is what puts them on your timeline.{' '}
+            Without location data a photo still lands on your timeline by its time — it just
+            gets no map pin until you give it a place.{' '}
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
@@ -217,15 +218,6 @@ export function UploadPage() {
               </li>
             ))}
           </ul>
-          {skipped.some((outcome) => outcome.code === 'no_location') && (
-            <button
-              type="button"
-              onClick={() => setHelpOpen(true)}
-              className="text-xs font-medium text-brand-600 underline underline-offset-2"
-            >
-              How do I keep the location on my photos?
-            </button>
-          )}
         </section>
       )}
 

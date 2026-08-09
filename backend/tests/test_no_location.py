@@ -1,15 +1,17 @@
-"""A photo with no location is never an itinerary entry.
+"""A photo with no location of its own is still an itinerary entry.
 
-Upload refuses one outright. The rows that got in before it could recognise a
-NaN coordinate are held to the same rule everywhere it matters, so they cannot
-keep surfacing on the timeline with no place and today's date on them.
+A screenshot of a receipt carries no GPS, and refusing it threw away the record
+of what was spent. It is accepted and placed by its clock instead: it joins the
+stop it was taken during, and naming a place for it gives it the coordinates it
+never had. What it never does is shape a stop — the window, the centroid and
+the name belong to the photos that knew where they were.
 """
 
 from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
-from app.models import Image, User, Visit
+from app.models import Image, Place, User, Visit
 from app.services.analysis import run_image_analysis
 from app.services.clustering import recluster_user
 from tests.conftest import register
@@ -24,31 +26,31 @@ async def _upload(client, name: str, data: bytes) -> dict:
     return response.json()[0]
 
 
-async def _legacy_row_without_location(db_sessionmaker, user_id: int, when: datetime) -> int:
-    """An image as the old code left one: accepted, then analyzed to nothing.
-
-    EXIF was applied inside the analysis transaction, so a failure rolled the
-    location back out and left the row with none.
-    """
+async def _analyzed(client, db_sessionmaker, name: str, data: bytes) -> dict:
+    created = await _upload(client, name, data)
     async with db_sessionmaker() as db:
-        image = Image(
-            user_id=user_id,
-            sha256="deadbeef" * 8,
-            original_path="/nowhere/legacy.jpg",
-            mime="image/jpeg",
-            size_bytes=1,
-            status="failed",
-            error="Out of range float values are not JSON compliant: nan",
-            taken_at=when,
+        await run_image_analysis(db, created["id"])
+    return created
+
+
+async def _a_place(db_sessionmaker, name="Kopi 1930", coords=BKK) -> int:
+    async with db_sessionmaker() as db:
+        place = Place(
+            google_place_id=f"ChIJ-{name}",
+            name=name,
+            formatted_address="1 St Andrew's Rd",
+            lat=coords[0],
+            lng=coords[1],
+            types=["cafe"],
         )
-        db.add(image)
+        db.add(place)
         await db.commit()
-        return image.id
+        return place.id
 
 
-async def test_upload_records_the_location_it_checked(client):
-    """The check already read it; deriving it again in the worker meant a
-    failed analysis rolled it back and stranded the photo."""
+async def test_upload_records_the_location_it_read(client):
+    """Deriving it again in the worker meant a failed analysis rolled it back
+    and stranded the photo."""
     await register(client)
     taken = datetime(2026, 8, 7, 18, 31, tzinfo=UTC)
     created = await _upload(client, "a.jpg", make_jpeg(*BKK, taken_at=taken))
@@ -78,60 +80,198 @@ async def test_a_failed_analysis_keeps_the_photo_where_it_was_taken(client, db_s
     assert created["id"] in shown, "a transient failure must not lose the photo"
 
 
-async def test_a_photo_with_no_location_stays_off_the_timeline(client, db_sessionmaker):
+async def test_a_photo_with_no_location_analyzes_normally(client, db_sessionmaker):
+    """It used to be marked failed with nothing wrong with it but its EXIF."""
     await register(client)
-    me = (await client.get("/api/auth/me")).json()
-    when = datetime(2026, 8, 7, 20, 19, tzinfo=UTC)
-    image_id = await _legacy_row_without_location(db_sessionmaker, me["id"], when)
+    created = await _analyzed(
+        client,
+        db_sessionmaker,
+        "receipt.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 18, 31, tzinfo=UTC)),
+    )
+
+    async with db_sessionmaker() as db:
+        image = await db.get(Image, created["id"])
+        assert image.status == "analyzed"
+        assert image.error is None
+        assert image.thumb_path is not None, "it is a photo like any other"
+
+
+async def test_it_joins_the_stop_it_was_taken_during(client, db_sessionmaker):
+    """The receipt was photographed at the table, minutes after the food."""
+    await register(client)
+    lunch = await _analyzed(
+        client,
+        db_sessionmaker,
+        "lunch.jpg",
+        make_jpeg(*BKK, taken_at=datetime(2026, 8, 7, 18, 31, tzinfo=UTC)),
+    )
+    receipt = await _analyzed(
+        client,
+        db_sessionmaker,
+        "receipt.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 18, 35, tzinfo=UTC), color=(2, 2, 2)),
+    )
+
+    async with db_sessionmaker() as db:
+        located = await db.get(Image, lunch["id"])
+        unlocated = await db.get(Image, receipt["id"])
+        assert located.visit_id is not None
+        assert unlocated.visit_id == located.visit_id
+        assert len((await db.execute(sa.select(Visit))).scalars().all()) == 1
+
+
+async def test_it_does_not_shape_the_stop_it_joins(client, db_sessionmaker):
+    """A stop it helped define would be a stop placed on a guess."""
+    await register(client)
+    await _analyzed(
+        client,
+        db_sessionmaker,
+        "lunch.jpg",
+        make_jpeg(*BKK, taken_at=datetime(2026, 8, 7, 18, 31, tzinfo=UTC)),
+    )
+    async with db_sessionmaker() as db:
+        visit = await db.scalar(sa.select(Visit))
+        before = (visit.lat, visit.lng, visit.started_at, visit.ended_at)
+
+    await _analyzed(
+        client,
+        db_sessionmaker,
+        "receipt.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 18, 35, tzinfo=UTC), color=(2, 2, 2)),
+    )
+
+    async with db_sessionmaker() as db:
+        visit = await db.scalar(sa.select(Visit))
+        assert (visit.lat, visit.lng, visit.started_at, visit.ended_at) == before
+
+
+async def test_one_taken_far_from_any_stop_is_left_unplaced(client, db_sessionmaker):
+    """Beyond the gap that would have kept two photos together, it is a guess."""
+    await register(client)
+    await _analyzed(
+        client,
+        db_sessionmaker,
+        "lunch.jpg",
+        make_jpeg(*BKK, taken_at=datetime(2026, 8, 7, 12, 0, tzinfo=UTC)),
+    )
+    stray = await _analyzed(
+        client,
+        db_sessionmaker,
+        "stray.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 23, 50, tzinfo=UTC), color=(2, 2, 2)),
+    )
+
+    async with db_sessionmaker() as db:
+        assert (await db.get(Image, stray["id"])).visit_id is None
+
+
+async def test_an_unplaced_photo_still_shows_on_its_day(client, db_sessionmaker):
+    """Off the map, but not out of the log — it is what was spent that day."""
+    await register(client)
+    stray = await _analyzed(
+        client,
+        db_sessionmaker,
+        "stray.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 23, 50, tzinfo=UTC)),
+    )
 
     response = await client.get("/api/timeline?date=2026-08-07&tz_offset_minutes=0")
     assert response.status_code == 200, response.text
     day = response.json()
-    assert [i["id"] for i in day["unassigned_images"]] == []
-    assert image_id not in [i["id"] for v in day["visits"] for i in v["images"]]
+    assert [i["id"] for i in day["unassigned_images"]] == [stray["id"]]
 
 
-async def test_a_photo_with_no_location_is_never_clustered_into_a_stop(client, db_sessionmaker):
-    """Left in, it would join whichever stop it fell next to in time and
-    inherit a place it was never at."""
+async def test_a_day_of_only_unlocated_photos_makes_no_stops(client, db_sessionmaker):
+    """With nothing that knows where it was, there is no stop to infer."""
+    await register(client)
+    first = await _analyzed(
+        client,
+        db_sessionmaker,
+        "one.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 9, 0, tzinfo=UTC), color=(1, 1, 1)),
+    )
+    second = await _analyzed(
+        client,
+        db_sessionmaker,
+        "two.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 9, 10, tzinfo=UTC), color=(2, 2, 2)),
+    )
+
+    async with db_sessionmaker() as db:
+        assert (await db.execute(sa.select(Visit))).scalars().all() == []
+
+    day = (await client.get("/api/timeline?date=2026-08-07&tz_offset_minutes=0")).json()
+    assert day["visits"] == []
+    assert [i["id"] for i in day["unassigned_images"]] == [first["id"], second["id"]]
+
+
+async def test_naming_a_place_puts_it_on_the_map(client, db_sessionmaker):
+    """A place is a real address, so it gives the photo coordinates to be a pin."""
+    await register(client)
+    created = await _analyzed(
+        client,
+        db_sessionmaker,
+        "receipt.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 18, 31, tzinfo=UTC)),
+    )
+    place_id = await _a_place(db_sessionmaker)
+
+    response = await client.patch(f"/api/images/{created['id']}", json={"place_id": place_id})
+    assert response.status_code == 200, response.text
+
+    async with db_sessionmaker() as db:
+        image = await db.get(Image, created["id"])
+        assert image.visit_id is not None, "it can be a stop now that it has a location"
+        visit = await db.get(Visit, image.visit_id)
+        assert (visit.lat, visit.lng) == BKK
+        assert visit.place_id == place_id
+
+
+async def test_a_named_place_survives_reclustering(client, db_sessionmaker):
+    """Inference only ever writes which stop a photo is in, never where it was."""
     await register(client)
     me = (await client.get("/api/auth/me")).json()
-    taken = datetime(2026, 8, 7, 18, 31, tzinfo=UTC)
-    created = await _upload(client, "a.jpg", make_jpeg(*BKK, taken_at=taken))
-    async with db_sessionmaker() as db:
-        await run_image_analysis(db, created["id"])
-
-    # Minutes later, so it would land in the same cluster if it were eligible
-    stray = await _legacy_row_without_location(
-        db_sessionmaker, me["id"], datetime(2026, 8, 7, 18, 35, tzinfo=UTC)
+    created = await _analyzed(
+        client,
+        db_sessionmaker,
+        "receipt.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 18, 31, tzinfo=UTC)),
     )
+    place_id = await _a_place(db_sessionmaker)
+    await client.patch(f"/api/images/{created['id']}", json={"place_id": place_id})
 
     async with db_sessionmaker() as db:
         await recluster_user(db, await db.get(User, me["id"]))
 
     async with db_sessionmaker() as db:
-        assert (await db.get(Image, stray)).visit_id is None
-        visits = (await db.execute(sa.select(Visit))).scalars().all()
-        assert len(visits) == 1, "only the photo that has a location makes a stop"
+        assert (await db.get(Image, created["id"])).place_id == place_id
 
 
-async def test_reanalyzing_one_says_what_is_actually_wrong(client, db_sessionmaker, tmp_path):
-    """Not "float values are not JSON compliant" — the real reason."""
+async def test_a_manual_stop_assignment_survives_reclustering(client, db_sessionmaker):
+    """The user filing a receipt under a stop outranks anything inferred."""
     await register(client)
     me = (await client.get("/api/auth/me")).json()
-    image_id = await _legacy_row_without_location(
-        db_sessionmaker, me["id"], datetime(2026, 8, 7, 20, 19, tzinfo=UTC)
+    await _analyzed(
+        client,
+        db_sessionmaker,
+        "morning.jpg",
+        make_jpeg(*BKK, taken_at=datetime(2026, 8, 7, 9, 0, tzinfo=UTC)),
     )
-    # Point it at a real file with no GPS, as re-analysis would read it
-    path = tmp_path / "legacy.jpg"
-    path.write_bytes(make_jpeg(color=(3, 3, 3)))
+    stray = await _analyzed(
+        client,
+        db_sessionmaker,
+        "stray.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 23, 50, tzinfo=UTC), color=(2, 2, 2)),
+    )
     async with db_sessionmaker() as db:
-        image = await db.get(Image, image_id)
-        image.original_path = str(path)
-        await db.commit()
-        await run_image_analysis(db, image_id)
+        visit_id = (await db.scalar(sa.select(Visit))).id
+
+    response = await client.post(f"/api/images/{stray['id']}/assign", json={"visit_id": visit_id})
+    assert response.status_code == 200, response.text
 
     async with db_sessionmaker() as db:
-        image = await db.get(Image, image_id)
-        assert image.status == "failed"
-        assert "location" in image.error.lower()
+        await recluster_user(db, await db.get(User, me["id"]))
+
+    async with db_sessionmaker() as db:
+        assert (await db.get(Image, stray["id"])).visit_id == visit_id

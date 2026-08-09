@@ -46,61 +46,39 @@ async def test_non_image_rejected(client):
     assert response.status_code == 415
 
 
-async def test_a_photo_without_location_is_refused(client):
-    """Location is what makes a photo an itinerary entry rather than a picture."""
+async def test_a_photo_without_location_is_accepted(client):
+    """A screenshot of a receipt has no GPS and is still worth logging."""
     await register(client)
-    response = await client.post(
-        "/api/images", files=[("files", ("no-gps.jpg", make_jpeg(color=(3, 3, 3)), "image/jpeg"))]
-    )
-    assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert "no-gps.jpg" in detail, "the message must name the file the user picked"
-    # It has to say how to fix it: phones strip location on share by default
-    assert "location" in detail.lower()
+    created = await _upload(client, "no-gps.jpg", make_jpeg(color=(3, 3, 3)))
+    assert len(created) == 1
+    assert created[0]["status"] == "pending"
+    assert created[0]["lat"] is None and created[0]["lng"] is None
 
 
-async def test_a_photo_whose_gps_never_fixed_is_refused_the_same_way(client):
-    """GPS tags full of NaN are no location, and must be caught at the door.
+async def test_a_photo_whose_gps_never_fixed_is_accepted_with_no_location(client):
+    """GPS tags full of NaN are no location, but they are not a reason to refuse.
 
-    They used to slip past the upload check and take the analysis down with a
-    "float values are not JSON compliant" error, minutes later, on a photo
-    already sitting in the log with no way to tell what was wrong with it.
+    They used to take the analysis down with a "float values are not JSON
+    compliant" error; what matters now is that they come out as no location at
+    all rather than as coordinates in the middle of the ocean.
     """
     await register(client)
-    response = await client.post(
-        "/api/images",
-        files=[
-            (
-                "files",
-                (
-                    "no-fix.jpg",
-                    make_jpeg(gps_dms=(NO_FIX_DMS, NO_FIX_DMS), color=(3, 4, 5)),
-                    "image/jpeg",
-                ),
-            )
-        ],
+    created = await _upload(
+        client, "no-fix.jpg", make_jpeg(gps_dms=(NO_FIX_DMS, NO_FIX_DMS), color=(3, 4, 5))
     )
-    assert response.status_code == 422
-    assert "no-fix.jpg" in response.json()["detail"]
+    assert created[0]["lat"] is None and created[0]["lng"] is None
 
 
-async def test_a_photo_with_a_timestamp_but_no_location_is_still_refused(client):
-    """EXIF alone is not enough — the GPS tags are the requirement."""
+async def test_a_photo_with_a_timestamp_but_no_location_keeps_its_timestamp(client):
+    """The clock is the half that places an unlocated photo, so it must survive."""
     await register(client)
-    response = await client.post(
-        "/api/images",
-        files=[
-            (
-                "files",
-                ("timed.jpg", make_jpeg(taken_at=datetime(2026, 8, 8, 12, 0)), "image/jpeg"),
-            )
-        ],
-    )
-    assert response.status_code == 422
+    created = await _upload(client, "timed.jpg", make_jpeg(taken_at=datetime(2026, 8, 8, 12, 0)))
+    assert created[0]["lat"] is None
+    assert created[0]["taken_at"] is not None
 
 
 async def test_a_located_photo_without_a_timestamp_is_accepted(client):
-    """Only location is mandatory; the clock falls back to the upload time."""
+    """Neither half is mandatory; the clock falls back to the upload time."""
     await register(client)
     response = await client.post(
         "/api/images", files=[("files", ("located.jpg", make_jpeg(*BKK), "image/jpeg"))]
@@ -108,10 +86,8 @@ async def test_a_located_photo_without_a_timestamp_is_accepted(client):
     assert response.status_code == 201, response.text
 
 
-async def test_one_unlocated_photo_rejects_the_whole_batch_cleanly(client, db_sessionmaker):
-    """And leaves nothing on disk — the client uploads one per request anyway."""
-    from app.config import settings
-
+async def test_a_batch_mixing_located_and_unlocated_photos_is_kept_whole(client):
+    """A phone selection is many photos at once, and only some carry a fix."""
     await register(client)
     response = await client.post(
         "/api/images",
@@ -120,12 +96,10 @@ async def test_one_unlocated_photo_rejects_the_whole_batch_cleanly(client, db_se
             ("files", ("no-gps.jpg", make_jpeg(color=(2, 2, 2)), "image/jpeg")),
         ],
     )
-    assert response.status_code == 422
-
-    async with db_sessionmaker() as db:
-        assert await db.scalar(sa.select(sa.func.count()).select_from(Image)) == 0
-    originals = list(settings.media_root.rglob("*")) if settings.media_root.exists() else []
-    assert [p for p in originals if p.is_file()] == []
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert len(created) == 2
+    assert sorted(image["lat"] is None for image in created) == [False, True]
 
 
 async def test_a_rejected_batch_leaves_nothing_behind(client, db_sessionmaker):

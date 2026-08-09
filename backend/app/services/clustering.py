@@ -4,6 +4,12 @@ Deterministic spatiotemporal clustering, re-run after every analyzed image:
 consecutive images join the same *visit* while the time gap stays under
 VISIT_MAX_GAP and the GPS distance under VISIT_MAX_DISTANCE.
 
+A photo does not need a fix of its own to take part. Its place, if the user
+named one, stands in for the coordinates it never had, and a photo with
+neither — a receipt screenshot, say — is attached afterwards to the stop
+nearest in time. Such a photo joins a stop without shaping it: the window,
+the centroid and the name are decided by the photos that know where they were.
+
 Days are the automatic unit above a visit — a day is simply the visits that
 fall in it. Trips are never inferred; they are made by hand (see app.models.Trip).
 
@@ -17,6 +23,7 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.models import Expense, Image, User, Visit
@@ -75,10 +82,50 @@ def dominant_place(place_ids: Iterable[int | None]) -> int | None:
     return max(counts, key=counts.get) if counts else None  # type: ignore[arg-type]
 
 
-def effective_ts(image: Image) -> datetime:
+def _aware(ts: datetime) -> datetime:
     # sqlite returns naive datetimes; normalize so comparisons never mix awareness
-    ts = image.taken_at or image.uploaded_at
     return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
+
+
+def effective_ts(image: Image) -> datetime:
+    return _aware(image.taken_at or image.uploaded_at)
+
+
+def effective_coords(image: Image) -> tuple[float | None, float | None]:
+    """Where a photo was, whether or not its camera knew.
+
+    A screenshot has no fix, but a place the user picked for it is a real
+    address with real coordinates — enough to make it a stop and a map pin.
+    Its own GPS still wins where it has one.
+    """
+    if image.lat is not None and image.lng is not None:
+        return image.lat, image.lng
+    if image.place is not None:
+        return image.place.lat, image.place.lng
+    return None, None
+
+
+def nearest_visit_id(ts: datetime, visits: Iterable[Visit], max_gap: timedelta) -> int | None:
+    """The stop a photo with no location of its own most likely belongs to.
+
+    Distance is measured to the stop's *window*: zero while the photo was taken
+    during it, and how far outside it otherwise. The nearest stop wins, and only
+    if it is within the same gap that would have kept two photos together —
+    beyond that the photo is left unplaced rather than guessed at.
+    """
+    when = _aware(ts)
+    best: tuple[timedelta, datetime, int] | None = None
+    for visit in visits:
+        started, ended = _aware(visit.started_at), _aware(visit.ended_at)
+        distance = max(started - when, when - ended, timedelta(0))
+        if distance > max_gap:
+            continue
+        # Ties go to the stop that started first, so the answer never depends
+        # on the order the rows came back in.
+        candidate = (distance, started, visit.id)
+        if best is None or candidate < best:
+            best = candidate
+    return best[2] if best is not None else None
 
 
 async def refresh_visit_place(db: AsyncSession, visit_id: int) -> None:
@@ -118,19 +165,24 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
         else sa.true()
     )
 
+    # Everything that knows where it was, by its own fix or by the place the
+    # user gave it. Photos with neither are attached afterwards, by time, so
+    # they cannot bridge two stops or stretch one to reach them.
     images = (
         (
             await db.execute(
-                sa.select(Image).where(
+                sa.select(Image)
+                .where(
                     Image.user_id == user.id,
                     Image.status != "pending",
-                    # No location, no stop. Nothing reaching here should lack
-                    # one, but a row that predates the NaN check would
-                    # otherwise be clustered into whichever stop it fell next
-                    # to in time and inherit a place it was never at.
-                    Image.lat.isnot(None),
+                    sa.or_(Image.lat.isnot(None), Image.place_id.isnot(None)),
                     unprotected,
                 )
+                .options(selectinload(Image.place))
+                # A caller that just changed a photo's place still holds the
+                # row with the place it had before, and the stale relationship
+                # would cost the photo the coordinates it was given.
+                .execution_options(populate_existing=True)
             )
         )
         .scalars()
@@ -147,10 +199,12 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
         delete_visits = delete_visits.where(Visit.id.notin_(protected_visit_ids))
     await db.execute(delete_visits)
 
-    points = [
-        Point(id=i.id, ts=effective_ts(i), lat=i.lat, lng=i.lng, place_id=i.place_id)
-        for i in images
-    ]
+    points: list[Point] = []
+    for image in images:
+        lat, lng = effective_coords(image)
+        points.append(
+            Point(id=image.id, ts=effective_ts(image), lat=lat, lng=lng, place_id=image.place_id)
+        )
     for group in group_into_visits(
         points,
         max_gap=timedelta(minutes=settings.visit_max_gap_minutes),
@@ -175,8 +229,51 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
             sa.update(Expense).where(Expense.image_id.in_(image_ids)).values(visit_id=visit.id)
         )
 
+    await _attach_unlocated(db, user, unprotected)
     await _reattach_manual_expenses(db, user)
     await db.commit()
+
+
+async def _attach_unlocated(
+    db: AsyncSession, user: User, unprotected: sa.ColumnElement[bool]
+) -> None:
+    """Place the photos that know neither where they were nor of what.
+
+    A receipt screenshot has no fix and, until the user says otherwise, no
+    place — but it was taken around the time of the stop it belongs to, and
+    that is enough to file it there. It is attached once the stops are built,
+    so it can only join one, never move or reshape one.
+    """
+    images = (
+        (
+            await db.execute(
+                sa.select(Image).where(
+                    Image.user_id == user.id,
+                    Image.status != "pending",
+                    Image.lat.is_(None),
+                    Image.place_id.is_(None),
+                    unprotected,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not images:
+        return
+
+    # Pinned stops are real stops and valid homes for a photo; refresh_visit_place
+    # leaves them alone, so joining one cannot rename it.
+    visits = (await db.execute(sa.select(Visit).where(Visit.user_id == user.id))).scalars().all()
+    max_gap = timedelta(minutes=settings.visit_max_gap_minutes)
+    for image in images:
+        image.visit_id = nearest_visit_id(effective_ts(image), visits, max_gap)
+        if image.visit_id is None:
+            continue
+        # A receipt's expense belongs to the same stop as the photo of it
+        await db.execute(
+            sa.update(Expense).where(Expense.image_id == image.id).values(visit_id=image.visit_id)
+        )
 
 
 async def _reattach_manual_expenses(db: AsyncSession, user: User) -> None:
