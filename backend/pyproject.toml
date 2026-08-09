@@ -10,6 +10,9 @@ dependencies = [
     "asyncpg>=0.29",
     "alembic>=1.13",
     "procrastinate>=2.9",
+    # Procrastinate connects with psycopg, whose pure-Python impl needs a system
+    # libpq. The slim runtime image has none, so ship the wheel that bundles it.
+    "psycopg[binary]>=3.2",
     "pydantic[email]>=2.7",
     "pydantic-settings>=2.3",
     "python-multipart>=0.0.9",
