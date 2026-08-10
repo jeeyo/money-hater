@@ -1,6 +1,7 @@
 import math
 from datetime import UTC, datetime
 
+import piexif
 import pytest
 import sqlalchemy as sa
 
@@ -104,6 +105,52 @@ def test_a_photo_with_no_gps_has_no_gps_block():
     """The other half of the signal: absent means the file really had none."""
     exif = extract_exif(make_jpeg(taken_at=datetime(2026, 8, 8, 12, 0)))
     assert "GPS" not in exif.raw
+
+
+def _nul_free(value) -> bool:
+    if isinstance(value, str):
+        return "\x00" not in value
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and "\x00" not in k for k in value) and all(
+            _nul_free(v) for v in value.values()
+        )
+    if isinstance(value, list):
+        return all(_nul_free(item) for item in value)
+    return True
+
+
+def test_empty_gps_tags_never_reach_the_column_as_nul():
+    """Postgres refuses \\u0000 anywhere in a JSONB document.
+
+    An OPPO Find N5 writes GPSDateStamp as ten NULs and GPSProcessingMethod as
+    twelve when it has nothing to put there. Those are strings and bytes that
+    look non-empty to Python, and storing one failed the insert for the entire
+    photo — which also blocked re-uploading it, since the upload writes the
+    same column. Sqlite takes NUL happily, so this asserts on the value rather
+    than on a round trip that would pass here and fail in production.
+    """
+    data = make_jpeg(
+        lat=13.7563,
+        lng=100.5018,
+        gps_extra={
+            piexif.GPSIFD.GPSDateStamp: b"\x00" * 10,
+            piexif.GPSIFD.GPSProcessingMethod: b"\x00" * 12,
+        },
+    )
+    raw = extract_exif(data).raw
+    assert _nul_free(raw), raw
+    gps = raw["GPS"]
+    assert "GPSDateStamp" not in gps, "an all-NUL tag holds nothing worth keeping"
+    assert "GPSProcessingMethod" not in gps
+    assert gps["GPSLatitudeRef"] == "N", "the tags that did carry something survive"
+
+
+def test_padded_text_tags_keep_their_content():
+    """NUL padding is stripped without taking the value with it."""
+    data = make_jpeg(lat=13.7563, lng=100.5018, gps_extra={
+        piexif.GPSIFD.GPSDateStamp: b"2026:08:02\x00",
+    })
+    assert extract_exif(data).raw["GPS"]["GPSDateStamp"] == "2026:08:02"
 
 
 def test_the_ifd_pointers_are_not_kept():
