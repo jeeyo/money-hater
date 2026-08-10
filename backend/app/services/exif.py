@@ -9,6 +9,7 @@ import io
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from numbers import Rational
 
 from PIL import ExifTags
 from PIL import Image as PILImage
@@ -69,6 +70,53 @@ def _json_safe(value):
     return value if isinstance(value, (int, str)) else None
 
 
+def _gps_value(value):
+    """A GPS tag as something a JSON column can hold.
+
+    Deliberately wider than `_json_safe`: coordinates are tuples of rationals
+    and the refs are byte strings, none of which survive the conservative rule
+    the other IFDs use. Taking the whole GPS IFD is safe where taking a whole
+    Exif IFD would not be — it is a dozen small tags, with no MakerNote in it
+    to run away with the row.
+
+    A component that cannot be read becomes null rather than dropping the tag,
+    so "the fix was there and unusable" still reads differently from "there
+    was no fix".
+    """
+    if isinstance(value, bytes):
+        # Most GPS tags are ASCII ("N", "2026:08:03"), but a few are binary —
+        # GPSVersionID is four raw bytes. Reading those as characters produces
+        # control-code noise, so anything unprintable stays numeric.
+        text = value.decode("ascii", "replace").replace("\x00", "").strip()
+        if text and text.isprintable():
+            return text
+        return list(value) or None
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, (tuple, list)):
+        return [_gps_value(item) for item in value]
+    if isinstance(value, int):  # GPSAltitudeRef and friends are small ints
+        return value
+    if isinstance(value, (float, Rational)):
+        return _to_float(value)
+    return None
+
+
+def _gps_raw(gps_ifd) -> dict:
+    """The GPS IFD as it was written, named and JSON-safe.
+
+    Kept whether or not the fix survived `_valid_coords`, because telling a
+    photo that arrived without GPS from one whose GPS we rejected is the whole
+    point of recording it.
+    """
+    raw = {}
+    for tag_id, value in gps_ifd.items():
+        safe = _gps_value(value)
+        if safe is not None:
+            raw[ExifTags.GPSTAGS.get(tag_id, str(tag_id))] = safe
+    return raw
+
+
 def _parse_exif_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -112,6 +160,15 @@ def extract_exif(data: bytes) -> ExifData:
         safe = _json_safe(value)
         if safe is not None:
             raw[name] = safe
+
+    # The IFD pointers are byte offsets into the file, not data. `GPSInfo` in
+    # particular is an integer that reads like a location and is not one — the
+    # exact confusion the block below exists to end.
+    for pointer in ("ExifOffset", "GPSInfo"):
+        raw.pop(pointer, None)
+    gps = _gps_raw(gps_ifd)
+    if gps:
+        raw["GPS"] = gps
 
     return ExifData(
         taken_at=taken_at,
