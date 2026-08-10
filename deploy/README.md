@@ -25,6 +25,20 @@ kubectl -n money-hater create secret generic money-hater-secrets \
   --from-literal=GOOGLE_MAPS_API_KEY="AIza..."
 ```
 
+To put a Cloudflare Turnstile challenge on the sign-in and sign-up forms, add
+both of its keys to the same secret — either both or neither, since the
+container refuses to start half-configured:
+
+```bash
+kubectl -n money-hater create secret generic money-hater-secrets \
+  --from-literal=TURNSTILE_SITE_KEY="0x4AAA..." \
+  --from-literal=TURNSTILE_SECRET_KEY="0x4AAA..." \
+  … # the literals above
+```
+
+The site key is public and the API hands it to the browser at runtime, so the
+same image works with or without the challenge — nothing is baked in at build.
+
 Edit `ingress.yaml` for your hostname/TLS before applying, and set the image
 tag in `kustomization.yaml`.
 

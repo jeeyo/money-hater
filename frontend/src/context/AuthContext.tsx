@@ -7,8 +7,8 @@ import type { User } from '../types';
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, turnstileToken?: string) => Promise<void>;
+  register: (email: string, password: string, turnstileToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -31,13 +31,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser().finally(() => setLoading(false));
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    setUser(await postJson<User>('/api/auth/login', { email, password }));
+  const login = useCallback(async (email: string, password: string, turnstileToken?: string) => {
+    setUser(
+      await postJson<User>('/api/auth/login', {
+        email,
+        password,
+        turnstile_token: turnstileToken ?? null,
+      }),
+    );
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    setUser(await postJson<User>('/api/auth/register', { email, password }));
-  }, []);
+  const register = useCallback(
+    async (email: string, password: string, turnstileToken?: string) => {
+      setUser(
+        await postJson<User>('/api/auth/register', {
+          email,
+          password,
+          turnstile_token: turnstileToken ?? null,
+        }),
+      );
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     await postJson('/api/auth/logout', {});

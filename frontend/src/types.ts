@@ -7,6 +7,11 @@ export interface User {
   home_label: string | null;
 }
 
+export interface AuthConfig {
+  /** Null unless the server has Turnstile configured. */
+  turnstile_site_key: string | null;
+}
+
 export interface Place {
   id: number;
   name: string;

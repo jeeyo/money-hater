@@ -54,7 +54,11 @@ async def client(db_sessionmaker, in_memory_queue) -> AsyncIterator[AsyncClient]
     app.dependency_overrides.clear()
 
 
-async def register(client: AsyncClient, email="user@example.com", password="password123") -> dict:
-    response = await client.post("/api/auth/register", json={"email": email, "password": password})
+async def register(
+    client: AsyncClient, email="user@example.com", password="password123", **extra
+) -> dict:
+    response = await client.post(
+        "/api/auth/register", json={"email": email, "password": password, **extra}
+    )
     assert response.status_code == 201, response.text
     return response.json()

@@ -4,6 +4,7 @@ import { apiJson, postJson } from '../lib/api';
 import { tzOffsetMinutes } from '../lib/format';
 import { queryClient } from '../lib/queryClient';
 import type {
+  AuthConfig,
   Expense,
   ExpenseSummary,
   ImageRecord,
@@ -28,6 +29,17 @@ export interface ExpenseInput {
   note?: string | null;
   fx_rate?: number | null;
   items?: { name: string; qty: number; amount: number }[];
+}
+
+/** Public config the sign-in form needs — currently just the Turnstile key. */
+export function useAuthConfig() {
+  return useQuery({
+    queryKey: ['auth-config'],
+    queryFn: () => apiJson<AuthConfig>('/api/auth/config'),
+    // It changes when the server is restarted with different settings, which
+    // is not something a signed-out browser needs to poll for.
+    staleTime: Infinity,
+  });
 }
 
 export function useTimeline(date: string) {

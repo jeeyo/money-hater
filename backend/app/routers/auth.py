@@ -7,7 +7,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Response, status
 from app.config import settings
 from app.deps import CurrentUser, DbSession
 from app.models import AuthSession, User
-from app.schemas import LoginRequest, RegisterRequest, SettingsUpdate, UserOut
+from app.schemas import AuthConfigOut, LoginRequest, RegisterRequest, SettingsUpdate, UserOut
 from app.security import (
     REFRESH_COOKIE,
     clear_auth_cookies,
@@ -19,8 +19,14 @@ from app.security import (
     verify_password,
 )
 from app.serialize import user_out
+from app.services.turnstile import verify_turnstile
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Postgres hands these back tz-aware; SQLite (tests) does not."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 async def _start_session(db: DbSession, response: Response, user: User) -> None:
@@ -36,8 +42,15 @@ async def _start_session(db: DbSession, response: Response, user: User) -> None:
     set_auth_cookies(response, make_access_token(user.id), refresh_token)
 
 
+@router.get("/config", response_model=AuthConfigOut)
+async def auth_config():
+    """Public: what the sign-in form needs before there is a session."""
+    return AuthConfigOut(turnstile_site_key=settings.turnstile_site_key or None)
+
+
 @router.post("/register", response_model=UserOut, status_code=201)
 async def register(body: RegisterRequest, db: DbSession, response: Response):
+    await verify_turnstile(body.turnstile_token)
     existing = await db.scalar(sa.select(User).where(User.email == body.email.lower()))
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
@@ -50,6 +63,7 @@ async def register(body: RegisterRequest, db: DbSession, response: Response):
 
 @router.post("/login", response_model=UserOut)
 async def login(body: LoginRequest, db: DbSession, response: Response):
+    await verify_turnstile(body.turnstile_token)
     user = await db.scalar(sa.select(User).where(User.email == body.email.lower()))
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
@@ -70,19 +84,28 @@ async def refresh(
         sa.select(AuthSession).where(AuthSession.refresh_token_hash == token_hash)
     )
     now = datetime.now(UTC)
-    if (
-        session is None
-        or session.revoked_at is not None
-        or session.expires_at.replace(tzinfo=session.expires_at.tzinfo or UTC) < now
-    ):
+    if session is None or _as_utc(session.expires_at) <= now:
         clear_auth_cookies(response)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    if session.revoked_at is not None:
+        # Already rotated. Usually that means a second tab beat this one to the
+        # refresh by milliseconds and both hold the same cookie, so honour the
+        # old token briefly rather than signing the user out of a session that
+        # is alive in the next tab along. Past the grace window it is a stale
+        # or replayed token and gets nothing.
+        grace = timedelta(seconds=settings.refresh_rotation_grace_seconds)
+        if _as_utc(session.revoked_at) + grace < now:
+            clear_auth_cookies(response)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     user = await db.get(User, session.user_id)
     if user is None:
         clear_auth_cookies(response)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user")
-    # Rotate: revoke the old session, issue a new refresh token
-    session.revoked_at = now
+    # Rotate: revoke the old session, issue a new refresh token. Keep the
+    # original revocation time when it is already set, so replaying a token
+    # inside its grace window cannot keep pushing that window forward.
+    if session.revoked_at is None:
+        session.revoked_at = now
     await _start_session(db, response, user)
     return user_out(user)
 
@@ -94,10 +117,15 @@ async def logout(
     mh_refresh: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ):
     if mh_refresh:
+        # Expire it as well as revoke it. Signing out is deliberate, so it ends
+        # the session outright — the grace a rotated token gets in `refresh`
+        # above is for a tab that raced, not for one the user just closed, and
+        # the expiry is checked before that grace.
+        now = datetime.now(UTC)
         await db.execute(
             sa.update(AuthSession)
             .where(AuthSession.refresh_token_hash == hash_refresh_token(mh_refresh))
-            .values(revoked_at=datetime.now(UTC))
+            .values(revoked_at=now, expires_at=now)
         )
         await db.commit()
     clear_auth_cookies(response)

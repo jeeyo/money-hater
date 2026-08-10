@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,29 @@ class Settings(BaseSettings):
     access_token_ttl_seconds: int = 3600
     refresh_token_ttl_days: int = 30
     cookie_secure: bool = False
+    # A refresh rotates the token, so the one the browser just replaced is
+    # dead. Two tabs (or a tab and the service worker) waking together both
+    # present it, and the loser would be signed out through no fault of its
+    # own. Honour a just-rotated token for this long instead.
+    refresh_rotation_grace_seconds: int = 30
+
+    # Cloudflare Turnstile on the sign-in and sign-up forms. Both blank — the
+    # default — turns it off: the devcontainer, the tests and a box on your own
+    # LAN have no Cloudflare account, and a login form that cannot be submitted
+    # without one is not a sensible default. Set both to switch it on.
+    turnstile_site_key: str = ""
+    turnstile_secret_key: str = ""
+    turnstile_verify_url: str = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+    @model_validator(mode="after")
+    def _turnstile_needs_both_keys(self):
+        # Half-configured fails in a way nobody enjoys debugging: with only the
+        # secret every login is rejected because no widget ever rendered, and
+        # with only the site key the challenge is decorative. Refuse to start.
+        if bool(self.turnstile_site_key) != bool(self.turnstile_secret_key):
+            missing = "TURNSTILE_SECRET_KEY" if self.turnstile_site_key else "TURNSTILE_SITE_KEY"
+            raise ValueError(f"Turnstile needs both keys or neither — {missing} is missing")
+        return self
 
     media_root: Path = Path("./data/media")
 
