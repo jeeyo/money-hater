@@ -15,11 +15,16 @@ export function PlaceAutocomplete({
   placeId,
   at,
   onChange,
+  inline = false,
 }: {
   value: string;
   placeId: number | null;
   at: string | null;
   onChange: (name: string, placeId: number | null) => void;
+  /** Let the list take room in the layout instead of floating over what is
+   *  under it. For a field whose Save button sits directly below — floating
+   *  there hides the one control the user is looking for. */
+  inline?: boolean;
 }) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -87,7 +92,9 @@ export function PlaceAutocomplete({
         <ul
           id="place-suggestions"
           role="listbox"
-          className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-lg"
+          className={`z-10 mt-1 max-h-60 overflow-y-auto rounded-xl border border-line bg-surface py-1 ${
+            inline ? 'shadow-sm' : 'absolute inset-x-0 top-full shadow-lg'
+          }`}
         >
           {loading && suggestions.length === 0 && (
             <li className="px-3 py-2 text-sm text-ink-4">Searching…</li>

@@ -134,6 +134,9 @@ class Image(Base):
     lng: Mapped[float | None] = mapped_column(sa.Float)
     exif: Mapped[dict | None] = mapped_column(JSONType)
     place_id: Mapped[int | None] = mapped_column(sa.ForeignKey("places.id", ondelete="SET NULL"))
+    # The user named this place themselves, so the pipeline must not answer
+    # over them. The counterpart of Visit.pinned, one level down.
+    place_pinned: Mapped[bool] = mapped_column(sa.Boolean, default=False, server_default=sa.false())
     visit_id: Mapped[int | None] = mapped_column(
         sa.ForeignKey("visits.id", ondelete="SET NULL"), index=True
     )

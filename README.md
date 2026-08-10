@@ -321,6 +321,10 @@ taken during, and only sits on its own under **Not yet placed** when nothing tha
 time. Give it a place — tap the photo, then **Set place** — and it takes that place's coordinates,
 forms or joins a stop, and appears on the map like any other.
 
+**Set place** takes either half of the answer: pick one of the suggestions, or type a name and press
+**Save** to search for it near where the photo was. Whichever way, that place is now the user's, and
+re-analyzing the photo will not put the pipeline's guess back over it.
+
 What it will not do is invent a location. A photo placed this way never contributes to where a stop
 is, so a stop is only ever positioned by the photos that actually knew.
 

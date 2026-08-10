@@ -11,18 +11,32 @@ import { PlaceAutocomplete } from './PlaceAutocomplete';
  * indoors or on a dense street is regularly the shop next door. Re-analyzing
  * asks the same question and gets the same answer, so the fix has to be the
  * user naming the place.
+ *
+ * Naming it means pressing Save. Committing on the click of a suggestion
+ * looked tidy and was not: a name that matched no suggestion had no way to be
+ * saved at all, and with an empty list — a log with no places in it yet — the
+ * sheet was a text field, a hint, and nothing that did anything.
  */
 function PlaceRow({ image }: { image: ImageRecord }) {
   const update = useUpdateImage();
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState('');
+  // The suggestion that was clicked, if any. Kept beside the text rather than
+  // saved on the spot so the row reads the same either way: pick or type, then
+  // Save. Typing again drops it — the text is what the user is now proposing.
+  const [picked, setPicked] = useState<number | null>(null);
 
-  function save(placeId: number | null) {
-    update.mutate(
-      { id: image.id, place_id: placeId },
-      { onSuccess: () => setEditing(false) },
-    );
+  function close() {
+    setEditing(false);
+    update.reset();
   }
+
+  function save(body: { place_id?: number | null; place_query?: string }) {
+    update.mutate({ id: image.id, ...body }, { onSuccess: close });
+  }
+
+  const typed = query.trim();
+  const canSave = picked != null || typed.length > 0;
 
   return (
     <div className="space-y-1.5">
@@ -35,6 +49,8 @@ function PlaceRow({ image }: { image: ImageRecord }) {
               // Empty, not the current name: prefilling it filters the list
               // down to the one place the user opened this to get away from.
               setQuery('');
+              setPicked(null);
+              update.reset();
               setEditing(true);
             }}
             className="flex items-center gap-1 text-xs font-medium text-brand-600"
@@ -48,22 +64,33 @@ function PlaceRow({ image }: { image: ImageRecord }) {
         <div className="space-y-1.5">
           <PlaceAutocomplete
             value={query}
-            // Always null: the field is a search here, and its own unlink
-            // button would be a second, silent way to do what "Remove place"
-            // does explicitly below.
-            placeId={null}
+            placeId={picked}
             at={image.taken_at}
+            inline
             onChange={(name, placeId) => {
               setQuery(name);
-              // Only a picked suggestion is a place; free text alone is not
-              if (placeId != null) save(placeId);
+              setPicked(placeId);
             }}
           />
-          <p className="text-xs text-ink-4">Pick one of the suggestions to save it.</p>
-          <div className="flex gap-3">
+          <p className="text-xs text-ink-4">
+            {picked != null
+              ? 'From your suggestions — Save to attach it.'
+              : 'Pick a suggestion, or type a name and Save to search for it.'}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => setEditing(false)}
+              disabled={!canSave || update.isPending}
+              onClick={() =>
+                save(picked != null ? { place_id: picked } : { place_query: typed })
+              }
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white active:bg-brand-700 disabled:bg-surface-2 disabled:text-ink-4"
+            >
+              {update.isPending ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={close}
               className="text-xs font-medium text-ink-3"
             >
               Cancel
@@ -71,7 +98,7 @@ function PlaceRow({ image }: { image: ImageRecord }) {
             {image.place && (
               <button
                 type="button"
-                onClick={() => save(null)}
+                onClick={() => save({ place_id: null })}
                 className="text-xs font-medium text-danger"
               >
                 Remove place

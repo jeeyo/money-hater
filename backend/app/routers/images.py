@@ -14,6 +14,7 @@ from app.serialize import image_out
 from app.services import storage
 from app.services.clustering import recluster_user, refresh_visit_place
 from app.services.exif import ExifData, extract_exif
+from app.services.places import search_place_by_text
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -130,25 +131,53 @@ async def reanalyze_image(image_id: int, user: CurrentUser, db: DbSession):
     return image_out(image)
 
 
+async def _place_from(db: DbSession, image: Image, body: ImageUpdate) -> Place | None:
+    """The place the user meant, by id or by the name they typed, or None to clear.
+
+    A typed name is searched for near the photo, so "Starbucks" resolves to the
+    one in the picture rather than the best match to nothing in particular.
+    Nothing found is a 404 the picker shows inline — better than a save that
+    quietly does nothing, which is how this read before it could take a name at
+    all.
+    """
+    if body.place_id is not None:
+        place = await db.get(Place, body.place_id)
+        if place is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Place not found")
+        return place
+    query = (body.place_query or "").strip()
+    if not query:
+        return None
+    near = (image.lat, image.lng) if image.lat is not None and image.lng is not None else None
+    place = await search_place_by_text(db, query, near=near)
+    if place is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "No matching place found"
+            if settings.google_maps_api_key
+            else "Place search needs a Google Maps API key — pick one of the suggestions instead",
+        )
+    return place
+
+
 @router.patch("/{image_id}", response_model=ImageOut)
 async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: DbSession):
     """Correct what the pipeline read off a photo — today, its place.
 
     Reverse geocoding picks the nearest match to the GPS fix, which indoors or
     in a dense block is often the shop next door. Rather than make the user
-    re-analyze and hope for a different answer, let them say which place it was.
+    re-analyze and hope for a different answer, let them say which place it was
+    — and remember that they did, so re-analyzing never answers back over them.
     """
     image = await _get_owned_image(db, user.id, image_id)
     sent = body.model_dump(exclude_unset=True)
 
-    if "place_id" in sent:
-        if body.place_id is None:
-            image.place_id = None
-        else:
-            place = await db.get(Place, body.place_id)
-            if place is None:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Place not found")
-            image.place_id = place.id
+    if "place_id" in sent or "place_query" in sent:
+        place = await _place_from(db, image, body)
+        image.place_id = place.id if place is not None else None
+        # Taking one off is an answer too, so it pins as well: re-analysis must
+        # not put back the place the user just rejected.
+        image.place_pinned = True
         await db.commit()
         if image.lat is None or image.lng is None:
             # A photo with no GPS borrows the coordinates of its place, so

@@ -319,11 +319,22 @@ export function useReanalyzeImage() {
   });
 }
 
-/** Correct what was read off a photo — currently the place it was taken at. */
+/** Correct what was read off a photo — currently the place it was taken at.
+ *
+ * `place_id` is a suggestion the user picked; `place_query` is a name they
+ * typed that matched none, which the server searches for. Sending neither
+ * (an explicit `place_id: null`) clears it.
+ */
 export function useUpdateImage() {
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: number; place_id?: number | null }) =>
-      postJson<ImageRecord>(`/api/images/${id}`, body, 'PATCH'),
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: number;
+      place_id?: number | null;
+      place_query?: string;
+    }) => postJson<ImageRecord>(`/api/images/${id}`, body, 'PATCH'),
     onSuccess: (image) => {
       // Seed the per-image cache so an open modal shows the new place at once
       queryClient.setQueryData(['images', image.id], image);

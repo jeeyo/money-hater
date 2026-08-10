@@ -152,6 +152,47 @@ async def test_an_unknown_place_is_a_404(client, db_sessionmaker):
     assert response.status_code == 404
 
 
+async def test_a_typed_name_can_be_saved(client, db_sessionmaker):
+    """The picker's field is a search, and what is typed into it has to save.
+
+    A name that matches nothing in the suggestions used to be unsaveable: the
+    only way to commit anything was to click a suggestion, so with an empty
+    list — a fresh log, or no Google key — the sheet offered no way out at all.
+    """
+    await register(client)
+    image_id = await _a_photo(client, db_sessionmaker)
+    await _a_place(db_sessionmaker, name="Kopi 1930")
+
+    response = await client.patch(f"/api/images/{image_id}", json={"place_query": "kopi 1930"})
+    assert response.status_code == 200, response.text
+    assert response.json()["place"]["name"] == "Kopi 1930"
+
+
+async def test_a_typed_name_that_resolves_to_nothing_says_so(client, db_sessionmaker):
+    """Better a message in the sheet than a Save button that does nothing."""
+    await register(client)
+    image_id = await _a_photo(client, db_sessionmaker)
+
+    response = await client.patch(
+        f"/api/images/{image_id}", json={"place_query": "somewhere that isn't"}
+    )
+    assert response.status_code == 404
+    assert "Google Maps API key" in response.json()["detail"]
+
+
+async def test_a_picked_suggestion_wins_over_the_text_beside_it(client, db_sessionmaker):
+    """The field keeps the typed name after a pick; the pick is what was meant."""
+    await register(client)
+    image_id = await _a_photo(client, db_sessionmaker)
+    place_id = await _a_place(db_sessionmaker, name="Menya Itto")
+
+    response = await client.patch(
+        f"/api/images/{image_id}", json={"place_id": place_id, "place_query": "men"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["place"]["id"] == place_id
+
+
 async def test_editing_someone_elses_photo_is_a_404(client, db_sessionmaker):
     await register(client, email="alice@example.com")
     image_id = await _a_photo(client, db_sessionmaker)

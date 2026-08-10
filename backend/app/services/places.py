@@ -394,15 +394,44 @@ async def place_details(db: AsyncSession, google_place_id: str) -> Place | None:
     return place
 
 
-async def search_place_by_text(db: AsyncSession, query: str) -> Place | None:
-    """Used when the user corrects a visit's place manually."""
+async def search_place_by_text(
+    db: AsyncSession, query: str, near: tuple[float, float] | None = None
+) -> Place | None:
+    """Resolve a name the user typed, for a stop or for a single photo.
+
+    Somewhere already on the itinerary answers first and for free: the name
+    someone types is usually a place they have been, and matching it locally
+    also means a self-hosted install with no Google key can still name things
+    after the first time it learns them.
+
+    `near` biases what Google is asked, which matters for the photo case — a
+    typed "Starbucks" means the one in the picture, not the nearest match to
+    nothing in particular.
+    """
+    needle = query.strip()
+    if not needle:
+        return None
+    local = await db.scalar(
+        sa.select(Place).where(sa.func.lower(Place.name) == needle.lower()).limit(1)
+    )
+    if local is not None:
+        return local
+
     if not settings.google_maps_api_key:
         return None
+    body: dict = {"textQuery": needle, "maxResultCount": 1}
+    if near is not None:
+        body["locationBias"] = {
+            "circle": {
+                "center": {"latitude": near[0], "longitude": near[1]},
+                "radius": SUGGEST_BIAS_RADIUS_M,
+            }
+        }
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             response = await client.post(
                 TEXT_URL,
-                json={"textQuery": query, "maxResultCount": 1},
+                json=body,
                 headers={
                     "X-Goog-Api-Key": settings.google_maps_api_key,
                     "X-Goog-FieldMask": FIELD_MASK,
