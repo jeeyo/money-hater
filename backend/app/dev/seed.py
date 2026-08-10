@@ -139,13 +139,21 @@ def receipt_photo(merchant: str, items: list[tuple[str, str]], total: str, curre
 
 
 # Built in the machine's local timezone so the demo reads as sensible wall-clock
-# times (breakfast in the morning), then stored as UTC like everything else.
+# times — breakfast in the morning — which is also how they are stored: every
+# recorded moment is the local clock (`app.services.localtime`), tagged UTC
+# without being moved by it. Converting here would file the evening's spend on
+# tomorrow east of Greenwich, which is the bug this frame exists to prevent.
 LOCAL_MIDNIGHT = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def now_local() -> datetime:
+    """Now on the machine's own wall clock — the frame the seeded rows are in."""
+    return datetime.now().replace(tzinfo=UTC)
 
 
 def at(days_ago: int, hour: int, minute: int) -> datetime:
     local = LOCAL_MIDNIGHT - timedelta(days=days_ago) + timedelta(hours=hour, minutes=minute)
-    return local.astimezone(UTC)
+    return local.replace(tzinfo=UTC)
 
 
 PLACES = {
@@ -522,12 +530,13 @@ async def seed_recommendations(db, user: User, trip: Trip, now: datetime | None 
         places[gid] = place
     await db.flush()
 
-    window = window_of(trip, 0)
+    moment = now or now_local()
+    window = window_of(trip, now=moment)
     # A suggestion is anchored on the last stop you have actually reached, so
     # spinning the container up before the demo day's first stop (08:35 local)
     # leaves nothing to anchor on and the panel offers to generate instead.
     # `now` is injectable so tests do not depend on the hour they run at.
-    anchor = await latest_visit_in(db, user, window, now=now)
+    anchor = await latest_visit_in(db, user, window, now=moment)
     if anchor is None:
         return
 

@@ -287,20 +287,21 @@ async def test_a_photo_stays_on_the_day_it_was_taken(client, db_sessionmaker):
     is only for photos in no stop at all. It was on screen nowhere.
     """
     await register(client)
-    tz = 7 * 60  # the viewer's offset; stored times are UTC, local is +7h
+    tz = 7 * 60  # the viewer's offset, which must not move anything by itself
 
-    # 23:50 and 00:10 local — twenty minutes apart, either side of midnight
+    # 23:50 and 00:10 on the camera's own clock — twenty minutes apart, either
+    # side of midnight, so the stop they share is on the day after the first.
     nightcap = await _analyzed(
         client,
         db_sessionmaker,
         "nightcap.jpg",
-        make_jpeg(taken_at=datetime(2026, 8, 7, 16, 50, tzinfo=UTC), color=(2, 2, 2)),
+        make_jpeg(taken_at=datetime(2026, 8, 7, 23, 50, tzinfo=UTC), color=(2, 2, 2)),
     )
     await _analyzed(
         client,
         db_sessionmaker,
         "bar.jpg",
-        make_jpeg(*BKK, taken_at=datetime(2026, 8, 7, 17, 10, tzinfo=UTC)),
+        make_jpeg(*BKK, taken_at=datetime(2026, 8, 8, 0, 10, tzinfo=UTC)),
     )
 
     async with db_sessionmaker() as db:

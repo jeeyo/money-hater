@@ -11,6 +11,7 @@ from app.deps import CurrentUser, DbSession
 from app.models import Expense, Image, Trip, User, Visit
 from app.schemas import TimelineDayOut, TimelineRangeOut
 from app.serialize import timeline_day_out, timeline_range_out
+from app.services.localtime import MAX_OFFSET_MINUTES
 from app.services.trips import covers, trip_overlapping, window_of
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
@@ -25,11 +26,16 @@ def parse_day(date_str: str) -> date:
         ) from exc
 
 
-def day_window_utc(date_str: str, tz_offset_minutes: int) -> tuple[datetime, datetime]:
-    """UTC window for a local calendar day. tz_offset_minutes is minutes east of UTC."""
-    start = datetime.combine(parse_day(date_str), datetime.min.time(), tzinfo=UTC) - timedelta(
-        minutes=tz_offset_minutes
-    )
+def day_window(date_str: str) -> tuple[datetime, datetime]:
+    """The half-open window a local calendar day covers: midnight to midnight.
+
+    Stored moments are already local wall clocks (`app.services.localtime`), so
+    the day someone asks for is the day it says on the clock — no offset comes
+    into it. Shifting the window by the viewer's offset moved every row by that
+    offset instead, which is what filed a 20:36 dinner in Bangkok under the
+    following morning.
+    """
+    start = datetime.combine(parse_day(date_str), datetime.min.time(), tzinfo=UTC)
     return start, start + timedelta(days=1)
 
 
@@ -77,10 +83,15 @@ async def get_timeline(
     user: CurrentUser,
     db: DbSession,
     date: str = Query(description="Local calendar day, YYYY-MM-DD"),
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0,
+        ge=-MAX_OFFSET_MINUTES,
+        le=MAX_OFFSET_MINUTES,
+        description="Your UTC offset — only for deciding where 'now' falls",
+    ),
 ):
     """One day: the stops you made, plus what you spent."""
-    start, end = day_window_utc(date, tz_offset_minutes)
+    start, end = day_window(date)
 
     visits = (
         (
@@ -173,7 +184,7 @@ async def trips_by_day(
 
     found: dict[str, Trip] = {}
     for day in days:
-        start, end = day_window_utc(day.isoformat(), tz_offset_minutes)
+        start, end = day_window(day.isoformat())
         for trip, window in windows:
             if covers(window, start, end):
                 found[day.isoformat()] = trip
@@ -187,12 +198,17 @@ async def get_timeline_range(
     db: DbSession,
     date: str = Query(description="Any local day inside the wanted span, YYYY-MM-DD"),
     span: Literal["week", "month"] = Query(default="week"),
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0,
+        ge=-MAX_OFFSET_MINUTES,
+        le=MAX_OFFSET_MINUTES,
+        description="Your UTC offset — only for deciding where 'now' falls",
+    ),
 ):
     """A week or a month at a glance: one summary per day, empty days included."""
     days = span_days(date, span)
-    start, _ = day_window_utc(days[0].isoformat(), tz_offset_minutes)
-    _, end = day_window_utc(days[-1].isoformat(), tz_offset_minutes)
+    start, _ = day_window(days[0].isoformat())
+    _, end = day_window(days[-1].isoformat())
 
     visits = (
         (
@@ -252,5 +268,4 @@ async def get_timeline_range(
         list(images),
         list(expenses),
         user.preferred_currency,
-        tz_offset_minutes,
     )

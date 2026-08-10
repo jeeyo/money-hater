@@ -27,8 +27,14 @@ def make_jpeg(
     size=(64, 64),
     gps_dms: tuple[list, list] | None = None,
     gps_extra: dict | None = None,
+    offset: str | None = None,
 ) -> bytes:
     """A JPEG with the EXIF a phone would have written.
+
+    `taken_at` is written as the wall clock it reads, which is all
+    `DateTimeOriginal` can hold. `offset` adds the `OffsetTimeOriginal` tag a
+    modern phone writes beside it ("+07:00") — a photo that states its zone,
+    for the tests that check we record that without acting on it.
 
     `gps_dms` writes the degree/minute/second rationals verbatim, for the
     malformed GPS tags that `lat`/`lng` could never produce. `gps_extra` adds
@@ -39,6 +45,8 @@ def make_jpeg(
     if taken_at is not None:
         stamp = taken_at.strftime("%Y:%m:%d %H:%M:%S")
         exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = stamp
+    if offset is not None:
+        exif_dict["Exif"][piexif.ExifIFD.OffsetTimeOriginal] = offset
     if gps_dms is not None:
         lat_dms, lng_dms = gps_dms
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = "N"

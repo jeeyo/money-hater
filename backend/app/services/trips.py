@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import Expense, Image, Trip, User, Visit
+from app.services.localtime import local_now
 
 
 class TripWindowError(ValueError):
@@ -38,15 +39,17 @@ def moment_of(expense: Expense) -> datetime:
     return _aware(expense.spent_at or expense.created_at)
 
 
-def snap_to_days(start: datetime, end: datetime, tz_offset_minutes: int) -> TripWindow:
+def snap_to_days(start: datetime, end: datetime) -> TripWindow:
     """Widen a pair of moments to cover their whole local days.
 
     A trip groups *days*: the two expenses only say which days. Without this a
     photo taken minutes before its own receipt would fall outside the trip.
+
+    Both moments are already local wall clocks
+    (`app.services.localtime`), so the days are read straight off them.
     """
-    shift = timedelta(minutes=tz_offset_minutes)
-    first = datetime.combine((start + shift).date(), time.min, tzinfo=UTC) - shift
-    last = datetime.combine((end + shift).date(), time.max, tzinfo=UTC) - shift
+    first = datetime.combine(start.date(), time.min, tzinfo=UTC)
+    last = datetime.combine(end.date(), time.max, tzinfo=UTC)
     return TripWindow(started_at=first, ended_at=last)
 
 
@@ -60,11 +63,18 @@ def window_of(trip: Trip, tz_offset_minutes: int = 0, now: datetime | None = Non
 
     An open trip has no ending expense, so it runs to ``now`` — today's local
     day — and grows by itself. ``now`` is injectable so tests can pin it.
+
+    ``tz_offset_minutes`` is needed for that ``now`` alone: the server's clock
+    is a real instant and the expenses either side of it are local wall clocks,
+    so it is read on the user's wall before the two are compared. A closed trip
+    never touches it.
     """
     ends_at = (
-        moment_of(trip.end_expense) if trip.end_expense is not None else (now or datetime.now(UTC))
+        moment_of(trip.end_expense)
+        if trip.end_expense is not None
+        else local_now(tz_offset_minutes, now)
     )
-    return snap_to_days(moment_of(trip.start_expense), ends_at, tz_offset_minutes)
+    return snap_to_days(moment_of(trip.start_expense), ends_at)
 
 
 async def resolve_bounds(
@@ -72,6 +82,7 @@ async def resolve_bounds(
     user: User,
     start_expense_id: int,
     end_expense_id: int | None,
+    tz_offset_minutes: int = 0,
     now: datetime | None = None,
 ) -> tuple[Expense, Expense | None]:
     """Load the bounding expenses. A missing end means an open trip."""
@@ -92,7 +103,9 @@ async def resolve_bounds(
     start_at = moment_of(start)
     if end is None:
         # An open trip ends now, so a start in the future cannot bound anything.
-        if start_at > (now or datetime.now(UTC)):
+        # "Future" is measured on the user's wall clock — east of the server,
+        # everything spent this evening reads as tomorrow otherwise.
+        if start_at > local_now(tz_offset_minutes, now):
             raise TripWindowError("An ongoing trip cannot start in the future")
         return start, None
     if moment_of(end) < start_at:
@@ -119,15 +132,20 @@ async def latest_expense_in(db: AsyncSession, user: User, window: TripWindow) ->
 
 
 async def latest_visit_in(
-    db: AsyncSession, user: User, window: TripWindow, now: datetime | None = None
+    db: AsyncSession,
+    user: User,
+    window: TripWindow,
+    tz_offset_minutes: int = 0,
+    now: datetime | None = None,
 ) -> Visit | None:
     """The last stop with coordinates — where "what's near me?" starts from.
 
     Clamped to now as well as to the window: you cannot be standing somewhere
     you have not been to yet, and a photo stamped later today would otherwise
-    make the trip look like it had already moved on.
+    make the trip look like it had already moved on. The stops are wall clocks,
+    so the clamp is the user's wall clock too.
     """
-    moment = now or datetime.now(UTC)
+    moment = local_now(tz_offset_minutes, now)
     return await db.scalar(
         sa.select(Visit)
         .where(
@@ -187,11 +205,10 @@ def covers(window: TripWindow, start: datetime, end: datetime) -> bool:
     return start <= window.ended_at and end > window.started_at
 
 
-def day_range(window: TripWindow, tz_offset_minutes: int) -> list[date]:
-    """Local calendar days the window touches."""
-    shift = timedelta(minutes=tz_offset_minutes)
-    first = (window.started_at + shift).date()
-    last = (window.ended_at + shift).date()
+def day_range(window: TripWindow) -> list[date]:
+    """Local calendar days the window touches — it is snapped to them already."""
+    first = window.started_at.date()
+    last = window.ended_at.date()
     return [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
 
 

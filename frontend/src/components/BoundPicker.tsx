@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react';
-import { formatMoney, localDateString } from '../lib/format';
+import { formatMoney, formatTime, wallClockDay } from '../lib/format';
 import type { Expense } from '../types';
 import { inputClass } from './Sheet';
 
@@ -8,16 +8,11 @@ export function expenseLabel(expense: Expense): string {
 }
 
 export function expenseTime(expense: Expense): string {
-  return expense.spent_at
-    ? new Date(expense.spent_at).toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '';
+  return expense.spent_at ? formatTime(expense.spent_at) : '';
 }
 
 export function expenseDay(expense: Expense): string {
-  return expense.spent_at ? localDateString(new Date(expense.spent_at)) : '';
+  return expense.spent_at ? wallClockDay(expense.spent_at) : '';
 }
 
 /** Narrow to a day, then pick the expense on it. */

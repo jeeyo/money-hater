@@ -242,7 +242,13 @@ async function uploadOne(file: File): Promise<UploadOutcome> {
   form.append('files', file);
   let code: UploadOutcome['code'];
   try {
-    const response = await fetch('/api/images', { method: 'POST', body: form });
+    // A photo whose camera wrote no timestamp is filed under when it arrived,
+    // and that has to be your clock rather than the server's — otherwise a
+    // screenshot uploaded over dinner lands hours from the photos beside it.
+    const response = await fetch(
+      `/api/images?tz_offset_minutes=${tzOffsetMinutes()}`,
+      { method: 'POST', body: form },
+    );
     if (!response.ok) {
       code = codeFor(response.status);
       const body = await response.json().catch(() => null);

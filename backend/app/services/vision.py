@@ -78,13 +78,20 @@ items exactly as printed; use the receipt's own numbers, do not invent values.""
 
 
 def parse_receipt_datetime(value: str | None) -> datetime | None:
+    """The time printed on the receipt, as printed.
+
+    A till prints local time — "10 August 2026 20:35" is 20:35 in the shop —
+    which is the frame everything else is kept in, so the clock is taken and
+    the zone, if the model volunteered one, is dropped. Honouring it would move
+    the receipt away from the photo of the same meal by the whole offset.
+    """
     if not value:
         return None
     try:
         parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return parsed.replace(tzinfo=UTC)
 
 
 async def analyze_image_content(image_path: Path, mime: str) -> VisionResult | None:

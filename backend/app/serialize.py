@@ -163,16 +163,20 @@ def visit_out(visit: Visit, base_currency: str) -> VisitOut:
     )
 
 
-def day_key(moment: datetime, tz_offset_minutes: int) -> str:
-    return (moment + timedelta(minutes=tz_offset_minutes)).date().isoformat()
+def day_key(moment: datetime) -> str:
+    """The day a stored moment falls on — read straight off its own clock.
+
+    Stored moments are local wall clocks (`app.services.localtime`), so the
+    date is already the local date. Adding the viewer's offset moved a whole
+    evening onto tomorrow.
+    """
+    return moment.date().isoformat()
 
 
-def group_by_day(
-    visits: list[Visit], base_currency: str, tz_offset_minutes: int
-) -> list[TripDayOut]:
+def group_by_day(visits: list[Visit], base_currency: str) -> list[TripDayOut]:
     days: dict[str, list[Visit]] = defaultdict(list)
     for visit in visits:
-        days[day_key(visit.started_at, tz_offset_minutes)].append(visit)
+        days[day_key(visit.started_at)].append(visit)
     return [
         TripDayOut(
             date=date,
@@ -197,10 +201,9 @@ def _trip_fields(
     visits: list[Visit],
     expenses: list[Expense],
     base_currency: str,
-    tz_offset_minutes: int,
 ) -> dict:
-    first = day_key(window.started_at, tz_offset_minutes)
-    last = day_key(window.ended_at, tz_offset_minutes)
+    first = day_key(window.started_at)
+    last = day_key(window.ended_at)
     return {
         "id": trip.id,
         "title": trip.title,
@@ -216,20 +219,14 @@ def _trip_fields(
     }
 
 
-def trip_out(
-    trip: Trip, window, visits, expenses, base_currency: str, tz_offset_minutes: int = 0
-) -> TripOut:
-    return TripOut(
-        **_trip_fields(trip, window, visits, expenses, base_currency, tz_offset_minutes)
-    )
+def trip_out(trip: Trip, window, visits, expenses, base_currency: str) -> TripOut:
+    return TripOut(**_trip_fields(trip, window, visits, expenses, base_currency))
 
 
-def trip_detail_out(
-    trip: Trip, window, visits, expenses, base_currency: str, tz_offset_minutes: int = 0
-) -> TripDetailOut:
+def trip_detail_out(trip: Trip, window, visits, expenses, base_currency: str) -> TripDetailOut:
     return TripDetailOut(
-        **_trip_fields(trip, window, visits, expenses, base_currency, tz_offset_minutes),
-        days=group_by_day(visits, base_currency, tz_offset_minutes),
+        **_trip_fields(trip, window, visits, expenses, base_currency),
+        days=group_by_day(visits, base_currency),
         expenses=[expense_out(expense) for expense in expenses],
     )
 
@@ -265,10 +262,10 @@ def expense_moment(expense: Expense) -> datetime:
     return expense.spent_at or expense.created_at
 
 
-def _days_touched(visit: Visit, tz_offset_minutes: int) -> list[str]:
+def _days_touched(visit: Visit) -> list[str]:
     """Every local day the visit is part of — a stop over midnight is on both."""
-    first = date.fromisoformat(day_key(visit.started_at, tz_offset_minutes))
-    last = date.fromisoformat(day_key(visit.ended_at, tz_offset_minutes))
+    first = date.fromisoformat(day_key(visit.started_at))
+    last = date.fromisoformat(day_key(visit.ended_at))
     return [
         (first + timedelta(days=offset)).isoformat() for offset in range((last - first).days + 1)
     ]
@@ -282,7 +279,6 @@ def timeline_range_out(
     images: list[Image],
     expenses: list[Expense],
     base_currency: str,
-    tz_offset_minutes: int,
 ) -> TimelineRangeOut:
     """A week or a month, one summary per day — empty days included.
 
@@ -292,16 +288,16 @@ def timeline_range_out(
     """
     day_visits: dict[str, list[Visit]] = defaultdict(list)
     for visit in visits:  # already ordered by start, so each day stays ordered
-        for key in _days_touched(visit, tz_offset_minutes):
+        for key in _days_touched(visit):
             day_visits[key].append(visit)
 
     day_images: dict[str, list[Image]] = defaultdict(list)
     for image in images:
-        day_images[day_key(image_moment(image), tz_offset_minutes)].append(image)
+        day_images[day_key(image_moment(image))].append(image)
 
     day_expenses: dict[str, list[Expense]] = defaultdict(list)
     for expense in expenses:
-        day_expenses[day_key(expense_moment(expense), tz_offset_minutes)].append(expense)
+        day_expenses[day_key(expense_moment(expense))].append(expense)
 
     summaries = []
     for day in days:

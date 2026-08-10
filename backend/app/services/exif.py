@@ -1,8 +1,11 @@
 """EXIF extraction: timestamp, GPS coordinates, camera info.
 
-EXIF timestamps carry no timezone; we store them as UTC as-is (the common
-self-hosting tradeoff) and record where the timestamp came from so the UI can
-flag low-confidence times.
+`DateTimeOriginal` is a wall clock with no zone attached, and it is kept that
+way: the timestamp is stored as it was written, tagged UTC because the column
+needs a tag. That is the frame the whole app works in — see
+`app.services.localtime` for what it means and why it is not a fudge. Nothing
+here converts anything; the offset tags a photo may carry are recorded in
+`raw`, where they are evidence rather than an instruction.
 """
 
 import io
@@ -139,6 +142,7 @@ def _gps_raw(gps_ifd) -> dict:
 
 
 def _parse_exif_datetime(value: str | None) -> datetime | None:
+    """The wall clock the tag holds, tagged UTC without being moved by it."""
     if not value:
         return None
     for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
