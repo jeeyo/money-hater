@@ -26,11 +26,14 @@ def make_jpeg(
     color=(200, 60, 60),
     size=(64, 64),
     gps_dms: tuple[list, list] | None = None,
+    gps_extra: dict | None = None,
 ) -> bytes:
     """A JPEG with the EXIF a phone would have written.
 
     `gps_dms` writes the degree/minute/second rationals verbatim, for the
-    malformed GPS tags that `lat`/`lng` could never produce.
+    malformed GPS tags that `lat`/`lng` could never produce. `gps_extra` adds
+    tags beside the coordinates — the padding and empty fields a real camera
+    puts there, which are where the awkward values live.
     """
     exif_dict: dict = {"0th": {}, "Exif": {}, "GPS": {}}
     if taken_at is not None:
@@ -47,6 +50,8 @@ def make_jpeg(
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitude] = _dms(lat)
         exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] = "E" if lng >= 0 else "W"
         exif_dict["GPS"][piexif.GPSIFD.GPSLongitude] = _dms(lng)
+    if gps_extra:
+        exif_dict["GPS"].update(gps_extra)
     exif_bytes = piexif.dump(exif_dict)
     buffer = io.BytesIO()
     PILImage.new("RGB", size, color).save(buffer, "JPEG", exif=exif_bytes)

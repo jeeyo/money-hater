@@ -59,6 +59,23 @@ def _valid_coords(lat: float | None, lng: float | None) -> tuple[float | None, f
     return lat, lng
 
 
+def _text(value: str) -> str | None:
+    """EXIF text a JSON column can actually hold, or None if nothing is left.
+
+    NUL is the sharp edge. Postgres rejects \\u0000 anywhere in a JSONB
+    document, and EXIF is full of it: fixed-width ASCII fields are padded with
+    it, and a tag the phone never filled in is *nothing but* it. `str.strip()`
+    does not touch it — it strips whitespace — so a GPSDateStamp of ten NULs
+    read as a perfectly ordinary non-empty string right up until the insert,
+    which then failed for the whole photo rather than for the one tag.
+
+    Lone surrogates come back from Pillow the same way and are equally
+    unstorable, so the text is round-tripped through UTF-8 to flush them out.
+    """
+    cleaned = value.replace("\x00", "").strip()
+    return cleaned.encode("utf-8", "replace").decode("utf-8") or None
+
+
 def _json_safe(value):
     """An EXIF value a JSON column can hold, or None to skip the tag.
 
@@ -67,7 +84,9 @@ def _json_safe(value):
     """
     if isinstance(value, float):
         return value if math.isfinite(value) else None
-    return value if isinstance(value, (int, str)) else None
+    if isinstance(value, str):
+        return _text(value)
+    return value if isinstance(value, int) else None
 
 
 def _gps_value(value):
@@ -84,15 +103,17 @@ def _gps_value(value):
     was no fix".
     """
     if isinstance(value, bytes):
+        # All-NUL is padding for a tag the phone left empty, not twelve zeroes
+        # worth recording.
+        if not any(value):
+            return None
         # Most GPS tags are ASCII ("N", "2026:08:03"), but a few are binary —
         # GPSVersionID is four raw bytes. Reading those as characters produces
         # control-code noise, so anything unprintable stays numeric.
-        text = value.decode("ascii", "replace").replace("\x00", "").strip()
-        if text and text.isprintable():
-            return text
-        return list(value) or None
+        text = _text(value.decode("ascii", "replace"))
+        return text if text and text.isprintable() else list(value)
     if isinstance(value, str):
-        return value.strip() or None
+        return _text(value)
     if isinstance(value, (tuple, list)):
         return [_gps_value(item) for item in value]
     if isinstance(value, int):  # GPSAltitudeRef and friends are small ints
