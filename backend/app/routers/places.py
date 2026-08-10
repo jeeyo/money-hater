@@ -17,9 +17,14 @@ async def suggest(
     at: datetime | None = Query(
         default=None, description="When the money was spent; biases results to where you were"
     ),
+    lat: float | None = Query(default=None, ge=-90, le=90),
+    lng: float | None = Query(default=None, ge=-180, le=180),
     limit: int = Query(default=8, ge=1, le=20),
 ):
-    results = await suggest_places(db, user, q, at=at, limit=limit)
+    # A caller that knows where it was says so; `at` is for the ones that only
+    # know when (an expense typed in after the fact).
+    near = (lat, lng) if lat is not None and lng is not None else None
+    results = await suggest_places(db, user, q, at=at, near=near, limit=limit)
     await db.commit()  # persist any places newly cached from Google
     return [
         PlaceSuggestion(

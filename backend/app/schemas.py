@@ -356,9 +356,13 @@ class ImageAssignRequest(BaseModel):
 class ImageUpdate(BaseModel):
     """Corrections to what was read off a photo. Omitted fields are left alone.
 
-    `place_id` is an id, not free text: the picker already turns a search into
-    a cached Place row (see /places/suggest), and an image's place is a link to
-    one rather than a name of its own.
+    Two ways to say where a photo was, because the picker has two. `place_id`
+    is a suggestion the user chose, already a cached Place row (see
+    /places/suggest). `place_query` is a name they typed that matched no
+    suggestion — searched for, exactly as a stop's `place_query` is, so that
+    somewhere the log has never seen can still be named. Sending both uses the
+    id.
     """
 
     place_id: int | None = None
+    place_query: str | None = None

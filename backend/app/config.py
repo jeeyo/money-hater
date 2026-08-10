@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4.1-mini"
     # Optional. Left blank, the SDK reads OPENAI_API_KEY from the environment.
     llm_api_key: str = ""
+    # How long one photo's model call may take before the pipeline gives up on
+    # it and logs the photo without a caption. The SDK's own default is ten
+    # minutes and it retries on top of that, which is long enough that a photo
+    # looks stuck rather than slow.
+    vision_timeout_seconds: int = 120
 
     google_maps_api_key: str = ""
 

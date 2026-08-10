@@ -1,10 +1,10 @@
-import { AlertTriangle, Camera, Check, ImagePlus, Loader2, MapPin } from 'lucide-react';
+import { AlertTriangle, Camera, Check, ImagePlus, Loader2, MapPin, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageThumb } from '../components/ImageThumb';
 import { LocationHelpSheet } from '../components/LocationHelpSheet';
-import { useImage, useUploadImages } from '../hooks/useData';
+import { useImage, useReanalyzeImage, useUploadImages } from '../hooks/useData';
 import type { UploadOutcome } from '../hooks/useData';
 import { looksLikeImage } from '../lib/files';
 import { takeSharedFiles } from '../lib/sharedFiles';
@@ -17,10 +17,42 @@ function reasonFor(outcome: UploadOutcome): string {
   return error.startsWith(outcome.name) ? error.slice(outcome.name.length).trimStart() : error;
 }
 
+/** How long a photo may sit at "Analyzing…" before we stop implying it is fine.
+ *
+ *  Analysis normally takes seconds. Past this it is not slow, it is waiting on
+ *  something that may never come back — a worker that went away mid-job leaves
+ *  the row exactly like this, and nothing else on this page can rescue it. */
+const STALL_AFTER_MS = 45_000;
+
 function UploadedImage({ initial }: { initial: ImageRecord }) {
   // Poll each uploaded image until analysis completes
   const { data } = useImage(initial.id);
+  const reanalyze = useReanalyzeImage();
+  const [stalled, setStalled] = useState(false);
   const image = data ?? initial;
+  const settled = image.status === 'analyzed' || image.status === 'failed';
+
+  useEffect(() => {
+    if (settled) {
+      setStalled(false);
+      return;
+    }
+    const timer = setTimeout(() => setStalled(true), STALL_AFTER_MS);
+    return () => clearTimeout(timer);
+    // Restart the clock whenever it goes back to analyzing, retries included
+  }, [settled, image.status, reanalyze.submittedAt]);
+
+  const retry = (
+    <button
+      type="button"
+      onClick={() => reanalyze.mutate(image.id)}
+      disabled={reanalyze.isPending}
+      className="mt-1 flex items-center gap-1 text-xs font-medium text-brand-600 disabled:text-ink-4"
+    >
+      <RefreshCw className="size-3.5" /> Try again
+    </button>
+  );
+
   return (
     <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2">
       <ImageThumb image={image} size="size-16" />
@@ -37,11 +69,24 @@ function UploadedImage({ initial }: { initial: ImageRecord }) {
             </p>
           </>
         ) : image.status === 'failed' ? (
-          <p className="text-xs text-danger">{image.error ?? 'Analysis failed'}</p>
+          <>
+            <p className="text-xs text-danger">{image.error ?? 'Analysis failed'}</p>
+            {retry}
+          </>
         ) : (
-          <p className="flex items-center gap-2 text-xs text-ink-3">
-            <Loader2 className="size-3.5 animate-spin" /> Analyzing…
-          </p>
+          <>
+            <p className="flex items-center gap-2 text-xs text-ink-3">
+              <Loader2 className="size-3.5 animate-spin" /> Analyzing…
+            </p>
+            {stalled && (
+              <>
+                <p className="text-xs text-ink-4">
+                  Taking longer than it should. The photo is logged either way.
+                </p>
+                {retry}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
