@@ -1,5 +1,21 @@
 /** Cookie-based API client: on 401 it tries one refresh, then retries once. */
 
+/**
+ * Endpoints whose 401 is the answer, not a stale access token.
+ *
+ * Everything else — `/api/auth/me` very much included — is worth one refresh
+ * first. The access cookie lasts an hour and the refresh cookie thirty days,
+ * so a session that skips the refresh on `me` is a session that ends an hour
+ * after you sign in: open the app the next morning, `me` 401s, and the app
+ * shows the login form while a perfectly good refresh token sits in the jar.
+ */
+const NO_REFRESH_ON_401 = new Set([
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+]);
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -22,7 +38,7 @@ async function tryRefresh(): Promise<boolean> {
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   let response = await fetch(path, init);
-  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+  if (response.status === 401 && !NO_REFRESH_ON_401.has(path.split('?')[0])) {
     if (await tryRefresh()) {
       response = await fetch(path, init);
     }

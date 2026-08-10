@@ -283,6 +283,58 @@ you opened and never for the whole row. A set is cached for 90 minutes and expir
 arrive somewhere new, and **Refresh** forces another run. It needs `OPENAI_API_KEY` and
 `GOOGLE_MAPS_API_KEY`; without them the panel says so instead of guessing.
 
+## Staying signed in
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/login.webp" alt="The sign-in form" />
+      <sub><b>Sign in</b> — once. The session is renewed behind you from then on.</sub>
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/screenshots/login-dark.webp" alt="The sign-in form in dark mode" />
+      <sub><b>Dark</b> — the same form, following your system like the rest of the app.</sub>
+    </td>
+    <td width="33%"></td>
+  </tr>
+</table>
+
+Signing in sets two cookies, both `HttpOnly`: a short-lived access token (an
+hour) and a refresh token that lasts a month. Every refresh rotates the token
+and pushes the expiry out again, so an app you open more often than once a
+month never asks for your password — which for something you reach for at every
+meal on a trip is the whole point. The client renews in the background on the
+first request that comes back `401`, including the "who am I" call it makes on
+launch, so a session outliving its access token is invisible rather than a trip
+back to the login form.
+
+Two tabs (or a tab and the service worker) can reach for the refresh at the same
+instant, and only one of them can win a rotation. The token the loser holds is
+honoured for `REFRESH_ROTATION_GRACE_SECONDS` after it is replaced — long enough
+for a race, short enough to be no use to anyone else. **Sign out** ends the
+session immediately, grace or no grace.
+
+### Cloudflare Turnstile (optional)
+
+Set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` and the sign-in and sign-up
+forms get a Turnstile challenge, verified server-side before the password is
+looked at. Leave them blank — the default — and the forms behave exactly as they
+did; a box on your own LAN has no Cloudflare account and shouldn't need one. Set
+only one and the app refuses to start rather than locking you out of your own
+login form.
+
+The widget sits between the password field and the button — the screenshots
+above are the form with Turnstile off, which is how it ships. Its space is
+reserved while Cloudflare's script loads, so the button does not jump, and it
+stays disabled until the challenge has actually passed. A rejected sign-in
+issues a fresh challenge, since a token is only good once.
+
+The site key reaches the browser at runtime from `/api/auth/config`, so one
+image serves both cases, and the widget's script is fetched only when a form
+actually needs it. Verification fails closed: if Cloudflare cannot be reached
+the sign-in is refused and asks you to try again, because a check that any
+outage switches off is not a check.
+
 ## Money and currencies
 
 - Amounts are stored as integers in each currency's minor unit (satang, yen) next to its ISO 4217

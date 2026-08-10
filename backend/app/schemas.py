@@ -8,11 +8,26 @@ from pydantic import BaseModel, EmailStr, Field
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    # Cloudflare Turnstile's response token. Ignored — and absent — when
+    # Turnstile is not configured, which is the default.
+    turnstile_token: str | None = None
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    turnstile_token: str | None = None
+
+
+class AuthConfigOut(BaseModel):
+    """What the sign-in form needs to know before anyone has signed in.
+
+    The site key is public by design, and it reaches the browser at runtime
+    rather than being baked in at build time: the container image is built once
+    and configured by whoever runs it.
+    """
+
+    turnstile_site_key: str | None
 
 
 class UserOut(BaseModel):
