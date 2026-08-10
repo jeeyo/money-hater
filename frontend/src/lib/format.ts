@@ -1,4 +1,4 @@
-import type { Spend } from '../types';
+import type { Spend, TimelineSpan } from '../types';
 
 const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'RWF', 'XAF', 'XOF', 'XPF']);
 
@@ -8,6 +8,24 @@ export function formatMoney(totalMinor: number, currency: string): string {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
   } catch {
     return `${amount.toFixed(2)} ${currency}`;
+  }
+}
+
+/** Shortened to fit a calendar cell: "฿1.2K" rather than "THB 1,240.00". The
+ *  narrow symbol matters as much as the compact number — a month cell on a
+ *  phone is about six characters wide, and "THB " alone eats four of them. */
+export function formatMoneyCompact(totalMinor: number, currency: string): string {
+  const amount = ZERO_DECIMAL.has(currency) ? totalMinor : totalMinor / 100;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+      notation: 'compact',
+      maximumFractionDigits: amount >= 1000 ? 1 : 0,
+    }).format(amount);
+  } catch {
+    return `${Math.round(amount)} ${currency}`;
   }
 }
 
@@ -97,4 +115,53 @@ export function shiftDate(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d + days);
   return localDateString(date);
+}
+
+/** A YYYY-MM-DD as local midnight. `new Date(str)` would read it as UTC and,
+ *  west of Greenwich, hand back the day before. */
+export function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Move by whole months, clamping the day: 31 Jan back a month is 28 Feb. */
+export function shiftMonth(dateStr: string, months: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const target = new Date(y, m - 1 + months, 1);
+  const lastOfMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d, lastOfMonth));
+  return localDateString(target);
+}
+
+/** The Monday of the week a day falls in — the week the server groups by. */
+export function startOfWeek(dateStr: string): string {
+  const weekday = parseLocalDate(dateStr).getDay(); // 0 = Sunday
+  return shiftDate(dateStr, -((weekday + 6) % 7));
+}
+
+/** The first day of the span a date falls in — the span's stable cache key, so
+ *  every day of the same week asks the server for the same week. */
+export function spanAnchor(span: TimelineSpan, dateStr: string): string {
+  return span === 'week' ? startOfWeek(dateStr) : `${dateStr.slice(0, 7)}-01`;
+}
+
+/** Step a span by one: a day, a week, or a calendar month. */
+export function shiftSpan(dateStr: string, span: TimelineSpan | 'day', steps: number): string {
+  if (span === 'month') return shiftMonth(dateStr, steps);
+  return shiftDate(dateStr, steps * (span === 'week' ? 7 : 1));
+}
+
+/** "August 2026", or "Aug 3 – Aug 9, 2026" for a week no month name covers.
+ *  Both ends name their month even when it is the same one: dropping it reads
+ *  as "3 – Aug 9" in a month-first locale, which is worse than the repetition. */
+export function formatSpanLabel(span: TimelineSpan, start: string, end: string): string {
+  const from = parseLocalDate(start);
+  const to = parseLocalDate(end);
+  if (span === 'month') {
+    return from.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }
+  return [
+    from.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+    to.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
+  ].join(' – ');
 }

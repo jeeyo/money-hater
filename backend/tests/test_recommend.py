@@ -71,7 +71,12 @@ async def _photo_stop(client, db_sessionmaker, lat: float, lng: float, hours_ago
 
 
 async def _open_trip(client, title: str = "Out and about") -> dict:
-    start = await _expense(client, "100", _at(0, hour=0), "First thing")
+    # Started yesterday, not today. A trip's window opens at the *day* of its
+    # first expense, while the stops below sit a few hours in the past — so run
+    # this suite between midnight and 04:00 and a "four hours ago" stop lands on
+    # yesterday, outside a trip that began at today's midnight, leaving the
+    # recommender with nothing to anchor on. Yesterday always covers them.
+    start = await _expense(client, "100", _at(1, hour=0), "First thing")
     response = await client.post(
         "/api/trips", json={"title": title, "start_expense_id": start["id"]}
     )
