@@ -102,6 +102,32 @@ async def test_a_batch_mixing_located_and_unlocated_photos_is_kept_whole(client)
     assert sorted(image["lat"] is None for image in created) == [False, True]
 
 
+async def test_a_batch_comes_back_in_the_order_it_was_sent(client):
+    """The response is how a caller learns the ids of what it just uploaded.
+
+    Postgres answers an unordered `id IN (...)` in whatever order suits it, so
+    pairing the rows with the files they came from shuffled them — the second
+    photo's place ending up on the third.
+
+    This pins the contract rather than catching the bug: the suite runs on
+    sqlite, which returns rowid order whether or not anything asked it to. The
+    reorder only shows against a real Postgres.
+    """
+    await register(client)
+    times = [datetime(2026, 8, 8, hour, 0, tzinfo=UTC) for hour in (9, 12, 15)]
+    response = await client.post(
+        "/api/images",
+        files=[
+            ("files", (f"{i}.jpg", make_jpeg(taken_at=taken, color=(i, i, i)), "image/jpeg"))
+            for i, taken in enumerate(times, start=1)
+        ],
+    )
+    assert response.status_code == 201, response.text
+    assert [image["taken_at"] for image in response.json()] == [
+        taken.isoformat().replace("+00:00", "Z") for taken in times
+    ]
+
+
 async def test_a_rejected_batch_leaves_nothing_behind(client, db_sessionmaker):
     """A phone selection is many files at once; one bad one must not litter.
 
