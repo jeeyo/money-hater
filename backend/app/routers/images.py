@@ -110,8 +110,14 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
     await db.commit()
     for image in created:
         await _defer_analysis(image.id)
+    # Ordered by id, which follows insertion, which follows the order the files
+    # arrived in. Without it Postgres answers in whatever order it likes, and a
+    # caller pairing the response with the files it sent gets them shuffled.
     result = await db.execute(
-        sa.select(Image).where(Image.id.in_([i.id for i in created])).options(*_LOADS)
+        sa.select(Image)
+        .where(Image.id.in_([i.id for i in created]))
+        .order_by(Image.id)
+        .options(*_LOADS)
     )
     return [image_out(image) for image in result.scalars()]
 
