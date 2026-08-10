@@ -27,16 +27,8 @@ def make_jpeg(
     size=(64, 64),
     gps_dms: tuple[list, list] | None = None,
     gps_extra: dict | None = None,
-    offset: str | None = None,
-    gps_utc: datetime | None = None,
 ) -> bytes:
     """A JPEG with the EXIF a phone would have written.
-
-    `taken_at` is written as the wall clock it shows — the tag carries no zone,
-    which is the whole difficulty. `offset` is the companion tag a modern phone
-    writes beside it ("+08:00"), and `gps_utc` is the GPS clock, which the spec
-    pins to UTC; either one is enough to place the wall clock on the map of
-    real instants.
 
     `gps_dms` writes the degree/minute/second rationals verbatim, for the
     malformed GPS tags that `lat`/`lng` could never produce. `gps_extra` adds
@@ -47,15 +39,6 @@ def make_jpeg(
     if taken_at is not None:
         stamp = taken_at.strftime("%Y:%m:%d %H:%M:%S")
         exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = stamp
-    if offset is not None:
-        exif_dict["Exif"][piexif.ExifIFD.OffsetTimeOriginal] = offset
-    if gps_utc is not None:
-        exif_dict["GPS"][piexif.GPSIFD.GPSDateStamp] = gps_utc.strftime("%Y:%m:%d")
-        exif_dict["GPS"][piexif.GPSIFD.GPSTimeStamp] = [
-            (gps_utc.hour, 1),
-            (gps_utc.minute, 1),
-            (gps_utc.second, 1),
-        ]
     if gps_dms is not None:
         lat_dms, lng_dms = gps_dms
         exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = "N"

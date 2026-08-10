@@ -1,33 +1,18 @@
 """EXIF extraction: timestamp, GPS coordinates, camera info.
 
-`DateTimeOriginal` is a wall clock with no zone attached — 17:20 means 17:20 on
-whatever wall the camera was looking at. Everything downstream wants a real
-instant: the timeline buckets days by the viewer's UTC offset and the UI renders
-times in the viewer's zone, so a wall clock stamped UTC and left there comes out
-shifted by the viewer's whole offset. A receipt from Tuesday afternoon in
-Singapore filed itself on Wednesday just after midnight.
-
-So the zone is recovered where the photo carries it, in the order it can be
-trusted: the EXIF offset tags a modern phone writes beside the timestamp, then
-the GPS clock, which is UTC by definition and so gives away the offset when
-compared with the wall clock. Only when the photo says neither is the old
-assumption kept — the wall clock read as UTC, because nothing in the file can
-say otherwise. `ExifData.tz_offset_minutes` records which of the three happened.
+EXIF timestamps carry no timezone; we store them as UTC as-is (the common
+self-hosting tradeoff) and record where the timestamp came from so the UI can
+flag low-confidence times.
 """
 
 import io
 import math
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 from numbers import Rational
 
 from PIL import ExifTags
 from PIL import Image as PILImage
-
-# Real UTC offsets run -12:00..+14:00, and every one in use is a multiple of a
-# quarter hour. Anything outside that is a misread, not a timezone.
-MAX_OFFSET_MINUTES = 14 * 60
-OFFSET_STEP_MINUTES = 15
 
 
 @dataclass
@@ -38,9 +23,6 @@ class ExifData:
     camera_make: str | None
     camera_model: str | None
     raw: dict
-    # Minutes east of UTC, as the photo gave it up; None when it never did and
-    # `taken_at` is a wall clock being read as UTC for want of anything better.
-    tz_offset_minutes: int | None = None
 
 
 def _to_float(value) -> float | None:
@@ -157,90 +139,14 @@ def _gps_raw(gps_ifd) -> dict:
 
 
 def _parse_exif_datetime(value: str | None) -> datetime | None:
-    """The wall clock a timestamp tag holds, with no zone read into it yet."""
     if not value:
         return None
     for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
         try:
-            return datetime.strptime(value.strip(), fmt)
+            return datetime.strptime(value.strip(), fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     return None
-
-
-def _parse_offset(value) -> int | None:
-    """Minutes east of UTC from an EXIF offset tag: "+08:00", "-0500", "Z".
-
-    The tag exists precisely because the timestamp beside it has no zone, and a
-    phone that has been abroad writes it. Its unset form is spaces or NULs,
-    which `_text` has already turned into nothing.
-    """
-    if isinstance(value, bytes):
-        value = value.decode("ascii", "replace")
-    if not isinstance(value, str):
-        return None
-    text = _text(value)
-    if not text:
-        return None
-    if text in ("Z", "z"):
-        return 0
-    sign = {"+": 1, "-": -1}.get(text[0])
-    if sign is None:
-        return None
-    digits = text[1:].replace(":", "")
-    if len(digits) != 4 or not digits.isdigit():
-        return None
-    hours, minutes = int(digits[:2]), int(digits[2:])
-    if minutes > 59:
-        return None
-    offset = sign * (hours * 60 + minutes)
-    return offset if abs(offset) <= MAX_OFFSET_MINUTES else None
-
-
-def _gps_utc(gps_ifd) -> datetime | None:
-    """The moment the GPS fix was taken, which the spec pins to UTC.
-
-    `GPSDateStamp` is "YYYY:MM:DD" and `GPSTimeStamp` is three rationals. Both
-    have to be there: the time alone cannot say which day it belongs to, and
-    guessing costs a whole day either side of midnight.
-    """
-    stamp = gps_ifd.get(ExifTags.GPS.GPSDateStamp)
-    clock = gps_ifd.get(ExifTags.GPS.GPSTimeStamp)
-    if isinstance(stamp, bytes):
-        stamp = stamp.decode("ascii", "replace")
-    if not isinstance(stamp, str) or not clock or len(clock) != 3:
-        return None
-    day = _text(stamp)
-    if not day:
-        return None
-    parts = [_to_float(value) for value in clock]
-    if any(part is None for part in parts):
-        return None
-    for fmt in ("%Y:%m:%d", "%Y-%m-%d"):
-        try:
-            parsed = datetime.strptime(day, fmt)
-        except ValueError:
-            continue
-        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-        if not 0 <= seconds < 24 * 3600:
-            return None
-        return (parsed + timedelta(seconds=seconds)).replace(tzinfo=UTC)
-    return None
-
-
-def _offset_from_gps(wall_clock: datetime, gps_utc: datetime | None) -> int | None:
-    """The offset implied by a local wall clock and the UTC clock beside it.
-
-    Two readings of the same moment, one zoned and one not, is all a UTC offset
-    is. Rounded to the quarter hour because the two are seconds apart at best —
-    the fix is not taken at the instant the shutter is — and no zone is finer
-    than that anyway.
-    """
-    if gps_utc is None:
-        return None
-    drift = (wall_clock.replace(tzinfo=UTC) - gps_utc).total_seconds() / 60
-    offset = round(drift / OFFSET_STEP_MINUTES) * OFFSET_STEP_MINUTES
-    return offset if abs(offset) <= MAX_OFFSET_MINUTES else None
 
 
 def extract_exif(data: bytes) -> ExifData:
@@ -255,31 +161,11 @@ def extract_exif(data: bytes) -> ExifData:
     except Exception:
         return empty
 
-    # Each timestamp has its own offset tag; taking the first timestamp that
-    # reads means taking the offset written for that one, not for its neighbour.
-    wall_clock = offset = None
-    for stamp, zone in (
-        (exif_ifd.get(ExifTags.Base.DateTimeOriginal), ExifTags.Base.OffsetTimeOriginal),
-        (exif_ifd.get(ExifTags.Base.DateTimeDigitized), ExifTags.Base.OffsetTimeDigitized),
-        (exif.get(ExifTags.Base.DateTime), ExifTags.Base.OffsetTime),
-    ):
-        wall_clock = _parse_exif_datetime(stamp)
-        if wall_clock is not None:
-            offset = _parse_offset(exif_ifd.get(zone) or exif.get(zone))
-            break
-
-    if wall_clock is None:
-        taken_at = None
-    else:
-        if offset is None:
-            offset = _offset_from_gps(wall_clock, _gps_utc(gps_ifd))
-        # No offset from either source leaves the wall clock read as UTC. It is
-        # the wrong instant anywhere east or west of Greenwich, but it is the
-        # only reading the file supports, and the time of day it shows is at
-        # least the time of day on the camera.
-        taken_at = wall_clock.replace(tzinfo=timezone(timedelta(minutes=offset or 0))).astimezone(
-            UTC
-        )
+    taken_at = _parse_exif_datetime(
+        exif_ifd.get(ExifTags.Base.DateTimeOriginal)
+        or exif_ifd.get(ExifTags.Base.DateTimeDigitized)
+        or exif.get(ExifTags.Base.DateTime)
+    )
 
     lat = _dms_to_degrees(
         gps_ifd.get(ExifTags.GPS.GPSLatitude), gps_ifd.get(ExifTags.GPS.GPSLatitudeRef)
@@ -312,5 +198,4 @@ def extract_exif(data: bytes) -> ExifData:
         camera_make=exif.get(ExifTags.Base.Make),
         camera_model=exif.get(ExifTags.Base.Model),
         raw=raw,
-        tz_offset_minutes=offset,
     )
