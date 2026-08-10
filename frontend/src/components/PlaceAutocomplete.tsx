@@ -14,12 +14,17 @@ export function PlaceAutocomplete({
   value,
   placeId,
   at,
+  near,
   onChange,
   inline = false,
 }: {
   value: string;
   placeId: number | null;
   at: string | null;
+  /** An actual fix to search around, when the caller has one. A photo's own
+   *  EXIF coordinates beat `at`, which can only be turned into the middle of
+   *  whichever stop covers that moment. */
+  near?: { lat: number; lng: number } | null;
   onChange: (name: string, placeId: number | null) => void;
   /** Let the list take room in the layout instead of floating over what is
    *  under it. For a field whose Save button sits directly below — floating
@@ -38,6 +43,10 @@ export function PlaceAutocomplete({
     const timer = setTimeout(async () => {
       const params = new URLSearchParams({ q: value });
       if (at) params.set('at', new Date(at).toISOString());
+      if (near) {
+        params.set('lat', String(near.lat));
+        params.set('lng', String(near.lng));
+      }
       try {
         const results = await apiJson<PlaceSuggestion[]>(`/api/places/suggest?${params}`);
         if (!cancelled) setSuggestions(results);
@@ -51,7 +60,9 @@ export function PlaceAutocomplete({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [value, at, open]);
+    // `near` is spread into primitives: a fresh object literal each render
+    // would re-run this on every keystroke's re-render, not just on a change.
+  }, [value, at, near?.lat, near?.lng, open]);
 
   useEffect(() => () => clearTimeout(blurTimer.current), []);
 

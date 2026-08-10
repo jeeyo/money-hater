@@ -66,6 +66,13 @@ function PlaceRow({ image }: { image: ImageRecord }) {
             value={query}
             placeId={picked}
             at={image.taken_at}
+            // The photo knows where it was; suggest from there rather than
+            // from the middle of whichever stop its clock lands in.
+            near={
+              image.lat != null && image.lng != null
+                ? { lat: image.lat, lng: image.lng }
+                : null
+            }
             inline
             onChange={(name, placeId) => {
               setQuery(name);

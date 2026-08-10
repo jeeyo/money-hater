@@ -60,6 +60,30 @@ HINT_TYPES = {
 }
 
 
+def _log_google_error(what: str, exc: httpx.HTTPError) -> None:
+    """Say what Google actually said, not just that it said no.
+
+    `raise_for_status()` stringifies to "Client error '400 Bad Request'" and
+    nothing else, so every way this can go wrong — the Places API (New) not
+    enabled on the project, a browser-restricted key used from a server, a
+    malformed field mask, billing off — logged as the same unhelpful line while
+    every photo quietly came back with no place. Google puts a real reason in
+    the body; print it.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        log.warning("Places %s failed: %s", what, exc)
+        return
+    detail = (response.text or "").strip()
+    log.warning(
+        "Places %s failed: HTTP %s from %s — %s",
+        what,
+        response.status_code,
+        response.request.url if response.request else "places.googleapis.com",
+        detail[:600] or "(empty body)",
+    )
+
+
 async def _cached_nearby(db: AsyncSession, lat: float, lng: float) -> Place | None:
     # ~0.002 deg is roughly 200m; coarse box filter, exact haversine check after
     box = 0.002
@@ -143,7 +167,7 @@ async def resolve_place(
             response.raise_for_status()
             items = response.json().get("places", [])
     except httpx.HTTPError as exc:
-        log.warning("Places nearby search failed: %s", exc)
+        _log_google_error("nearby search", exc)
         return None
     candidate = _pick_candidate(items, hint)
     return await _upsert_place(db, candidate) if candidate else None
@@ -229,7 +253,7 @@ async def _google_text_search(
             response.raise_for_status()
             return response.json().get("places", [])
     except httpx.HTTPError as exc:
-        log.warning("Places suggest failed: %s", exc)
+        _log_google_error("suggest", exc)
         return []
 
 
@@ -238,16 +262,24 @@ async def suggest_places(
     user: User,
     query: str,
     at: datetime | None = None,
+    near: tuple[float, float] | None = None,
     limit: int = 8,
 ) -> list[tuple[Place, float | None, str]]:
-    """Suggest places for a query, biased to where the user was at `at`.
+    """Suggest places for a query, biased to where the caller was.
+
+    `near` is an actual fix and wins outright — a photo naming its own place
+    has its EXIF coordinates, which beat anything inferred. `at` is the weaker
+    answer for callers that only know a time (an expense typed in by hand): it
+    is turned into the centroid of whichever stop covers that moment. Asking by
+    time for something that knew where it was gave suggestions around the
+    middle of a stop instead of around the photo.
 
     Returns (place, distance_from_anchor_m, source) with places already on the
     itinerary first — those cost nothing and are what people usually mean.
     Google is only consulted when the local list is thin, which keeps the
     keystroke-driven UI off the billing meter.
     """
-    anchor = await anchor_for_time(db, user, at)
+    anchor = near if near is not None else await anchor_for_time(db, user, at)
     needle = query.strip().lower()
 
     def distance(place: Place) -> float | None:
@@ -334,7 +366,7 @@ async def search_for_recommendations(
     except httpx.HTTPError as exc:
         # A bad type name from the model lands here as a 400; an empty list
         # tells it to try something else rather than failing the whole run.
-        log.warning("Places recommendation search failed: %s", exc)
+        _log_google_error("recommendation search", exc)
         return []
 
     found: list[Place] = []
@@ -383,7 +415,7 @@ async def place_details(db: AsyncSession, google_place_id: str) -> Place | None:
             response.raise_for_status()
             item = response.json()
     except httpx.HTTPError as exc:
-        log.warning("Place details failed for %s: %s", google_place_id, exc)
+        _log_google_error(f"details for {google_place_id}", exc)
         return place
 
     if place is None:
@@ -440,6 +472,6 @@ async def search_place_by_text(
             response.raise_for_status()
             items = response.json().get("places", [])
     except httpx.HTTPError as exc:
-        log.warning("Places text search failed: %s", exc)
+        _log_google_error("text search", exc)
         return None
     return await _upsert_place(db, items[0]) if items else None

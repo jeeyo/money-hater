@@ -88,6 +88,37 @@ async def test_results_are_ranked_by_distance_from_where_you_were(client, db_ses
     assert at_breakfast[0]["name"] == "Bootleg Coffee"
 
 
+async def test_a_caller_with_its_own_fix_is_asked_from_there(client, db_sessionmaker):
+    """A photo naming its place has EXIF coordinates; they beat its clock.
+
+    Asked by time alone, a photo taken at lunchtime is answered from the middle
+    of the lunch stop — so a photo of the cafe, taken while the lunch stop was
+    running, is offered the ramen shop first. Its own fix settles it.
+    """
+    await _seed_itinerary(client, db_sessionmaker)
+
+    by_time = (
+        await client.get(
+            "/api/places/suggest", params={"q": "", "at": "2026-08-08T12:35:00Z"}
+        )
+    ).json()
+    assert by_time[0]["name"] == "Menya Itto"
+
+    by_fix = (
+        await client.get(
+            "/api/places/suggest",
+            params={
+                "q": "",
+                "at": "2026-08-08T12:35:00Z",
+                "lat": CAFE["lat"],
+                "lng": CAFE["lng"],
+            },
+        )
+    ).json()
+    assert by_fix[0]["name"] == "Bootleg Coffee"
+    assert by_fix[0]["distance_m"] == 0
+
+
 async def test_time_between_stops_uses_the_nearest_visit(client, db_sessionmaker):
     await _seed_itinerary(client, db_sessionmaker)
     # 11:30 is inside no visit but closest to the 12:30 lunch stop
