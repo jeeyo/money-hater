@@ -33,6 +33,29 @@ def day_window_utc(date_str: str, tz_offset_minutes: int) -> tuple[datetime, dat
     return start, start + timedelta(days=1)
 
 
+def holds_a_photo_from(start: datetime, end: datetime) -> sa.ColumnElement[bool]:
+    """Does this stop hold a photo taken during the day being asked for?
+
+    A stop's window is built from the photos that knew where they were; one
+    that did not — a receipt, a plate of food — joins afterwards, by whichever
+    stop is nearest in time, and that stop can be on the other side of local
+    midnight. The window alone then leaves the photo on screen nowhere: not in
+    the stops of the day it was taken on, because the stop is not on that day,
+    and not in the unplaced list either, because it is in a stop.
+
+    So a stop belongs to a day if its window falls in it *or* it holds a photo
+    from it. This is what the week and month views have always done — they
+    count photos by their own moment — and it is the reading `_days_touched`
+    already takes of a stop that runs over midnight: it is on both days.
+    """
+    moment = sa.func.coalesce(Image.taken_at, Image.uploaded_at)
+    return (
+        sa.select(Image.id)
+        .where(Image.visit_id == Visit.id, moment >= start, moment < end)
+        .exists()
+    )
+
+
 def span_days(date_str: str, span: str) -> list[date]:
     """The local days of the week or month the given day falls in.
 
@@ -65,8 +88,10 @@ async def get_timeline(
                 sa.select(Visit)
                 .where(
                     Visit.user_id == user.id,
-                    Visit.started_at < end,
-                    Visit.ended_at >= start,
+                    sa.or_(
+                        sa.and_(Visit.started_at < end, Visit.ended_at >= start),
+                        holds_a_photo_from(start, end),
+                    ),
                 )
                 .order_by(Visit.started_at)
                 .options(

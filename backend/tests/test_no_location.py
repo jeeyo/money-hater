@@ -275,3 +275,41 @@ async def test_a_manual_stop_assignment_survives_reclustering(client, db_session
 
     async with db_sessionmaker() as db:
         assert (await db.get(Image, stray["id"])).visit_id == visit_id
+
+
+async def test_a_photo_stays_on_the_day_it_was_taken(client, db_sessionmaker):
+    """Joining a stop must not take a photo off its own day.
+
+    A photo with no place is filed by whichever stop is nearest in time, and
+    that stop can be on the other side of local midnight. The day view used to
+    ask only for stops whose window fell in the day, so the photo showed
+    neither there — the stop is on tomorrow — nor in the unplaced list, which
+    is only for photos in no stop at all. It was on screen nowhere.
+    """
+    await register(client)
+    tz = 7 * 60  # the viewer's offset; stored times are UTC, local is +7h
+
+    # 23:50 and 00:10 local — twenty minutes apart, either side of midnight
+    nightcap = await _analyzed(
+        client,
+        db_sessionmaker,
+        "nightcap.jpg",
+        make_jpeg(taken_at=datetime(2026, 8, 7, 16, 50, tzinfo=UTC), color=(2, 2, 2)),
+    )
+    await _analyzed(
+        client,
+        db_sessionmaker,
+        "bar.jpg",
+        make_jpeg(*BKK, taken_at=datetime(2026, 8, 7, 17, 10, tzinfo=UTC)),
+    )
+
+    async with db_sessionmaker() as db:
+        assert (await db.get(Image, nightcap["id"])).visit_id is not None, (
+            "it joins the stop twenty minutes later, which is the point"
+        )
+
+    day = (await client.get(f"/api/timeline?date=2026-08-07&tz_offset_minutes={tz}")).json()
+    shown = [i["id"] for v in day["visits"] for i in v["images"]] + [
+        i["id"] for i in day["unassigned_images"]
+    ]
+    assert nightcap["id"] in shown, "the photo was taken on the 7th and belongs on it"
