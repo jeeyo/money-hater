@@ -5,7 +5,7 @@ import sqlalchemy as sa
 import app.services.analysis as analysis_mod
 from app.models import Expense
 from app.services.analysis import run_image_analysis
-from app.services.money import to_minor
+from app.services.money import normalize_currency, to_minor
 from app.services.vision import (
     ReceiptData,
     ReceiptItem,
@@ -151,3 +151,91 @@ def test_receipt_datetime_check_in_vision_result():
     assert RECEIPT_RESULT.receipt is not None
     parsed = parse_receipt_datetime(RECEIPT_RESULT.receipt.datetime_iso)
     assert parsed == datetime(2026, 8, 8, 6, 5, tzinfo=UTC)
+
+
+def test_normalize_currency():
+    assert normalize_currency("thb") == "THB"
+    assert normalize_currency(" jpy ") == "JPY"
+    # Anything that is not three ASCII letters is not a code we can store
+    assert normalize_currency("PPTN") is None
+    assert normalize_currency("¥") is None
+    assert normalize_currency("TH") is None
+    assert normalize_currency("12") is None
+    assert normalize_currency("") is None
+    assert normalize_currency(None) is None
+
+
+async def test_a_currency_the_model_invented_does_not_sink_the_receipt(
+    client, db_sessionmaker, monkeypatch
+):
+    """`expenses.currency` is varchar(3); a model reading a receipt is not.
+
+    A Chinese receipt came back with the currency read as "PPTN", and the
+    fourth character was not a wrong label in the UI — it was a failed INSERT
+    that took the whole analysis down and left the photo showing a raw
+    StringDataRightTruncationError on the upload page.
+    """
+    await register(client)
+    created = (
+        await client.post(
+            "/api/images",
+            files=[("files", ("cn.jpg", make_jpeg(*BKK, color=(210, 30, 30)), "image/jpeg"))],
+        )
+    ).json()
+    image_id = created[0]["id"]
+
+    async def fake_vision(path, mime):
+        return VisionResult(
+            kind="receipt",
+            caption="Receipt from a hotpot place",
+            labels=["receipt"],
+            receipt=ReceiptData(
+                merchant="遥记砂锅牛羊水店", currency="PPTN", total=86.21, tax=7.12
+            ),
+        )
+
+    monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
+
+    async with db_sessionmaker() as db:
+        await run_image_analysis(db, image_id)
+
+    async with db_sessionmaker() as db:
+        expense = await db.scalar(sa.select(Expense))
+    assert expense is not None
+    assert expense.currency == "THB", "falls back to the user's own currency"
+    assert expense.total_minor == 8621
+    assert expense.merchant == "遥记砂锅牛羊水店"
+    assert "PPTN" in (expense.note or ""), "and says what it read, so it can be corrected"
+
+    image = (await client.get(f"/api/images/{image_id}")).json()
+    assert image["status"] == "analyzed"
+    assert image["error"] is None
+
+
+async def test_a_merchant_longer_than_the_column_is_kept_not_fatal(
+    client, db_sessionmaker, monkeypatch
+):
+    await register(client)
+    created = (
+        await client.post(
+            "/api/images",
+            files=[("files", ("long.jpg", make_jpeg(*BKK, color=(11, 200, 60)), "image/jpeg"))],
+        )
+    ).json()
+
+    async def fake_vision(path, mime):
+        return VisionResult(
+            kind="receipt",
+            caption="A receipt",
+            labels=["receipt"],
+            receipt=ReceiptData(merchant="Very Long Name " * 40, currency="THB", total=10.0),
+        )
+
+    monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
+
+    async with db_sessionmaker() as db:
+        await run_image_analysis(db, created[0]["id"])
+
+    async with db_sessionmaker() as db:
+        expense = await db.scalar(sa.select(Expense))
+    assert expense is not None and len(expense.merchant) == 255

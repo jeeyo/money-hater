@@ -149,8 +149,10 @@ class ExpenseCreate(BaseModel):
 
 
 class ExpenseUpdate(BaseModel):
-    description: str | None = None
-    merchant: str | None = None
+    # Bounded like ExpenseCreate above: both write the same varchar(255)
+    # columns, so a length only the create path checked was a 500 on edit.
+    description: str | None = Field(default=None, max_length=255)
+    merchant: str | None = Field(default=None, max_length=255)
     place_id: int | None = None
     spent_at: datetime | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)

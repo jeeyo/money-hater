@@ -13,6 +13,21 @@ ZERO_DECIMAL = {"JPY", "KRW", "VND", "CLP", "ISK", "UGX", "RWF", "XAF", "XOF", "
 DEFAULT_BASE_CURRENCY = "THB"
 
 
+def normalize_currency(value: str | None) -> str | None:
+    """A code that can be stored as one, or None if this is not one.
+
+    Every currency the API accepts is length-checked at its schema, but the one
+    read off a receipt arrives from a vision model and is whatever it thought it
+    saw — "PPTN" off a Chinese receipt, say. The column is `varchar(3)`, so a
+    fourth character is not a wrong answer that shows up in the UI, it is a
+    failed INSERT that takes the whole analysis down with it.
+    """
+    if value is None:
+        return None
+    code = value.strip().upper()
+    return code if len(code) == 3 and code.isascii() and code.isalpha() else None
+
+
 def minor_factor(currency: str) -> int:
     return 1 if currency.upper() in ZERO_DECIMAL else 100
 

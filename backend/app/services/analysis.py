@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import sqlalchemy as sa
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -24,7 +25,7 @@ from app.services import storage
 from app.services.clustering import recluster_user
 from app.services.exif import extract_exif
 from app.services.expenses import create_expense
-from app.services.money import to_minor
+from app.services.money import normalize_currency, to_minor
 from app.services.places import resolve_place
 from app.services.vision import (
     VisionResult,
@@ -63,14 +64,31 @@ async def _apply_receipt(
     if existing is not None:
         log.info("image %s already has expense %s; leaving it", image.id, existing)
         return
-    currency = (receipt.currency or user.preferred_currency).upper()
+    # Everything below comes from a vision model reading a photo, so nothing is
+    # the shape the columns promise until it is made so. What the model read is
+    # kept verbatim in ImageAnalysis.raw either way.
+    currency = normalize_currency(receipt.currency)
+    note = None
+    if currency is None:
+        currency = user.preferred_currency
+        if receipt.currency:
+            # Say so rather than quietly denominating it in the wrong money —
+            # the total is right, the label is a guess, and the note is what
+            # lets someone spot that and correct it.
+            log.info(
+                "image %s: unusable currency %r from the model; recording as %s",
+                image.id,
+                receipt.currency,
+                currency,
+            )
+            note = f"Currency read as {receipt.currency.strip()[:16]!r}; recorded as {currency}."
     spent_at = parse_receipt_datetime(receipt.datetime_iso)
     expense = await create_expense(
         db,
         user,
         image_id=image.id,
         source="receipt",
-        merchant=receipt.merchant,
+        merchant=receipt.merchant[:255] if receipt.merchant else None,
         # The photo's own GPS already told us where this was
         place_id=image.place_id,
         spent_at=spent_at or image.taken_at,
@@ -78,6 +96,7 @@ async def _apply_receipt(
         total_minor=to_minor(receipt.total, currency) or 0,
         tax_minor=to_minor(receipt.tax, currency),
         tip_minor=to_minor(receipt.tip, currency),
+        note=note,
     )
     for item in receipt.items:
         db.add(
@@ -132,6 +151,21 @@ async def _record_analysis(db: AsyncSession, image: Image, vision: VisionResult)
     existing.raw = vision.model_dump(mode="json")
     existing.model = settings.llm_model
     existing.analyzed_at = datetime.now(UTC)
+
+
+def _readable_error(exc: Exception) -> str:
+    """What to put on the row for the user to read.
+
+    `image.error` is rendered verbatim under the photo, and a database error
+    stringifies to the whole failed statement — every column, every bound
+    parameter, the driver's class path. Nobody can act on a screen of INSERT,
+    and it is the wrong thing to hand a phone. The full exception goes to the
+    log, where it is diagnosable; this is the sentence that goes on screen.
+    """
+    if isinstance(exc, SQLAlchemyError):
+        return "Could not save what was read from this photo."
+    first_line = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
+    return first_line[:300] or f"Analysis failed ({type(exc).__name__})."
 
 
 async def _analysis_allowed(db: AsyncSession, image: Image) -> bool:
@@ -195,11 +229,12 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
         image.error = None
         await db.commit()
     except Exception as exc:
+        log.exception("analysis failed for image %s", image_id)
         await db.rollback()
         image = await db.get(Image, image_id)
         if image:
             image.status = "failed"
-            image.error = str(exc)[:1000]
+            image.error = _readable_error(exc)
             await db.commit()
         raise
 

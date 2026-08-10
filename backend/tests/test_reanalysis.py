@@ -11,6 +11,7 @@ and 'failed' with nothing to show for it.
 import asyncio
 from datetime import UTC, datetime
 
+import pytest
 import sqlalchemy as sa
 
 import app.services.analysis as analysis_mod
@@ -183,3 +184,56 @@ async def test_a_model_that_never_answers_does_not_park_the_photo(
         assert image.status == "analyzed"
         assert image.error is None
         assert await db.get(ImageAnalysis, image_id) is None
+
+
+async def test_a_database_failure_is_not_shown_as_sql(client, db_sessionmaker, monkeypatch):
+    """`image.error` is rendered verbatim under the photo on the upload page.
+
+    A driver error stringifies to the entire failed statement — every column,
+    every bound parameter — which filled the phone with INSERT and told the
+    user nothing. The detail belongs in the log.
+    """
+    from sqlalchemy.exc import DBAPIError
+
+    await register(client)
+    image_id = await _upload(client, "boom.jpg", color=(6, 6, 6))
+    _stub_vision(monkeypatch, A_RECEIPT)
+
+    # Where the reported failure actually landed: writing the expense
+    async def explode(db, image, result, user):
+        raise DBAPIError(
+            "INSERT INTO expenses (user_id, image_id, currency) VALUES ($1, $2, $3)",
+            {"currency": "PPTN"},
+            Exception("value too long for type character varying(3)"),
+        )
+
+    monkeypatch.setattr(analysis_mod, "_apply_receipt", explode)
+
+    async with db_sessionmaker() as db:
+        with pytest.raises(DBAPIError):
+            await run_image_analysis(db, image_id)
+
+    async with db_sessionmaker() as db:
+        image = await db.get(Image, image_id)
+    assert image.status == "failed"
+    assert "INSERT" not in image.error and "$1" not in image.error
+    assert len(image.error) < 120
+
+
+async def test_an_ordinary_failure_still_says_what_happened(
+    client, db_sessionmaker, monkeypatch
+):
+    await register(client)
+    image_id = await _upload(client, "gone.jpg", color=(8, 8, 8))
+
+    def explode(original):
+        raise FileNotFoundError("the original is missing from disk")
+
+    monkeypatch.setattr(analysis_mod.storage, "make_thumbnail", explode)
+
+    async with db_sessionmaker() as db:
+        with pytest.raises(FileNotFoundError):
+            await run_image_analysis(db, image_id)
+
+    async with db_sessionmaker() as db:
+        assert "missing from disk" in (await db.get(Image, image_id)).error
