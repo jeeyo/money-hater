@@ -147,10 +147,22 @@ async def test_vision_skipped_without_key(client, db_sessionmaker):
     assert image["has_expense"] is False
 
 
-def test_receipt_datetime_check_in_vision_result():
+def test_a_receipt_keeps_the_time_it_was_printed_with():
+    """A till prints local time, and local time is the frame we store in.
+
+    Honouring an offset the model volunteered would move the receipt away from
+    the photo of the same meal by that whole offset — 13:05 lunch filed at
+    06:05, hours from the picture of the plate.
+    """
     assert RECEIPT_RESULT.receipt is not None
+    assert RECEIPT_RESULT.receipt.datetime_iso == "2026-08-08T13:05:00+07:00"
     parsed = parse_receipt_datetime(RECEIPT_RESULT.receipt.datetime_iso)
-    assert parsed == datetime(2026, 8, 8, 6, 5, tzinfo=UTC)
+    assert parsed == datetime(2026, 8, 8, 13, 5, tzinfo=UTC)
+
+    # A receipt that prints no zone at all — most of them — reads the same way
+    assert parse_receipt_datetime("2026-08-10T20:35:00") == datetime(
+        2026, 8, 10, 20, 35, tzinfo=UTC
+    )
 
 
 def test_normalize_currency():

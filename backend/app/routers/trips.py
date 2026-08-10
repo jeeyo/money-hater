@@ -22,6 +22,7 @@ from app.serialize import trip_detail_out, trip_out, visit_label, visit_out
 from app.services import recommend as recommend_service
 from app.services import trips as trip_service
 from app.services.llm import llm_enabled
+from app.services.localtime import MAX_OFFSET_MINUTES, local_now
 from app.services.places import search_place_by_text
 from app.services.trips import TripWindowError
 
@@ -37,8 +38,10 @@ async def _load(db: DbSession, user, trip_id: int) -> Trip:
 
 def _bounds_window(start: Expense, end: Expense | None, tz_offset_minutes: int):
     """The window a pair of bounds spans — with no end, it runs to now."""
-    ends_at = trip_service.moment_of(end) if end is not None else datetime.now(UTC)
-    return trip_service.snap_to_days(trip_service.moment_of(start), ends_at, tz_offset_minutes)
+    ends_at = (
+        trip_service.moment_of(end) if end is not None else local_now(tz_offset_minutes)
+    )
+    return trip_service.snap_to_days(trip_service.moment_of(start), ends_at)
 
 
 async def _render(db: DbSession, user, trip: Trip, tz_offset_minutes: int, detail: bool):
@@ -46,14 +49,16 @@ async def _render(db: DbSession, user, trip: Trip, tz_offset_minutes: int, detai
     visits = await trip_service.visits_in(db, user, window)
     expenses = await trip_service.expenses_in(db, user, window)
     render = trip_detail_out if detail else trip_out
-    return render(trip, window, visits, expenses, user.preferred_currency, tz_offset_minutes)
+    return render(trip, window, visits, expenses, user.preferred_currency)
 
 
 @router.get("/trips", response_model=list[TripOut])
 async def list_trips(
     user: CurrentUser,
     db: DbSession,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     trips = (
         (
@@ -77,7 +82,9 @@ async def create_trip(
     body: TripCreate,
     user: CurrentUser,
     db: DbSession,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     """Group everything between two expenses into a named trip.
 
@@ -86,7 +93,7 @@ async def create_trip(
     """
     try:
         start, end = await trip_service.resolve_bounds(
-            db, user, body.start_expense_id, body.end_expense_id
+            db, user, body.start_expense_id, body.end_expense_id, tz_offset_minutes
         )
         if end is None:
             await trip_service.assert_no_other_open_trip(db, user)
@@ -117,7 +124,9 @@ async def get_trip(
     trip_id: int,
     user: CurrentUser,
     db: DbSession,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     return await _render(db, user, await _load(db, user, trip_id), tz_offset_minutes, detail=True)
 
@@ -128,7 +137,9 @@ async def update_trip(
     body: TripUpdate,
     user: CurrentUser,
     db: DbSession,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     trip = await _load(db, user, trip_id)
     if body.title is not None:
@@ -145,6 +156,7 @@ async def update_trip(
                 user,
                 body.start_expense_id or trip.start_expense_id,
                 body.end_expense_id if ends_given else trip.end_expense_id,
+                tz_offset_minutes,
             )
             if end is None:
                 await trip_service.assert_no_other_open_trip(db, user, exclude_id=trip.id)
@@ -173,7 +185,9 @@ async def end_trip(
     user: CurrentUser,
     db: DbSession,
     body: TripEnd | None = None,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     """Close a trip you are on. With no expense given, it ends at the last one."""
     trip = await _load(db, user, trip_id)
@@ -189,7 +203,9 @@ async def end_trip(
         chosen = latest.id if latest else trip.start_expense_id
 
     try:
-        start, end = await trip_service.resolve_bounds(db, user, trip.start_expense_id, chosen)
+        start, end = await trip_service.resolve_bounds(
+            db, user, trip.start_expense_id, chosen, tz_offset_minutes
+        )
         await trip_service.assert_no_overlap(
             db,
             user,
@@ -233,12 +249,14 @@ async def get_recommendations(
     trip_id: int,
     user: CurrentUser,
     db: DbSession,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     """The last generated set, if it is still worth showing. Never spends money."""
     trip = await _load(db, user, trip_id)
     window = trip_service.window_of(trip, tz_offset_minutes)
-    anchor = await trip_service.latest_visit_in(db, user, window)
+    anchor = await trip_service.latest_visit_in(db, user, window, tz_offset_minutes)
     row = await recommend_service.newest_for_trip(db, trip.id)
     label = visit_label(anchor) if anchor is not None else None
     if row is None or not recommend_service.is_fresh(
@@ -254,7 +272,9 @@ async def create_recommendations(
     user: CurrentUser,
     db: DbSession,
     body: RecommendationRequest | None = None,
-    tz_offset_minutes: int = Query(default=0, ge=-840, le=840),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
 ):
     """Queue a run. The panel polls the GET above until it turns ready."""
     trip = await _load(db, user, trip_id)
@@ -273,7 +293,7 @@ async def create_recommendations(
         )
 
     window = trip_service.window_of(trip, tz_offset_minutes)
-    anchor = await trip_service.latest_visit_in(db, user, window)
+    anchor = await trip_service.latest_visit_in(db, user, window, tz_offset_minutes)
     if anchor is None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,

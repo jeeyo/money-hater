@@ -81,7 +81,7 @@ async def test_the_window_keeps_growing_on_its_own(client, db_sessionmaker):
         in_five_days = trip_service.window_of(
             loaded, 0, now=datetime.now(UTC) + timedelta(days=5)
         )
-        assert len(trip_service.day_range(in_five_days, 0)) == 7
+        assert len(trip_service.day_range(in_five_days)) == 7
 
 
 async def test_only_one_trip_may_be_open_at_a_time(client):

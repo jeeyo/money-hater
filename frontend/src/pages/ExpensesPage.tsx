@@ -5,7 +5,7 @@ import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
 import { ImageModal } from '../components/ImageModal';
 import { useAuth } from '../context/AuthContext';
 import { useDeleteExpense, useExpenseSummary, useExpenses, useImage } from '../hooks/useData';
-import { formatMoney } from '../lib/format';
+import { formatDateTime, formatMoney } from '../lib/format';
 import type { Expense, MerchantTotal } from '../types';
 
 /** Single-hue magnitude bars: one series, values in ink rather than series color. */
@@ -83,7 +83,7 @@ function ExpenseRow({
               </>
             )}
             <span className="truncate">
-              {expense.spent_at ? new Date(expense.spent_at).toLocaleString() : 'date unknown'}
+              {expense.spent_at ? formatDateTime(expense.spent_at) : 'date unknown'}
             </span>
           </span>
         </span>

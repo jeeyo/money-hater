@@ -41,7 +41,12 @@ async def _apply_exif(image: Image, data: bytes) -> None:
     if exif.taken_at:
         image.taken_at = exif.taken_at
         image.taken_at_source = "exif"
-    else:
+    elif image.taken_at is None:
+        # Only rows written before uploads carried the uploader's offset get
+        # here, and `uploaded_at` is the best this side of the request has.
+        # Never for a photo the upload already filed: that one holds the
+        # uploader's wall clock, and `uploaded_at` is a UTC instant, so
+        # re-analysing would drag it across the day by the whole offset.
         image.taken_at = image.uploaded_at
         image.taken_at_source = "upload"
     image.lat, image.lng = exif.lat, exif.lng

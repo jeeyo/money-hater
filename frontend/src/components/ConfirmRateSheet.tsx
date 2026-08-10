@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useConfirmExpense } from '../hooks/useData';
-import { formatMoney, toMajor, toMinor } from '../lib/format';
+import { formatDateTime, formatMoney, toMajor, toMinor } from '../lib/format';
 import { Sheet, inputClass, labelClass } from './Sheet';
 import type { Expense } from '../types';
 
@@ -35,7 +35,7 @@ export function ConfirmRateSheet({
           </p>
           <p className="mt-1 text-xs text-ink-3">
             Paid in {expense.currency}
-            {expense.spent_at && <> · {new Date(expense.spent_at).toLocaleString()}</>}
+            {expense.spent_at && <> · {formatDateTime(expense.spent_at)}</>}
           </p>
         </div>
 

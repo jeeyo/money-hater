@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatDateTime,
+  formatDay,
   formatMoney,
   formatMoneyCompact,
   formatSpanLabel,
   formatSpend,
+  formatTime,
   formatTripRange,
+  fromWallClockInput,
   isOpenTrip,
   parseLocalDate,
   shiftDate,
@@ -14,6 +18,8 @@ import {
   startOfWeek,
   toMajor,
   toMinor,
+  toWallClockInput,
+  wallClockDay,
 } from './format';
 
 describe('formatMoney', () => {
@@ -175,5 +181,49 @@ describe('formatMoneyCompact', () => {
   it('shortens a calendar cell to something that fits', () => {
     expect(formatMoneyCompact(124000, 'THB')).toMatch(/1\.2K/i);
     expect(formatMoneyCompact(9500, 'THB')).toMatch(/95/);
+  });
+});
+
+
+/**
+ * Times from the API are wall clocks — the clock where the thing happened —
+ * sent with a Z on the end because an ISO string needs one. Reading them in the
+ * browser's timezone adds an offset to a clock that already has one baked in,
+ * which is what put a 20:36 dinner in Bangkok at 03:36 the next morning.
+ *
+ * These run under whatever TZ the suite is given, so they assert the one thing
+ * that must hold everywhere: what comes out is what went in.
+ */
+describe('stored moments read as the clock they were written on', () => {
+  const dinner = '2026-08-10T20:36:12Z';
+
+  it('shows the hour on the receipt, not the hour in your browser', () => {
+    expect(formatTime(dinner)).toContain('36');
+    expect(formatTime(dinner)).toMatch(/\b(20|08)\b/); // 24-hour or 12-hour locale
+    expect(formatTime(dinner)).not.toContain('03');
+  });
+
+  it('keeps the day it happened on', () => {
+    expect(formatDay(dinner)).toContain('10');
+    expect(formatDay(dinner)).toMatch(/Aug/);
+    expect(formatDateTime(dinner)).toContain('36');
+    expect(wallClockDay(dinner)).toBe('2026-08-10');
+  });
+
+  it('round-trips through the datetime-local picker unchanged', () => {
+    expect(toWallClockInput(dinner)).toBe('2026-08-10T20:36');
+    expect(fromWallClockInput('2026-08-10T20:36')).toBe('2026-08-10T20:36:00Z');
+    expect(wallClockDay(fromWallClockInput(toWallClockInput(dinner)))).toBe('2026-08-10');
+  });
+
+  it('names a trip by the days its bounds fall on', () => {
+    const range = formatTripRange({
+      end_expense_id: 2,
+      started_at: '2026-08-10T00:00:00Z',
+      ended_at: '2026-08-12T23:59:59Z',
+      day_count: 3,
+    });
+    expect(range).toContain('10');
+    expect(range).toContain('12');
   });
 });

@@ -2,7 +2,12 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useAddExpense, useUpdateExpense } from '../hooks/useData';
 import type { ExpenseInput } from '../hooks/useData';
-import { COMMON_CURRENCIES, toMajor } from '../lib/format';
+import {
+  COMMON_CURRENCIES,
+  fromWallClockInput,
+  toMajor,
+  toWallClockInput,
+} from '../lib/format';
 import type { Expense } from '../types';
 import { CurrencyRateField } from './CurrencyRateField';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
@@ -41,8 +46,11 @@ export function ExpenseSheet({
   const [where, setWhere] = useState(expense?.place?.name ?? expense?.merchant ?? '');
   const [placeId, setPlaceId] = useState<number | null>(expense?.place?.id ?? null);
   const [note, setNote] = useState(expense?.note ?? '');
+  // Both sides of this are wall clocks: what the column holds, and what the
+  // picker shows. A new expense starts at the browser's own clock, which is the
+  // one the user is standing in.
   const [spentAt, setSpentAt] = useState(() =>
-    localDateTimeValue(expense?.spent_at ? new Date(expense.spent_at) : new Date()),
+    expense?.spent_at ? toWallClockInput(expense.spent_at) : localDateTimeValue(new Date()),
   );
   const [rate, setRate] = useState<number | null>(expense?.fx_rate ?? null);
   const [rateEdited, setRateEdited] = useState(false);
@@ -62,7 +70,7 @@ export function ExpenseSheet({
       merchant: where.trim() || null,
       place_id: placeId,
       note: note.trim() || null,
-      spent_at: new Date(spentAt).toISOString(),
+      spent_at: fromWallClockInput(spentAt),
     };
     // Send a rate only when the user vouched for it; otherwise the server
     // looks one up and queues the expense for confirmation.

@@ -65,17 +65,62 @@ export const COMMON_CURRENCIES = [
   'INR',
 ];
 
+/**
+ * Every moment the API sends back — a photo's `taken_at`, an expense's
+ * `spent_at`, a stop's bounds — is the clock that was on the wall where it
+ * happened, sent as an ISO string ending in Z because it has to end in
+ * something. It is not a UTC instant, so it is read back as it was written.
+ *
+ * `timeZone: 'UTC'` is what does that: it stops the browser adding its own
+ * offset to a clock that is already local. Without it a 20:36 dinner in
+ * Bangkok came back as 03:36 the next morning, on the next day's page, under
+ * the next day's spend — the same photo, moved by the viewer's offset twice.
+ *
+ * The rule is per value, not per component: anything from a time column goes
+ * through these; a `Date` the browser itself made (today, a picker's value) is
+ * a real local date and is formatted normally.
+ */
+const WALL_CLOCK = { timeZone: 'UTC' } as const;
+
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString(undefined, {
+    ...WALL_CLOCK,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
+    ...WALL_CLOCK,
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+/** A stored moment in full — "10/08/2026, 20:36" — for a list or a summary line. */
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, WALL_CLOCK);
+}
+
+/** The YYYY-MM-DD a stored moment falls on, by its own clock. */
+export function wallClockDay(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+/** A stored moment as a `datetime-local` input's value, and back again.
+ *
+ *  The input speaks wall clocks natively — "2026-08-10T20:36", no zone — which
+ *  is exactly what the column holds, so both directions are a slice and a
+ *  suffix rather than a conversion through the browser's timezone. */
+export function toWallClockInput(iso: string): string {
+  return iso.slice(0, 16);
+}
+
+export function fromWallClockInput(value: string): string {
+  return `${value.length === 16 ? value : value.slice(0, 16)}:00Z`;
 }
 
 /** A trip with no ending expense is one you are still on. */

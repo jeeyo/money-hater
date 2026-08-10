@@ -24,6 +24,7 @@ from app.models import Place, Trip, TripRecommendation, User, Visit
 from app.services import trips as trip_service
 from app.services.geo import haversine_m
 from app.services.llm import prepare_sdk
+from app.services.localtime import local_now
 from app.services.places import search_for_recommendations
 
 log = logging.getLogger(__name__)
@@ -92,11 +93,6 @@ class TripContext:
     visited_place_ids: set[str]
 
 
-def _local(moment: datetime, tz_offset_minutes: int) -> datetime:
-    aware = moment if moment.tzinfo else moment.replace(tzinfo=UTC)
-    return aware + timedelta(minutes=tz_offset_minutes)
-
-
 async def build_context(
     db: AsyncSession, user: User, trip: Trip, tz_offset_minutes: int
 ) -> TripContext | None:
@@ -104,16 +100,18 @@ async def build_context(
     from app.serialize import visit_label
 
     window = trip_service.window_of(trip, tz_offset_minutes)
-    anchor_visit = await trip_service.latest_visit_in(db, user, window)
+    anchor_visit = await trip_service.latest_visit_in(db, user, window, tz_offset_minutes)
     if anchor_visit is None or anchor_visit.lat is None:
         return None
 
     visits = await trip_service.visits_in(db, user, window)
     expenses = await trip_service.expenses_in(db, user, window)
-    local_now = _local(datetime.now(UTC), tz_offset_minutes)
+    # The stops and the window are already on the user's wall clock; only the
+    # server's own clock has to be moved onto it to be comparable with them.
+    now = local_now(tz_offset_minutes)
 
     stops = [
-        f"{_local(visit.started_at, tz_offset_minutes):%a %H:%M} — {visit_label(visit)}"
+        f"{visit.started_at:%a %H:%M} — {visit_label(visit)}"
         + (f" ({', '.join((visit.place.types or [])[:3])})" if visit.place else "")
         for visit in visits
     ]
@@ -127,13 +125,13 @@ async def build_context(
         visit.place.google_place_id for visit in visits if visit.place is not None
     }
 
-    first_day = _local(window.started_at, tz_offset_minutes).date()
+    first_day = window.started_at.date()
     return TripContext(
         anchor=(anchor_visit.lat, anchor_visit.lng),
         anchor_visit=anchor_visit,
         anchor_label=visit_label(anchor_visit),
-        local_now=local_now,
-        day_number=(local_now.date() - first_day).days + 1,
+        local_now=now,
+        day_number=(now.date() - first_day).days + 1,
         stops=stops[-12:],
         spending=spending[-12:],
         visited_place_ids=visited_place_ids,

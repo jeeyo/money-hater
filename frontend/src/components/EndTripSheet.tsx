@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useEndTrip, useExpenses } from '../hooks/useData';
-import { localDateString } from '../lib/format';
+import { localDateString, wallClockDay } from '../lib/format';
 import type { TripDetail } from '../types';
 import { BoundPicker, expenseDay } from './BoundPicker';
 import { Sheet } from './Sheet';
@@ -12,7 +12,9 @@ export function EndTripSheet({ trip, onClose }: { trip: TripDetail; onClose: () 
   const endTrip = useEndTrip(trip.id);
   const [endId, setEndId] = useState<number | null>(null);
 
-  const firstDay = localDateString(new Date(trip.started_at));
+  // The trip's own bounds are wall clocks; "today" is the browser's own date,
+  // which is the same clock the user is reading them on.
+  const firstDay = wallClockDay(trip.started_at);
   const lastDay = localDateString(new Date());
 
   // Only expenses inside the trip can end it, so clamp the picker to its days.

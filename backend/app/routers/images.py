@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 
 import sqlalchemy as sa
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +14,7 @@ from app.serialize import image_out
 from app.services import storage
 from app.services.clustering import place_edit_regroups, recluster_user, refresh_visit_place
 from app.services.exif import ExifData, extract_exif
+from app.services.localtime import MAX_OFFSET_MINUTES, local_now
 from app.services.places import search_place_by_text
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -47,7 +48,17 @@ async def _defer_analysis(image_id: int) -> None:
 
 
 @router.post("", response_model=list[ImageOut], status_code=201)
-async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSession):
+async def upload_images(
+    files: list[UploadFile],
+    user: CurrentUser,
+    db: DbSession,
+    tz_offset_minutes: int = Query(
+        default=0,
+        ge=-MAX_OFFSET_MINUTES,
+        le=MAX_OFFSET_MINUTES,
+        description="The uploader's UTC offset, for photos whose own clock is missing",
+    ),
+):
     if not files:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No files provided")
 
@@ -78,6 +89,13 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
         exif = await asyncio.to_thread(extract_exif, data)
         accepted.append((data, mime, exif))
 
+    # A photo whose camera never wrote a timestamp is filed under when it
+    # arrived — but as the *uploader's* clock reads it, not the server's. The
+    # column is a local wall clock (`app.services.localtime`), and dropping a
+    # UTC instant into it would put a photo uploaded over dinner in Bangkok at
+    # lunchtime, hours from the photos it was taken beside.
+    arrived_at = local_now(tz_offset_minutes)
+
     created: list[Image] = []
     for data, mime, exif in accepted:
         sha256 = storage.sha256_hex(data)
@@ -101,7 +119,7 @@ async def upload_images(files: list[UploadFile], user: CurrentUser, db: DbSessio
             status="pending",
             lat=exif.lat,
             lng=exif.lng,
-            taken_at=exif.taken_at,
+            taken_at=exif.taken_at or arrived_at,
             taken_at_source="exif" if exif.taken_at else "upload",
             exif=exif.raw or None,
         )
