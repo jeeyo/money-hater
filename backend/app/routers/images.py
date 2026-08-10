@@ -12,7 +12,7 @@ from app.models import Image, Place
 from app.schemas import ImageAssignRequest, ImageOut, ImageUpdate
 from app.serialize import image_out
 from app.services import storage
-from app.services.clustering import recluster_user, refresh_visit_place
+from app.services.clustering import place_edit_regroups, recluster_user, refresh_visit_place
 from app.services.exif import ExifData, extract_exif
 from app.services.places import search_place_by_text
 
@@ -179,16 +179,16 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
         # not put back the place the user just rejected.
         image.place_pinned = True
         await db.commit()
-        if image.lat is None or image.lng is None:
-            # A photo with no GPS borrows the coordinates of its place, so
-            # naming one gives it a location it never had. Rebuild the stops
-            # rather than only renaming one: it can now form or join a stop,
-            # and that is what puts it on the map.
+        if await place_edit_regroups(db, image):
+            # The answer can change which photos belong together — a photo with
+            # no GPS gains the coordinates of its place, and a place picked by
+            # hand outranks the distance between two fixes — so rebuild the
+            # stops rather than only renaming one.
             await recluster_user(db, user)
         elif image.visit_id is not None:
-            # A stop is named after the places of its photos, so the correction
-            # has to reach the stop too. Grouping is decided by time and GPS,
-            # which have not changed, so no photo can move between stops.
+            # Nothing can move, so only the name is out of date. Renaming in
+            # place keeps the stop's id, and with it the card the user is
+            # looking at.
             await refresh_visit_place(db, image.visit_id)
 
     return image_out(await _get_owned_image(db, user.id, image_id))
