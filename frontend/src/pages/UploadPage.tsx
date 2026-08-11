@@ -64,10 +64,20 @@ function UploadedImage({ initial, onOpen }: { initial: ImageRecord; onOpen: () =
   );
 
   return (
-    <button
-      type="button"
+    // A <div>, not a <button>: ImageThumb is itself a button, and a button
+    // cannot nest one — the browser would split it out from under React,
+    // hydration mismatch included.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface p-2 text-left active:bg-surface-2"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface p-2 text-left active:bg-surface-2"
     >
       <ImageThumb image={image} size="size-16" />
       <div className="min-w-0 flex-1 text-sm">
@@ -111,7 +121,7 @@ function UploadedImage({ initial, onOpen }: { initial: ImageRecord; onOpen: () =
           </p>
         )}
       </div>
-    </button>
+    </div>
   );
 }
 
