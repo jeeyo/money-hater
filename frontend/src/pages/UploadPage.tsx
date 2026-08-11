@@ -1,12 +1,19 @@
-import { AlertTriangle, Camera, Check, ImagePlus, Loader2, MapPin, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Clock, ImagePlus, Loader2, MapPin, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { ImageModal } from '../components/ImageModal';
 import { ImageThumb } from '../components/ImageThumb';
 import { LocationHelpSheet } from '../components/LocationHelpSheet';
-import { useImage, useReanalyzeImage, useUploadImages } from '../hooks/useData';
+import {
+  useImage,
+  useReanalyzeImage,
+  useRecentImages,
+  useUploadImages,
+} from '../hooks/useData';
 import type { UploadOutcome } from '../hooks/useData';
 import { looksLikeImage } from '../lib/files';
+import { formatDateTime } from '../lib/format';
 import { takeSharedFiles } from '../lib/sharedFiles';
 import type { ImageRecord } from '../types';
 
@@ -24,7 +31,7 @@ function reasonFor(outcome: UploadOutcome): string {
  *  the row exactly like this, and nothing else on this page can rescue it. */
 const STALL_AFTER_MS = 45_000;
 
-function UploadedImage({ initial }: { initial: ImageRecord }) {
+function UploadedImage({ initial, onOpen }: { initial: ImageRecord; onOpen: () => void }) {
   // Poll each uploaded image until analysis completes
   const { data } = useImage(initial.id);
   const reanalyze = useReanalyzeImage();
@@ -45,7 +52,10 @@ function UploadedImage({ initial }: { initial: ImageRecord }) {
   const retry = (
     <button
       type="button"
-      onClick={() => reanalyze.mutate(image.id)}
+      onClick={(e) => {
+        e.stopPropagation();
+        reanalyze.mutate(image.id);
+      }}
       disabled={reanalyze.isPending}
       className="mt-1 flex items-center gap-1 text-xs font-medium text-brand-600 disabled:text-ink-4"
     >
@@ -54,7 +64,11 @@ function UploadedImage({ initial }: { initial: ImageRecord }) {
   );
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface p-2 text-left active:bg-surface-2"
+    >
       <ImageThumb image={image} size="size-16" />
       <div className="min-w-0 flex-1 text-sm">
         {image.status === 'analyzed' ? (
@@ -88,8 +102,16 @@ function UploadedImage({ initial }: { initial: ImageRecord }) {
             )}
           </>
         )}
+        {image.taken_at && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-ink-4">
+            <Clock className="size-3 shrink-0" aria-hidden />
+            {formatDateTime(image.taken_at)}
+            {image.taken_at_source === 'custom' ? ' · edited' : ''}
+            {image.taken_at_source === 'upload' ? ' · guessed' : ''}
+          </p>
+        )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -99,8 +121,14 @@ export function UploadPage() {
   const [skipped, setSkipped] = useState<UploadOutcome[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [openImage, setOpenImage] = useState<ImageRecord | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
+  const recent = useRecentImages();
+  const uploadedIds = new Set(uploaded.map((image) => image.id));
+  // Older uploads, from this session or an earlier one — the "just uploaded"
+  // list above already covers the ones just added, so this is everything else.
+  const olderUploads = (recent.data ?? []).filter((image) => !uploadedIds.has(image.id));
 
   // `upload` is recreated each render, so keep the callback out of the effect's
   // dependencies — the shared photos must be claimed exactly once.
@@ -271,8 +299,9 @@ export function UploadPage() {
           <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-3">
             <Check className="size-4 text-brand-600" aria-hidden /> Just uploaded
           </h2>
+          <p className="text-xs text-ink-4">Tap a photo to fix its date, time, or place.</p>
           {uploaded.map((image) => (
-            <UploadedImage key={image.id} initial={image} />
+            <UploadedImage key={image.id} initial={image} onOpen={() => setOpenImage(image)} />
           ))}
           <Link to="/" className="inline-block pt-1 text-sm font-medium text-brand-600">
             See today's timeline →
@@ -280,7 +309,22 @@ export function UploadPage() {
         </section>
       )}
 
+      {olderUploads.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-3">
+            <Clock className="size-4 text-ink-4" aria-hidden /> Recently uploaded
+          </h2>
+          <p className="text-xs text-ink-4">
+            Got filed on the wrong day? Tap a photo to fix its date, time, or place.
+          </p>
+          {olderUploads.map((image) => (
+            <UploadedImage key={image.id} initial={image} onOpen={() => setOpenImage(image)} />
+          ))}
+        </section>
+      )}
+
       {helpOpen && <LocationHelpSheet onClose={() => setHelpOpen(false)} />}
+      {openImage && <ImageModal image={openImage} onClose={() => setOpenImage(null)} />}
     </div>
   );
 }
