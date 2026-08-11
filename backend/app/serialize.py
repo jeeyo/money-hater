@@ -65,6 +65,7 @@ def image_out(image: Image) -> ImageOut:
         id=image.id,
         mime=image.mime,
         taken_at=image.taken_at,
+        exif_taken_at=image.exif_taken_at,
         taken_at_source=image.taken_at_source,
         lat=coord(image.lat),
         lng=coord(image.lng),

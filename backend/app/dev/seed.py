@@ -366,7 +366,8 @@ async def build(db) -> User:
         jitter = random.Random(key)
         image = Image(
             user_id=user.id, sha256=sha, original_path=str(path), thumb_path=str(thumb),
-            mime="image/jpeg", size_bytes=len(data), taken_at=taken, taken_at_source="exif",
+            mime="image/jpeg", size_bytes=len(data), taken_at=taken, exif_taken_at=taken,
+            taken_at_source="exif",
             lat=place.lat + jitter.uniform(-4e-4, 4e-4),
             lng=place.lng + jitter.uniform(-4e-4, 4e-4),
             place_id=place.id, status="analyzed", uploaded_at=taken,
