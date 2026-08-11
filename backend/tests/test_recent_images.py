@@ -32,7 +32,9 @@ async def test_recent_images_are_scoped_to_the_caller(client):
 async def test_recent_images_respects_limit(client):
     await register(client)
     for name, color in (("a.jpg", (10, 10, 10)), ("b.jpg", (20, 20, 20)), ("c.jpg", (30, 30, 30))):
-        await client.post("/api/images", files=[("files", (name, make_jpeg(color=color), "image/jpeg"))])
+        await client.post(
+            "/api/images", files=[("files", (name, make_jpeg(color=color), "image/jpeg"))]
+        )
 
     listed = (await client.get("/api/images?limit=2")).json()
     assert len(listed) == 2
