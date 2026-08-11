@@ -141,6 +141,28 @@ async def upload_images(
     return [image_out(image) for image in result.scalars()]
 
 
+@router.get("", response_model=list[ImageOut])
+async def list_recent_images(
+    user: CurrentUser,
+    db: DbSession,
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    """The most recently uploaded photos, newest first.
+
+    Lets the upload page offer a fix for a wrong date or place right where a
+    photo landed, rather than sending the user hunting for it on the
+    timeline it got misfiled onto.
+    """
+    result = await db.execute(
+        sa.select(Image)
+        .where(Image.user_id == user.id)
+        .order_by(Image.uploaded_at.desc(), Image.id.desc())
+        .limit(limit)
+        .options(*_LOADS)
+    )
+    return [image_out(image) for image in result.scalars()]
+
+
 @router.get("/{image_id}", response_model=ImageOut)
 async def get_image(image_id: int, user: CurrentUser, db: DbSession):
     return image_out(await _get_owned_image(db, user.id, image_id))

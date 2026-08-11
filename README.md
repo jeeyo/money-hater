@@ -394,6 +394,19 @@ Keeping it is still worth doing — it is what puts a photo on the map with no e
 the upload screen links **"How to keep it"**: a sheet with the camera and sharing settings for
 whichever phone you are on, and the warning about chat apps.
 
+### Fixing a wrong date or time
+
+A camera's clock is not always right, and a photo with no clock of its own is filed under when it
+arrived — which can be hours off, or land it on the wrong side of midnight. That is exactly the
+kind of mistake that's hard to catch after the fact: a photo filed on the wrong day is not where
+you'd think to go looking for it.
+
+The upload page keeps the fix close by instead of leaving you to hunt for it on the timeline.
+Every photo you have uploaded shows the date and time it was filed under, and **tapping it** opens
+the same date/time and place editor the timeline uses. This works for photos you just added and
+for anything uploaded earlier — a **Recently uploaded** list below shows your most recent uploads
+across sessions, so a mis-parsed photo from yesterday is still one tap away from being fixed.
+
 ## Adding expenses without a receipt
 
 Not everything comes with paper. **Expenses → Add** records an amount, currency, **what** it was

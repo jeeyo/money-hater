@@ -216,6 +216,17 @@ function invalidateItinerary() {
   queryClient.invalidateQueries({ queryKey: ['timeline'] });
   queryClient.invalidateQueries({ queryKey: ['trips'] });
   queryClient.invalidateQueries({ queryKey: ['expenses'] });
+  queryClient.invalidateQueries({ queryKey: ['images', 'recent'] });
+}
+
+/** The most recently uploaded photos, across sessions — so a photo the
+ *  parser filed under the wrong date is still findable and fixable from the
+ *  upload page itself, not just by hunting for it on the timeline. */
+export function useRecentImages(limit = 20) {
+  return useQuery({
+    queryKey: ['images', 'recent', limit],
+    queryFn: () => apiJson<ImageRecord[]>(`/api/images?limit=${limit}`),
+  });
 }
 
 export interface UploadOutcome {
