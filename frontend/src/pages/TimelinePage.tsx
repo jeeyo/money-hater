@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Luggage } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ImageModal } from '../components/ImageModal';
 import { ImageThumb } from '../components/ImageThumb';
@@ -59,6 +59,19 @@ export function TimelinePage() {
   const { view, date, go } = useTimelineParams();
   const today = localDateString(new Date());
   const [openImage, setOpenImage] = useState<ImageRecord | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  function finishSwipe(event: React.TouchEvent) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || event.changedTouches.length === 0) return;
+    const dx = event.changedTouches[0].clientX - start.x;
+    const dy = event.changedTouches[0].clientY - start.y;
+    // Deliberately require a clear horizontal gesture so ordinary scrolling
+    // and taps on cards never page the timeline by accident.
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    go({ date: shiftSpan(date, view, dx < 0 ? 1 : -1) });
+  }
 
   const span: TimelineSpan = view === 'month' ? 'month' : 'week';
   const day = useTimeline(date);
@@ -81,7 +94,15 @@ export function TimelinePage() {
         : date.slice(0, 7) === today.slice(0, 7);
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4 touch-pan-y"
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+      }}
+      onTouchEnd={finishSwipe}
+      onTouchCancel={() => { touchStart.current = null; }}
+    >
       <header className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <button

@@ -120,6 +120,7 @@ async def upload_images(
             lat=exif.lat,
             lng=exif.lng,
             taken_at=exif.taken_at or arrived_at,
+            exif_taken_at=exif.taken_at,
             taken_at_source="exif" if exif.taken_at else "upload",
             exif=exif.raw or None,
         )
@@ -186,7 +187,7 @@ async def _place_from(db: DbSession, image: Image, body: ImageUpdate) -> Place |
 
 @router.patch("/{image_id}", response_model=ImageOut)
 async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: DbSession):
-    """Correct what the pipeline read off a photo — today, its place.
+    """Correct the time or place the pipeline read off a photo.
 
     Reverse geocoding picks the nearest match to the GPS fix, which indoors or
     in a dense block is often the shop next door. Rather than make the user
@@ -195,6 +196,22 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
     """
     image = await _get_owned_image(db, user.id, image_id)
     sent = body.model_dump(exclude_unset=True)
+
+    if "taken_at" in sent:
+        if body.taken_at is None:
+            if image.exif_taken_at is None:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT, "This image has no EXIF date to restore"
+                )
+            image.taken_at = image.exif_taken_at
+            image.taken_at_source = "exif"
+        else:
+            image.taken_at = body.taken_at
+            image.taken_at_source = "custom"
+        await db.commit()
+        # Time determines both the day and the stop, so refresh the itinerary
+        # immediately after a correction rather than waiting for analysis.
+        await recluster_user(db, user)
 
     if "place_id" in sent or "place_query" in sent:
         place = await _place_from(db, image, body)

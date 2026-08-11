@@ -1,7 +1,7 @@
 import { MapPin, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useDeleteImage, useImage, useReanalyzeImage, useUpdateImage } from '../hooks/useData';
-import { formatTime } from '../lib/format';
+import { formatDateTime, fromWallClockInput, toWallClockInput } from '../lib/format';
 import type { ImageRecord } from '../types';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 
@@ -139,6 +139,49 @@ function PlaceRow({ image }: { image: ImageRecord }) {
   );
 }
 
+function DateTimeRow({ image }: { image: ImageRecord }) {
+  const update = useUpdateImage();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(image.taken_at ? toWallClockInput(image.taken_at) : '');
+
+  function close() {
+    setEditing(false);
+    update.reset();
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-ink-3">Date and time</span>
+        {!editing && (
+          <button type="button" onClick={() => setEditing(true)} className="flex items-center gap-1 text-xs font-medium text-brand-600">
+            <Pencil className="size-3.5" /> Edit
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <input type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink" />
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" disabled={!value || update.isPending} onClick={() => update.mutate({ id: image.id, taken_at: fromWallClockInput(value) }, { onSuccess: close })} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-surface-2 disabled:text-ink-4">Save</button>
+            <button type="button" onClick={close} className="text-xs font-medium text-ink-3">Cancel</button>
+            {image.taken_at_source === 'custom' && image.exif_taken_at && (
+              <button type="button" onClick={() => update.mutate({ id: image.id, taken_at: null }, { onSuccess: close })} className="text-xs font-medium text-brand-600">Revert to EXIF</button>
+            )}
+          </div>
+          {update.isError && <p className="text-xs text-danger">{update.error.message}</p>}
+        </div>
+      ) : (
+        <p className="text-sm text-ink-2">
+          {image.taken_at
+            ? `${formatDateTime(image.taken_at)} (${image.taken_at_source})`
+            : 'Not set'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ImageModal({ image: initial, onClose }: { image: ImageRecord; onClose: () => void }) {
   const reanalyze = useReanalyzeImage();
   const remove = useDeleteImage();
@@ -184,16 +227,9 @@ export function ImageModal({ image: initial, onClose }: { image: ImageRecord; on
 
           <PlaceRow image={image} />
 
+          <DateTimeRow image={image} />
+
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-3">
-            {image.taken_at && (
-              <>
-                <dt>Taken</dt>
-                <dd>
-                  {formatTime(image.taken_at)}{' '}
-                  <span className="text-ink-4">({image.taken_at_source})</span>
-                </dd>
-              </>
-            )}
             {image.lat != null && (
               <>
                 <dt>GPS</dt>

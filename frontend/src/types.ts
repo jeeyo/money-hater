@@ -36,7 +36,8 @@ export interface ImageRecord {
   id: number;
   mime: string;
   taken_at: string | null;
-  taken_at_source: 'exif' | 'receipt' | 'upload';
+  exif_taken_at: string | null;
+  taken_at_source: 'exif' | 'receipt' | 'upload' | 'custom';
   lat: number | null;
   lng: number | null;
   status: 'pending' | 'processing' | 'analyzed' | 'failed';

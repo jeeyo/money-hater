@@ -352,6 +352,7 @@ export function useUpdateImage() {
       id: number;
       place_id?: number | null;
       place_query?: string;
+      taken_at?: string | null;
     }) => postJson<ImageRecord>(`/api/images/${id}`, body, 'PATCH'),
     onSuccess: (image) => {
       // Seed the per-image cache so an open modal shows the new place at once

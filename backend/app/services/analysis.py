@@ -39,8 +39,10 @@ log = logging.getLogger(__name__)
 async def _apply_exif(image: Image, data: bytes) -> None:
     exif = await asyncio.to_thread(extract_exif, data)
     if exif.taken_at:
-        image.taken_at = exif.taken_at
-        image.taken_at_source = "exif"
+        image.exif_taken_at = exif.taken_at
+        if image.taken_at_source != "custom":
+            image.taken_at = exif.taken_at
+            image.taken_at_source = "exif"
     elif image.taken_at is None:
         # Only rows written before uploads carried the uploader's offset get
         # here, and `uploaded_at` is the best this side of the request has.

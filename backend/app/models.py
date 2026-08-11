@@ -129,6 +129,9 @@ class Image(Base):
     mime: Mapped[str] = mapped_column(sa.String(64))
     size_bytes: Mapped[int] = mapped_column(sa.BigInteger)
     taken_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # The camera value is kept separately so a user's correction never
+    # destroys it and can always be undone.
+    exif_taken_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     taken_at_source: Mapped[str] = mapped_column(sa.String(16), default="upload")
     lat: Mapped[float | None] = mapped_column(sa.Float)
     lng: Mapped[float | None] = mapped_column(sa.Float)

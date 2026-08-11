@@ -96,6 +96,7 @@ class ImageOut(BaseModel):
     id: int
     mime: str
     taken_at: datetime | None
+    exif_taken_at: datetime | None
     taken_at_source: str
     lat: float | None
     lng: float | None
@@ -383,3 +384,6 @@ class ImageUpdate(BaseModel):
 
     place_id: int | None = None
     place_query: str | None = None
+    # A value is a user override; explicit null restores the preserved EXIF
+    # value. Omission leaves the time untouched.
+    taken_at: datetime | None = None
