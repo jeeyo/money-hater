@@ -59,7 +59,13 @@ export function TimelinePage() {
   const { view, date, go } = useTimelineParams();
   const today = localDateString(new Date());
   const [openImage, setOpenImage] = useState<ImageRecord | null>(null);
+  const [pageDirection, setPageDirection] = useState<1 | -1>(1);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  function page(steps: 1 | -1) {
+    setPageDirection(steps);
+    go({ date: shiftSpan(date, view, steps) });
+  }
 
   function finishSwipe(event: React.TouchEvent) {
     const start = touchStart.current;
@@ -70,7 +76,7 @@ export function TimelinePage() {
     // Deliberately require a clear horizontal gesture so ordinary scrolling
     // and taps on cards never page the timeline by accident.
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
-    go({ date: shiftSpan(date, view, dx < 0 ? 1 : -1) });
+    page(dx < 0 ? 1 : -1);
   }
 
   const span: TimelineSpan = view === 'month' ? 'month' : 'week';
@@ -95,7 +101,7 @@ export function TimelinePage() {
 
   return (
     <div
-      className="space-y-4 touch-pan-y"
+      className="flex flex-1 flex-col space-y-4 touch-pan-y"
       onTouchStart={(event) => {
         const touch = event.touches[0];
         touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
@@ -108,7 +114,7 @@ export function TimelinePage() {
           <button
             type="button"
             aria-label={`Previous ${view}`}
-            onClick={() => go({ date: shiftSpan(date, view, -1) })}
+            onClick={() => page(-1)}
             className="rounded-full p-2 text-ink-3 active:bg-surface-2"
           >
             <ChevronLeft className="size-5" />
@@ -130,7 +136,7 @@ export function TimelinePage() {
           <button
             type="button"
             aria-label={`Next ${view}`}
-            onClick={() => go({ date: shiftSpan(date, view, 1) })}
+            onClick={() => page(1)}
             className="rounded-full p-2 text-ink-3 active:bg-surface-2"
           >
             <ChevronRight className="size-5" />
@@ -172,78 +178,87 @@ export function TimelinePage() {
         </div>
       </header>
 
-      {trips.map((trip) => (
-        <Link
-          key={trip.id}
-          to={`/trips/${trip.id}`}
-          className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700"
-        >
-          <Luggage className="size-4 shrink-0" />
-          <span className="flex-1 truncate">
-            {view === 'day' ? 'Part of ' : 'Includes '}
-            <span className="font-semibold">{trip.title}</span>
-            {isOpenTrip(trip) && ' · ongoing'}
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-brand-500" />
-        </Link>
-      ))}
-
-      {spend && spend.base_total_minor > 0 && (
-        <p className="rounded-xl bg-money-bg px-4 py-2.5 text-sm text-money">
-          Spent this {view}: <span className="font-semibold">{formatSpend(spend)}</span>
-        </p>
-      )}
-
-      {isLoading && <p className="py-12 text-center text-sm text-ink-4">Loading {view}…</p>}
-
-      {view === 'day' && dayIsEmpty && (
-        <div className="py-16 text-center">
-          <p className="text-ink-3">Nothing logged this day.</p>
-          <Link to="/upload" className="mt-2 inline-block font-medium text-brand-600">
-            Upload photos →
+      <div
+        key={`${view}:${date}`}
+        className={`space-y-4 ${pageDirection === 1 ? 'timeline-page-forward' : 'timeline-page-back'}`}
+      >
+        {trips.map((trip) => (
+          <Link
+            key={trip.id}
+            to={`/trips/${trip.id}`}
+            className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700"
+          >
+            <Luggage className="size-4 shrink-0" />
+            <span className="flex-1 truncate">
+              {view === 'day' ? 'Part of ' : 'Includes '}
+              <span className="font-semibold">{trip.title}</span>
+              {isOpenTrip(trip) && ' · ongoing'}
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-brand-500" />
           </Link>
-        </div>
-      )}
+        ))}
 
-      {view === 'day' && day.data && day.data.visits.length > 0 && (
-        <div className="space-y-3 border-l border-line [&>*]:-ml-px">
-          {day.data.visits.map((visit) => (
-            <VisitCard key={visit.id} visit={visit} />
-          ))}
-        </div>
-      )}
+        {spend && spend.base_total_minor > 0 && (
+          <p className="rounded-xl bg-money-bg px-4 py-2.5 text-sm text-money">
+            Spent this {view}: <span className="font-semibold">{formatSpend(spend)}</span>
+          </p>
+        )}
 
-      {view === 'day' && day.data && day.data.unassigned_images.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="px-1 text-sm font-semibold text-ink-3">Not yet placed</h2>
-          <div className="flex flex-wrap gap-2">
-            {day.data.unassigned_images.map((image) => (
-              <ImageThumb key={image.id} image={image} onClick={() => setOpenImage(image)} />
+        {isLoading && <p className="py-12 text-center text-sm text-ink-4">Loading {view}…</p>}
+
+        {view === 'day' && dayIsEmpty && (
+          <div className="py-16 text-center">
+            <p className="text-ink-3">Nothing logged this day.</p>
+            <Link to="/upload" className="mt-2 inline-block font-medium text-brand-600">
+              Upload photos →
+            </Link>
+          </div>
+        )}
+
+        {view === 'day' && day.data && day.data.visits.length > 0 && (
+          <div className="space-y-3 border-l border-line [&>*]:-ml-px">
+            {day.data.visits.map((visit) => (
+              <VisitCard key={visit.id} visit={visit} />
             ))}
           </div>
-        </section>
-      )}
+        )}
 
-      {view === 'week' && range.data && (
-        <WeekView data={range.data} today={today} onOpenDay={(d) => go({ view: 'day', date: d })} />
-      )}
+        {view === 'day' && day.data && day.data.unassigned_images.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="px-1 text-sm font-semibold text-ink-3">Not yet placed</h2>
+            <div className="flex flex-wrap gap-2">
+              {day.data.unassigned_images.map((image) => (
+                <ImageThumb key={image.id} image={image} onClick={() => setOpenImage(image)} />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {view === 'month' && range.data && (
-        <MonthView
-          data={range.data}
-          today={today}
-          onOpenDay={(d) => go({ view: 'day', date: d })}
-        />
-      )}
+        {view === 'week' && range.data && (
+          <WeekView
+            data={range.data}
+            today={today}
+            onOpenDay={(d) => go({ view: 'day', date: d })}
+          />
+        )}
 
-      {view !== 'day' && range.data && isSpanEmpty(range.data) && (
-        <p className="pb-4 text-center text-sm text-ink-4">
-          Nothing logged this {view}.{' '}
-          <Link to="/upload" className="font-medium text-brand-600">
-            Upload photos →
-          </Link>
-        </p>
-      )}
+        {view === 'month' && range.data && (
+          <MonthView
+            data={range.data}
+            today={today}
+            onOpenDay={(d) => go({ view: 'day', date: d })}
+          />
+        )}
+
+        {view !== 'day' && range.data && isSpanEmpty(range.data) && (
+          <p className="pb-4 text-center text-sm text-ink-4">
+            Nothing logged this {view}.{' '}
+            <Link to="/upload" className="font-medium text-brand-600">
+              Upload photos →
+            </Link>
+          </p>
+        )}
+      </div>
 
       {openImage && <ImageModal image={openImage} onClose={() => setOpenImage(null)} />}
     </div>

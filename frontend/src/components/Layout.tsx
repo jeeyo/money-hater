@@ -42,7 +42,7 @@ function NavItems({ vertical }: { vertical?: boolean }) {
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh md:flex">
+    <div className="flex min-h-dvh flex-col md:flex-row">
       {/* Sidebar on ≥md */}
       <aside className="hidden md:flex md:w-56 md:flex-col md:gap-1 md:border-r md:border-line md:bg-surface md:p-4">
         <div className="mb-4 flex items-center gap-2.5 px-3">
@@ -55,7 +55,9 @@ export function Layout({ children }: { children: ReactNode }) {
         <NavItems vertical />
       </aside>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-4 md:pb-8">{children}</main>
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-24 pt-4 md:pb-8">
+        {children}
+      </main>
 
       {/* Bottom tab bar on mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-surface/95 backdrop-blur md:hidden">
