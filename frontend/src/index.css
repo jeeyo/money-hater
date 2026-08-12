@@ -85,3 +85,31 @@ body {
 .dark .maplibregl-ctrl-group {
   filter: invert(1) hue-rotate(180deg);
 }
+
+/* Timeline paging (TimelinePage): the incoming day/week/month slides in from
+   the side it was paged from, so a swipe reads as moving along a filmstrip
+   rather than a jump-cut. */
+@keyframes timeline-page-from-right {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@keyframes timeline-page-from-left {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+.timeline-page-forward {
+  animation: timeline-page-from-right 200ms ease-out;
+}
+.timeline-page-back {
+  animation: timeline-page-from-left 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .timeline-page-forward,
+  .timeline-page-back {
+    animation: none;
+  }
+}
