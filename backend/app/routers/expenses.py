@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 from decimal import Decimal
 
@@ -10,13 +11,15 @@ from app.models import Expense, ExpenseItem, Image, Trip
 from app.schemas import (
     ExpenseConfirm,
     ExpenseCreate,
+    ExpenseGroupOut,
     ExpenseOut,
+    ExpensePageOut,
     ExpenseSummaryOut,
     ExpenseUpdate,
     MerchantTotal,
     RateOut,
 )
-from app.serialize import expense_out, spend_out
+from app.serialize import expense_moment, expense_out, place_out, spend_out
 from app.services import fx
 from app.services.expenses import (
     apply_conversion,
@@ -71,6 +74,76 @@ async def list_expenses(
         query = query.where(Expense.needs_review.is_(needs_review))
     result = await db.execute(query.order_by(_spent.desc()).limit(limit).offset(offset))
     return [expense_out(expense) for expense in result.scalars()]
+
+
+@router.get("/grouped", response_model=ExpensePageOut)
+async def list_expenses_grouped(
+    user: CurrentUser,
+    db: DbSession,
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    needs_review: bool | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=50),
+):
+    """The "All expenses" list, sectioned by place.
+
+    Expenses sharing a resolved place are shown as one group, ordered by that
+    place's most recent visit; an expense with no resolved place stands alone.
+    Paginated over groups (not raw rows) so a page always reads as complete
+    sections rather than a place cut off mid-list.
+    """
+    # Negative expense id keeps solo groups unique without colliding with a
+    # real (always positive) place id.
+    group_key = sa.func.coalesce(Expense.place_id, -Expense.id)
+
+    def _filtered(query):
+        query = _range_filter(query, user.id, date_from, date_to)
+        if needs_review is not None:
+            query = query.where(Expense.needs_review.is_(needs_review))
+        return query
+
+    groups_q = _filtered(
+        sa.select(group_key.label("gkey"), sa.func.max(_spent).label("last_spent"))
+    ).group_by(group_key)
+
+    total_groups = await db.scalar(sa.select(sa.func.count()).select_from(groups_q.subquery()))
+    total_groups = total_groups or 0
+
+    page_rows = (
+        await db.execute(
+            groups_q.order_by(sa.desc("last_spent"))
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+    ).all()
+    keys = [row.gkey for row in page_rows]
+
+    groups: list[ExpenseGroupOut] = []
+    if keys:
+        expenses_q = _filtered(
+            sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place))
+        ).where(group_key.in_(keys))
+        buckets: dict[int, list[Expense]] = {key: [] for key in keys}
+        for expense in (await db.execute(expenses_q)).scalars():
+            bucket_key = expense.place_id if expense.place_id is not None else -expense.id
+            buckets[bucket_key].append(expense)
+        for key in keys:
+            bucket = sorted(buckets[key], key=expense_moment, reverse=True)
+            groups.append(
+                ExpenseGroupOut(
+                    place=place_out(bucket[0].place),
+                    expenses=[expense_out(e) for e in bucket],
+                )
+            )
+
+    return ExpensePageOut(
+        groups=groups,
+        page=page,
+        page_size=page_size,
+        total_groups=total_groups,
+        total_pages=max(1, math.ceil(total_groups / page_size)),
+    )
 
 
 @router.post("", response_model=ExpenseOut, status_code=201)

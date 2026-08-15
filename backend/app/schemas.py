@@ -142,6 +142,25 @@ class ExpenseOut(BaseModel):
     items: list[ExpenseItemOut]
 
 
+class ExpenseGroupOut(BaseModel):
+    """Expenses sharing a resolved place, most recent first.
+
+    ``place`` is null for a group of one — an expense with no resolved place,
+    standing on its own rather than merged with unrelated free-text merchants.
+    """
+
+    place: PlaceOut | None
+    expenses: list[ExpenseOut]
+
+
+class ExpensePageOut(BaseModel):
+    groups: list[ExpenseGroupOut]
+    page: int
+    page_size: int
+    total_groups: int
+    total_pages: int
+
+
 class ExpenseItemIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     qty: float = 1.0

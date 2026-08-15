@@ -1,12 +1,27 @@
-import { AlertTriangle, MapPin, Pencil, Plus, Receipt, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Pencil,
+  Plus,
+  Receipt,
+  Trash2,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { ExpenseSheet } from '../components/ExpenseSheet';
 import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
 import { ImageModal } from '../components/ImageModal';
 import { useAuth } from '../context/AuthContext';
-import { useDeleteExpense, useExpenseSummary, useExpenses, useImage } from '../hooks/useData';
+import {
+  useDeleteExpense,
+  useExpenseSummary,
+  useExpenses,
+  useExpensesGrouped,
+  useImage,
+} from '../hooks/useData';
 import { formatDateTime, formatMoney } from '../lib/format';
-import type { Expense, MerchantTotal } from '../types';
+import type { Expense, ExpenseGroup, MerchantTotal } from '../types';
 
 /** Single-hue magnitude bars: one series, values in ink rather than series color. */
 function MerchantBars({ merchants }: { merchants: MerchantTotal[] }) {
@@ -181,16 +196,78 @@ function ExpenseRow({
   );
 }
 
+/** One section of the All expenses list — expenses sharing a resolved place,
+ *  under a header, or a single ungrouped expense standing on its own. */
+function ExpenseGroupSection({
+  group,
+  baseCurrency,
+  onConfirm,
+  onEdit,
+}: {
+  group: ExpenseGroup;
+  baseCurrency: string;
+  onConfirm: (expense: Expense) => void;
+  onEdit: (expense: Expense) => void;
+}) {
+  if (!group.place) {
+    return (
+      <>
+        {group.expenses.map((expense) => (
+          <ExpenseRow
+            key={expense.id}
+            expense={expense}
+            onConfirm={() => onConfirm(expense)}
+            onEdit={() => onEdit(expense)}
+          />
+        ))}
+      </>
+    );
+  }
+
+  const total = group.expenses.reduce((sum, e) => sum + (e.base_total_minor ?? 0), 0);
+
+  return (
+    <li className="space-y-2">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-ink-3">
+          <MapPin className="size-3.5 shrink-0 text-ink-4" />
+          <span className="truncate">{group.place.name}</span>
+        </span>
+        <span className="shrink-0 text-xs font-medium text-ink-4 tabular-nums">
+          {formatMoney(total, baseCurrency)} · {group.expenses.length}
+        </span>
+      </div>
+      <ul className="space-y-2">
+        {group.expenses.map((expense) => (
+          <ExpenseRow
+            key={expense.id}
+            expense={expense}
+            onConfirm={() => onConfirm(expense)}
+            onEdit={() => onEdit(expense)}
+          />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
 export function ExpensesPage() {
   const { user } = useAuth();
   const baseCurrency = user?.preferred_currency ?? 'THB';
   const { data: summary } = useExpenseSummary();
-  const { data: expenses, isLoading } = useExpenses();
+  const { data: needsReview } = useExpenses(true);
+  const [page, setPage] = useState(1);
+  const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
 
-  const needsReview = expenses?.filter((e) => e.needs_review) ?? [];
+  const totalPages = expensePage?.total_pages ?? 1;
+  // Deleting the last expense on the last page would otherwise strand the
+  // view on a page that no longer exists.
+  useEffect(() => {
+    if (expensePage && page > expensePage.total_pages) setPage(expensePage.total_pages);
+  }, [expensePage, page]);
 
   return (
     <div className="space-y-6">
@@ -205,7 +282,7 @@ export function ExpensesPage() {
         </button>
       </header>
 
-      {needsReview.length > 0 && (
+      {needsReview && needsReview.length > 0 && (
         <button
           type="button"
           onClick={() => setConfirming(needsReview[0])}
@@ -249,21 +326,45 @@ export function ExpensesPage() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-ink-3">All expenses</h2>
         {isLoading && <p className="py-8 text-center text-sm text-ink-4">Loading…</p>}
-        {expenses?.length === 0 && (
+        {expensePage?.groups.length === 0 && (
           <p className="py-12 text-center text-sm text-ink-3">
             Nothing yet — upload a receipt photo, or add an expense by hand.
           </p>
         )}
-        <ul className="space-y-2">
-          {expenses?.map((expense) => (
-            <ExpenseRow
-              key={expense.id}
-              expense={expense}
-              onConfirm={() => setConfirming(expense)}
-              onEdit={() => setEditing(expense)}
+        <ul className={`space-y-2 ${isFetching ? 'opacity-60' : ''}`}>
+          {expensePage?.groups.map((group) => (
+            <ExpenseGroupSection
+              key={group.place ? `place:${group.place.id}` : `expense:${group.expenses[0].id}`}
+              group={group}
+              baseCurrency={baseCurrency}
+              onConfirm={setConfirming}
+              onEdit={setEditing}
             />
           ))}
         </ul>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 pt-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="flex size-8 items-center justify-center rounded-full border border-line text-ink-3 disabled:opacity-30"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-sm text-ink-3 tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="flex size-8 items-center justify-center rounded-full border border-line text-ink-3 disabled:opacity-30"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
       </section>
 
       {adding && <ExpenseSheet baseCurrency={baseCurrency} onClose={() => setAdding(false)} />}
