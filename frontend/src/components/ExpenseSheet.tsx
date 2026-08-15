@@ -8,7 +8,7 @@ import {
   toMajor,
   toWallClockInput,
 } from '../lib/format';
-import type { Expense } from '../types';
+import type { Expense, ImageRecord } from '../types';
 import { CurrencyRateField } from './CurrencyRateField';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 import { Sheet, inputClass, labelClass } from './Sheet';
@@ -23,14 +23,21 @@ function localDateTimeValue(date: Date): string {
 /**
  * One form for logging a new expense and for correcting an existing one —
  * including receipts the vision model misread.
+ *
+ * Passing `image` instead of `expense` is the third mode: a photo the model
+ * didn't read as a receipt at all, force-attached by hand. The amount still
+ * has to come from the user, same as a plain manual expense, but the result
+ * carries the photo as its receipt like one the pipeline got right.
  */
 export function ExpenseSheet({
   baseCurrency,
   expense,
+  image,
   onClose,
 }: {
   baseCurrency: string;
   expense?: Expense;
+  image?: ImageRecord;
   onClose: () => void;
 }) {
   const editing = expense != null;
@@ -43,15 +50,20 @@ export function ExpenseSheet({
   );
   const [currency, setCurrency] = useState(expense?.currency ?? baseCurrency);
   const [description, setDescription] = useState(expense?.description ?? '');
-  const [where, setWhere] = useState(expense?.place?.name ?? expense?.merchant ?? '');
-  const [placeId, setPlaceId] = useState<number | null>(expense?.place?.id ?? null);
+  const [where, setWhere] = useState(expense?.place?.name ?? expense?.merchant ?? image?.place?.name ?? '');
+  const [placeId, setPlaceId] = useState<number | null>(
+    expense?.place?.id ?? image?.place?.id ?? null,
+  );
   const [note, setNote] = useState(expense?.note ?? '');
   // Both sides of this are wall clocks: what the column holds, and what the
   // picker shows. A new expense starts at the browser's own clock, which is the
-  // one the user is standing in.
-  const [spentAt, setSpentAt] = useState(() =>
-    expense?.spent_at ? toWallClockInput(expense.spent_at) : localDateTimeValue(new Date()),
-  );
+  // one the user is standing in — unless it is standing in for a photo, whose
+  // own time is the better guess.
+  const [spentAt, setSpentAt] = useState(() => {
+    if (expense?.spent_at) return toWallClockInput(expense.spent_at);
+    if (image?.taken_at) return toWallClockInput(image.taken_at);
+    return localDateTimeValue(new Date());
+  });
   const [rate, setRate] = useState<number | null>(expense?.fx_rate ?? null);
   const [rateEdited, setRateEdited] = useState(false);
 
@@ -72,6 +84,9 @@ export function ExpenseSheet({
       note: note.trim() || null,
       spent_at: fromWallClockInput(spentAt),
     };
+    if (image) {
+      body.image_id = image.id;
+    }
     // Send a rate only when the user vouched for it; otherwise the server
     // looks one up and queues the expense for confirmation.
     if (isForeign && (rateEdited || (editing && !currencyChanged && rate != null))) {
@@ -85,7 +100,10 @@ export function ExpenseSheet({
   }
 
   return (
-    <Sheet title={editing ? 'Edit expense' : 'Add expense'} onClose={onClose}>
+    <Sheet
+      title={editing ? 'Edit expense' : image ? 'Mark as receipt' : 'Add expense'}
+      onClose={onClose}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         {editing ? (
           expense.source === 'receipt' && (
@@ -93,6 +111,11 @@ export function ExpenseSheet({
               Read from a receipt photo. Your edits win over what was detected.
             </p>
           )
+        ) : image ? (
+          <p className="text-sm text-ink-3">
+            Wasn't read as a receipt automatically. Enter what it says and this photo becomes its
+            receipt.
+          </p>
         ) : (
           <p className="text-sm text-ink-3">
             For spending with no receipt photo — cash, a fare, a tip, your share of a bill.

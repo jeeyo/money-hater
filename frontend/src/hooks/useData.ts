@@ -29,6 +29,8 @@ export interface ExpenseInput {
   note?: string | null;
   fx_rate?: number | null;
   items?: { name: string; qty: number; amount: number }[];
+  /** Force-attach this photo as the expense's receipt — see ExpenseSheet. */
+  image_id?: number;
 }
 
 /** Public config the sign-in form needs — currently just the Turnstile key. */
@@ -216,7 +218,9 @@ function invalidateItinerary() {
   queryClient.invalidateQueries({ queryKey: ['timeline'] });
   queryClient.invalidateQueries({ queryKey: ['trips'] });
   queryClient.invalidateQueries({ queryKey: ['expenses'] });
-  queryClient.invalidateQueries({ queryKey: ['images', 'recent'] });
+  // Covers both the recent-uploads list and any single image being viewed —
+  // marking a photo as a receipt, for one, changes has_expense on the latter.
+  queryClient.invalidateQueries({ queryKey: ['images'] });
 }
 
 /** The most recently uploaded photos, across sessions — so a photo the
