@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiJson, postJson } from '../lib/api';
 import { tzOffsetMinutes } from '../lib/format';
@@ -6,6 +6,7 @@ import { queryClient } from '../lib/queryClient';
 import type {
   AuthConfig,
   Expense,
+  ExpensePage,
   ExpenseSummary,
   ImageRecord,
   PlaceDetails,
@@ -152,6 +153,16 @@ export function useExpenses(needsReview?: boolean) {
   return useQuery({
     queryKey: ['expenses', 'list', needsReview ?? 'all'],
     queryFn: () => apiJson<Expense[]>(`/api/expenses${query}`),
+  });
+}
+
+/** The "All expenses" list, sectioned by place and paginated a page of
+ *  sections at a time — see the /grouped endpoint for how groups are formed. */
+export function useExpensesGrouped(page: number) {
+  return useQuery({
+    queryKey: ['expenses', 'grouped', page],
+    queryFn: () => apiJson<ExpensePage>(`/api/expenses/grouped?page=${page}`),
+    placeholderData: keepPreviousData,
   });
 }
 

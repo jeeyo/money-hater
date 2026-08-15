@@ -226,6 +226,20 @@ export interface Expense {
   items: ExpenseItem[];
 }
 
+export interface ExpenseGroup {
+  /** Null for a group of one — an expense with no resolved place. */
+  place: Place | null;
+  expenses: Expense[];
+}
+
+export interface ExpensePage {
+  groups: ExpenseGroup[];
+  page: number;
+  page_size: number;
+  total_groups: number;
+  total_pages: number;
+}
+
 export interface MerchantTotal {
   merchant: string;
   base_currency: string;
