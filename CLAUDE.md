@@ -36,3 +36,15 @@ actually gets used.
 Screens worth checking, by what you touched: the day timeline (`/`), a trip's
 detail page with its map, the upload page, the expenses list, and any sheet or
 modal the change reaches.
+
+## Run ruff before calling a backend change done
+
+CI runs `uv run ruff check .` in `backend/` and fails the build on any lint
+error — an E501 (line too long, 100-col limit) in a new test is enough to
+sink an otherwise-correct PR. `pytest` passing says nothing about this; it's
+a separate command. Run `cd backend && uv run ruff check .` after editing
+anything under `backend/`, before considering the change finished, not after
+CI reports it back.
+
+(`uv run ruff format --check .` is not part of CI — plenty of existing files,
+migrations especially, don't pass it. Don't chase that one.)

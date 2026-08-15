@@ -1,8 +1,10 @@
-import { MapPin, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
+import { MapPin, Pencil, Receipt, RefreshCw, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useDeleteImage, useImage, useReanalyzeImage, useUpdateImage } from '../hooks/useData';
 import { formatDateTime, fromWallClockInput, toWallClockInput } from '../lib/format';
 import type { ImageRecord } from '../types';
+import { ExpenseSheet } from './ExpenseSheet';
 import { PlaceAutocomplete } from './PlaceAutocomplete';
 
 /** The place a photo was taken at, as read by the pipeline and as correctable.
@@ -183,8 +185,10 @@ function DateTimeRow({ image }: { image: ImageRecord }) {
 }
 
 export function ImageModal({ image: initial, onClose }: { image: ImageRecord; onClose: () => void }) {
+  const { user } = useAuth();
   const reanalyze = useReanalyzeImage();
   const remove = useDeleteImage();
+  const [marking, setMarking] = useState(false);
   // The caller's copy is a snapshot of the list it came from; follow the
   // record itself so an edit made here shows without closing the modal.
   const { data } = useImage(initial.id);
@@ -245,6 +249,16 @@ export function ImageModal({ image: initial, onClose }: { image: ImageRecord; on
               </>
             )}
           </dl>
+          {!image.has_expense && image.status === 'analyzed' && (
+            <button
+              type="button"
+              onClick={() => setMarking(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-money-bg py-2.5 text-sm font-medium text-money active:opacity-80"
+            >
+              <Receipt className="size-4" /> Mark as receipt
+            </button>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -265,6 +279,13 @@ export function ImageModal({ image: initial, onClose }: { image: ImageRecord; on
           </div>
         </div>
       </div>
+      {marking && (
+        <ExpenseSheet
+          baseCurrency={user?.preferred_currency ?? 'THB'}
+          image={image}
+          onClose={() => setMarking(false)}
+        />
+      )}
     </div>
   );
 }

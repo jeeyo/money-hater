@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 
 from app.deps import CurrentUser, DbSession
-from app.models import Expense, ExpenseItem, Trip
+from app.models import Expense, ExpenseItem, Image, Trip
 from app.schemas import (
     ExpenseConfirm,
     ExpenseCreate,
@@ -75,8 +75,24 @@ async def list_expenses(
 
 @router.post("", response_model=ExpenseOut, status_code=201)
 async def add_expense(body: ExpenseCreate, user: CurrentUser, db: DbSession):
-    """Log spending with no receipt photo — cash, a tip, a fare, a split bill."""
+    """Log spending with no receipt photo — cash, a tip, a fare, a split bill.
+
+    Also how a photo the vision model didn't read as a receipt becomes one: pass
+    its image_id and the expense is recorded exactly as if the model had read it
+    correctly, receipt icon and photo link included.
+    """
     currency = body.currency.upper()
+    source = "manual"
+    image_id = None
+    if body.image_id is not None:
+        image = await db.get(Image, body.image_id)
+        if image is None or image.user_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+        already = await db.scalar(sa.select(Expense.id).where(Expense.image_id == image.id))
+        if already is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "This photo already has an expense")
+        image_id = image.id
+        source = "receipt"
     expense = await create_expense(
         db,
         user,
@@ -89,7 +105,8 @@ async def add_expense(body: ExpenseCreate, user: CurrentUser, db: DbSession):
         note=body.note,
         tax_minor=to_minor(body.tax, currency),
         tip_minor=to_minor(body.tip, currency),
-        source="manual",
+        image_id=image_id,
+        source=source,
         fx_rate=body.fx_rate,
     )
     for item in body.items:

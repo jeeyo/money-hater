@@ -162,6 +162,10 @@ class ExpenseCreate(BaseModel):
     tip: Decimal | None = None
     fx_rate: Decimal | None = Field(default=None, gt=0)
     items: list[ExpenseItemIn] = []
+    # A photo the vision model didn't read as a receipt (or misread), force-
+    # attached by the user instead of the pipeline. Recorded as source=receipt,
+    # same as one the model got right.
+    image_id: int | None = None
 
 
 class ExpenseUpdate(BaseModel):

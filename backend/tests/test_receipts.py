@@ -130,6 +130,72 @@ async def test_expense_manual_correction(client, db_sessionmaker, monkeypatch):
     assert body["base_total_minor"] == 40000
 
 
+async def test_force_mark_image_as_receipt(client, db_sessionmaker, monkeypatch):
+    """A photo the model called something other than a receipt, fixed by hand."""
+    await register(client)
+    created = (
+        await client.post(
+            "/api/images",
+            files=[("files", ("plate.jpg", make_jpeg(*BKK, color=(90, 140, 30)), "image/jpeg"))],
+        )
+    ).json()
+    image_id = created[0]["id"]
+
+    async def fake_vision(path, mime):
+        return VisionResult(kind="food", caption="A plate of noodles", labels=["food"])
+
+    monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
+    async with db_sessionmaker() as db:
+        await run_image_analysis(db, image_id)
+
+    image = (await client.get(f"/api/images/{image_id}")).json()
+    assert image["analysis"]["kind"] == "food"
+    assert image["has_expense"] is False
+
+    response = await client.post(
+        "/api/expenses",
+        json={
+            "total": "250.00",
+            "currency": "THB",
+            "merchant": "Noodle stand",
+            "image_id": image_id,
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["source"] == "receipt"
+    assert body["image_id"] == image_id
+    assert body["total_minor"] == 25000
+
+    image = (await client.get(f"/api/images/{image_id}")).json()
+    assert image["has_expense"] is True
+
+    # Can't force it twice — the photo already has an expense
+    again = await client.post(
+        "/api/expenses",
+        json={"total": "10.00", "currency": "THB", "image_id": image_id},
+    )
+    assert again.status_code == 409
+
+
+async def test_force_mark_receipt_rejects_someone_elses_photo(client, db_sessionmaker):
+    await register(client, email="owner@example.com")
+    created = (
+        await client.post(
+            "/api/images",
+            files=[("files", ("mine.jpg", make_jpeg(*BKK, color=(5, 5, 5)), "image/jpeg"))],
+        )
+    ).json()
+    image_id = created[0]["id"]
+
+    await client.post("/api/auth/logout", json={})
+    await register(client, email="other@example.com")
+    response = await client.post(
+        "/api/expenses", json={"total": "10.00", "currency": "THB", "image_id": image_id}
+    )
+    assert response.status_code == 404
+
+
 async def test_vision_skipped_without_key(client, db_sessionmaker):
     """Without OPENAI_API_KEY the pipeline still completes with no analysis row."""
     await register(client)
