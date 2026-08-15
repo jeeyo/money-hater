@@ -154,7 +154,12 @@ async def test_force_mark_image_as_receipt(client, db_sessionmaker, monkeypatch)
 
     response = await client.post(
         "/api/expenses",
-        json={"total": "250.00", "currency": "THB", "merchant": "Noodle stand", "image_id": image_id},
+        json={
+            "total": "250.00",
+            "currency": "THB",
+            "merchant": "Noodle stand",
+            "image_id": image_id,
+        },
     )
     assert response.status_code == 201, response.text
     body = response.json()
