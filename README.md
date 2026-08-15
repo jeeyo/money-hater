@@ -20,12 +20,32 @@ places, expenses, and trips.
 | --- | --- | --- |
 | ![Day timeline of stops with photos and spend](docs/screenshots/timeline.webp) | ![Trip detail with days, stops, and route map](docs/screenshots/trip-detail.webp) | ![Expenses converted into the base currency](docs/screenshots/expenses.webp) |
 
+| Add expense | Confirm rate | Trip in progress |
+| --- | --- | --- |
+| ![Adding an expense with place suggestions](docs/screenshots/add-expense.webp) | ![Confirming the exchange rate for a foreign expense](docs/screenshots/confirm-rate.webp) | ![A trip that is still running, with suggestions for where to go next](docs/screenshots/trip-open.webp) |
+
+| Recommendation | Trips | Sign in |
+| --- | --- | --- |
+| ![A suggested place, with why it was picked and recent comments](docs/screenshots/recommendation.webp) | ![List of trips the user has created](docs/screenshots/trips.webp) | ![The sign-in form](docs/screenshots/login.webp) |
+
+![Desktop layout with a sidebar](docs/screenshots/desktop.webp)
+
 <details>
 <summary>Dark mode</summary>
 
 | Timeline | Trip | Expenses |
 | --- | --- | --- |
 | ![Timeline in dark mode](docs/screenshots/timeline-dark.webp) | ![Trip detail in dark mode](docs/screenshots/trip-detail-dark.webp) | ![Expenses in dark mode](docs/screenshots/expenses-dark.webp) |
+
+| Add expense | Confirm rate | Trip in progress |
+| --- | --- | --- |
+| ![Adding an expense in dark mode](docs/screenshots/add-expense-dark.webp) | ![Confirming the exchange rate in dark mode](docs/screenshots/confirm-rate-dark.webp) | ![A trip in progress in dark mode](docs/screenshots/trip-open-dark.webp) |
+
+| Recommendation | Trips | Sign in |
+| --- | --- | --- |
+| ![A suggested place in dark mode](docs/screenshots/recommendation-dark.webp) | ![List of trips in dark mode](docs/screenshots/trips-dark.webp) | ![The sign-in form in dark mode](docs/screenshots/login-dark.webp) |
+
+![Desktop layout in dark mode](docs/screenshots/desktop-dark.webp)
 
 </details>
 
