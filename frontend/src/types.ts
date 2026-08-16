@@ -227,8 +227,10 @@ export interface Expense {
 }
 
 export interface ExpenseGroup {
-  /** Null for a group of one — an expense with no resolved place. */
+  /** Set when the group shares a resolved place. */
   place: Place | null;
+  /** Set instead when the group shares typed merchant text with no resolved place. */
+  merchant: string | null;
   expenses: Expense[];
 }
 

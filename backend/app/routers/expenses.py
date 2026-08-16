@@ -43,6 +43,32 @@ def _range_filter(query, user_id: int, date_from: datetime | None, date_to: date
     return query
 
 
+def _group_key_sql():
+    """Same-place expenses share a key: the resolved place, else the merchant
+    text typed on the receipt (trimmed, case-folded), else the expense stands
+    alone. ``.concat`` rather than ``+``/``func.concat`` so this compiles on
+    both Postgres (prod) and SQLite (tests) without a dialect-specific op.
+    """
+    merchant_norm = sa.func.lower(sa.func.trim(Expense.merchant))
+    place_key = sa.literal("p:").concat(sa.cast(Expense.place_id, sa.String))
+    merchant_key = sa.literal("m:").concat(merchant_norm)
+    return sa.case(
+        (Expense.place_id.isnot(None), place_key),
+        (sa.and_(Expense.merchant.isnot(None), sa.func.trim(Expense.merchant) != ""), merchant_key),
+        else_=sa.literal("e:").concat(sa.cast(Expense.id, sa.String)),
+    )
+
+
+def _group_key_py(expense: Expense) -> str:
+    """Python-side mirror of ``_group_key_sql``, for bucketing fetched rows."""
+    if expense.place_id is not None:
+        return f"p:{expense.place_id}"
+    merchant = (expense.merchant or "").strip()
+    if merchant:
+        return f"m:{merchant.lower()}"
+    return f"e:{expense.id}"
+
+
 async def _get_owned(db: DbSession, user_id: int, expense_id: int) -> Expense:
     expense = await db.scalar(
         sa.select(Expense)
@@ -88,14 +114,13 @@ async def list_expenses_grouped(
 ):
     """The "All expenses" list, sectioned by place.
 
-    Expenses sharing a resolved place are shown as one group, ordered by that
-    place's most recent visit; an expense with no resolved place stands alone.
-    Paginated over groups (not raw rows) so a page always reads as complete
-    sections rather than a place cut off mid-list.
+    Expenses sharing a resolved place — or, failing that, the same typed
+    merchant name — are shown as one group, ordered by that place's most
+    recent visit; an expense with neither stands alone. Paginated over groups
+    (not raw rows) so a page always reads as complete sections rather than a
+    place cut off mid-list.
     """
-    # Negative expense id keeps solo groups unique without colliding with a
-    # real (always positive) place id.
-    group_key = sa.func.coalesce(Expense.place_id, -Expense.id)
+    group_key = _group_key_sql()
 
     def _filtered(query):
         query = _range_filter(query, user.id, date_from, date_to)
@@ -124,15 +149,16 @@ async def list_expenses_grouped(
         expenses_q = _filtered(
             sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place))
         ).where(group_key.in_(keys))
-        buckets: dict[int, list[Expense]] = {key: [] for key in keys}
+        buckets: dict[str, list[Expense]] = {key: [] for key in keys}
         for expense in (await db.execute(expenses_q)).scalars():
-            bucket_key = expense.place_id if expense.place_id is not None else -expense.id
-            buckets[bucket_key].append(expense)
+            buckets[_group_key_py(expense)].append(expense)
         for key in keys:
             bucket = sorted(buckets[key], key=expense_moment, reverse=True)
+            head = bucket[0]
             groups.append(
                 ExpenseGroupOut(
-                    place=place_out(bucket[0].place),
+                    place=place_out(head.place),
+                    merchant=head.merchant if head.place is None else None,
                     expenses=[expense_out(e) for e in bucket],
                 )
             )

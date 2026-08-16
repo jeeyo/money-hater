@@ -87,6 +87,49 @@ async def test_grouped_pagination_splits_over_pages(client, db_sessionmaker):
     assert first_ids.isdisjoint(second_ids)
 
 
+async def test_expenses_with_the_same_merchant_text_are_grouped_without_a_place(
+    client, db_sessionmaker
+):
+    """A vending machine or kiosk Google has no entry for still groups by name."""
+    await register(client)
+
+    await _spend(client, "40.00", "Turtle vending machine", spent_at="2026-08-11T08:27:00Z")
+    await _spend(client, "50.00", "Turtle vending machine", spent_at="2026-08-12T11:19:00Z")
+    await _spend(client, "60.00", "Different kiosk", spent_at="2026-08-13T09:00:00Z")
+
+    page = (await client.get("/api/expenses/grouped")).json()
+    assert page["total_groups"] == 2
+
+    by_merchant = {g["merchant"]: g for g in page["groups"]}
+    assert len(by_merchant["Turtle vending machine"]["expenses"]) == 2
+    assert by_merchant["Turtle vending machine"]["place"] is None
+    assert len(by_merchant["Different kiosk"]["expenses"]) == 1
+
+
+async def test_merchant_grouping_ignores_case_and_surrounding_whitespace(client, db_sessionmaker):
+    await register(client)
+    await _spend(client, "10.00", "Turtle vending machine", spent_at="2026-08-11T08:00:00Z")
+    await _spend(client, "10.00", "  turtle VENDING machine  ", spent_at="2026-08-12T08:00:00Z")
+
+    page = (await client.get("/api/expenses/grouped")).json()
+    assert page["total_groups"] == 1
+    assert len(page["groups"][0]["expenses"]) == 2
+
+
+async def test_a_resolved_place_takes_priority_over_matching_merchant_text(
+    client, db_sessionmaker
+):
+    """Once a place is picked, that's the grouping key — not the leftover merchant text."""
+    await register(client)
+    place_id = await _a_place(db_sessionmaker, "Kiosk")
+
+    await _spend(client, "10.00", "Kiosk", place_id, "2026-08-11T08:00:00Z")
+    await _spend(client, "10.00", "Kiosk", spent_at="2026-08-12T08:00:00Z")  # no place resolved
+
+    page = (await client.get("/api/expenses/grouped")).json()
+    assert page["total_groups"] == 2
+
+
 async def test_grouped_respects_needs_review_filter(client, db_sessionmaker):
     await register(client)
     place_id = await _a_place(db_sessionmaker, "Kopi 1930")
