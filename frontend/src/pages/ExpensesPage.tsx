@@ -196,8 +196,9 @@ function ExpenseRow({
   );
 }
 
-/** One section of the All expenses list — expenses sharing a resolved place,
- *  under a header, or a single ungrouped expense standing on its own. */
+/** One section of the All expenses list — expenses sharing a resolved place
+ *  or, absent that, matching merchant text, under a header; otherwise a
+ *  single ungrouped expense standing on its own. */
 function ExpenseGroupSection({
   group,
   baseCurrency,
@@ -209,7 +210,14 @@ function ExpenseGroupSection({
   onConfirm: (expense: Expense) => void;
   onEdit: (expense: Expense) => void;
 }) {
-  if (!group.place) {
+  const label = group.place?.name ?? group.merchant;
+  // A shared place always gets a header, even for one visit; shared merchant
+  // text only earns one once it has actually merged something — otherwise
+  // every plain manual expense would grow a header that just repeats its own
+  // row.
+  const showHeader = group.place != null || (label != null && group.expenses.length > 1);
+
+  if (!showHeader) {
     return (
       <>
         {group.expenses.map((expense) => (
@@ -231,7 +239,7 @@ function ExpenseGroupSection({
       <div className="flex items-center justify-between gap-2 px-1">
         <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-ink-3">
           <MapPin className="size-3.5 shrink-0 text-ink-4" />
-          <span className="truncate">{group.place.name}</span>
+          <span className="truncate">{label}</span>
         </span>
         <span className="shrink-0 text-xs font-medium text-ink-4 tabular-nums">
           {formatMoney(total, baseCurrency)} · {group.expenses.length}

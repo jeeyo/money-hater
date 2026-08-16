@@ -143,13 +143,17 @@ class ExpenseOut(BaseModel):
 
 
 class ExpenseGroupOut(BaseModel):
-    """Expenses sharing a resolved place, most recent first.
+    """Expenses sharing a resolved place — or, absent that, the same typed
+    merchant name — most recent first.
 
-    ``place`` is null for a group of one — an expense with no resolved place,
-    standing on its own rather than merged with unrelated free-text merchants.
+    ``place`` is set when the group shares a resolved place. ``merchant`` is
+    set instead when the group shares free-text merchant text with no
+    resolved place (e.g. a receipt from a vending machine Google has no entry
+    for). Both null means the expense has neither and stands alone.
     """
 
     place: PlaceOut | None
+    merchant: str | None
     expenses: list[ExpenseOut]
 
 
