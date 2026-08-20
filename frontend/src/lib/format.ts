@@ -144,6 +144,18 @@ export function formatTripRange(trip: {
   return `${formatDay(trip.started_at)} – ${formatDay(trip.ended_at)} · ${days}`;
 }
 
+/** A bare date reused as a midnight instant, the wall-clock convention the
+ *  API expects for `date_from`/`date_to` — same as `fromWallClockInput`. */
+export function wallClockBound(dateStr: string): string {
+  return `${dateStr}T00:00:00Z`;
+}
+
+/** The last 30 days including today, as API-ready date bounds. */
+export function last30DayRange(): { from: string; to: string } {
+  const today = localDateString(new Date());
+  return { from: wallClockBound(shiftDate(today, -29)), to: wallClockBound(shiftDate(today, 1)) };
+}
+
 export function localDateString(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
