@@ -28,6 +28,10 @@ places, expenses, and trips.
 | --- | --- | --- |
 | ![A suggested place, with why it was picked and recent comments](docs/screenshots/recommendation.webp) | ![List of trips the user has created](docs/screenshots/trips.webp) | ![The sign-in form](docs/screenshots/login.webp) |
 
+| Expense summary |
+| --- |
+| ![Spending summary modal with 7/30-day and to-date totals plus a daily spend chart](docs/screenshots/expense-summary.webp) |
+
 ![Desktop layout with a sidebar](docs/screenshots/desktop.webp)
 
 <details>
@@ -44,6 +48,10 @@ places, expenses, and trips.
 | Recommendation | Trips | Sign in |
 | --- | --- | --- |
 | ![A suggested place in dark mode](docs/screenshots/recommendation-dark.webp) | ![List of trips in dark mode](docs/screenshots/trips-dark.webp) | ![The sign-in form in dark mode](docs/screenshots/login-dark.webp) |
+
+| Expense summary |
+| --- |
+| ![Spending summary modal in dark mode](docs/screenshots/expense-summary-dark.webp) |
 
 ![Desktop layout in dark mode](docs/screenshots/desktop-dark.webp)
 
