@@ -206,10 +206,14 @@ export function useDeleteExpense() {
   });
 }
 
-export function useExpenseSummary() {
+export function useExpenseSummary(dateFrom?: string, dateTo?: string) {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  const qs = params.toString();
   return useQuery({
-    queryKey: ['expenses', 'summary'],
-    queryFn: () => apiJson<ExpenseSummary>('/api/expenses/summary'),
+    queryKey: ['expenses', 'summary', dateFrom ?? null, dateTo ?? null],
+    queryFn: () => apiJson<ExpenseSummary>(`/api/expenses/summary${qs ? `?${qs}` : ''}`),
   });
 }
 

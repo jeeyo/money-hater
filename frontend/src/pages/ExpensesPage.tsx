@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   MapPin,
@@ -11,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { ExpenseSheet } from '../components/ExpenseSheet';
 import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
+import { ExpenseSummaryModal } from '../components/ExpenseSummaryModal';
 import { ImageModal } from '../components/ImageModal';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -269,6 +271,7 @@ export function ExpensesPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   const totalPages = expensePage?.total_pages ?? 1;
   // Deleting the last expense on the last page would otherwise strand the
@@ -307,10 +310,21 @@ export function ExpensesPage() {
 
       {summary && (
         <div className="rounded-2xl border border-line bg-surface p-4">
-          <p className="text-xs text-ink-3">Total spent</p>
-          <p className="mt-0.5 text-3xl font-bold text-ink tabular-nums">
-            {formatMoney(summary.spend.base_total_minor, summary.spend.base_currency)}
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs text-ink-3">Total spent</p>
+              <p className="mt-0.5 text-3xl font-bold text-ink tabular-nums">
+                {formatMoney(summary.spend.base_total_minor, summary.spend.base_currency)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSummary(true)}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-ink-2 active:bg-surface-2"
+            >
+              <BarChart3 className="size-3.5" /> Summary
+            </button>
+          </div>
           {summary.spend.by_currency.length > 1 && (
             <p className="mt-1 text-xs text-ink-3">
               Paid in{' '}
@@ -385,6 +399,9 @@ export function ExpensesPage() {
       )}
       {confirming && (
         <ConfirmRateSheet expense={confirming} onClose={() => setConfirming(null)} />
+      )}
+      {showSummary && (
+        <ExpenseSummaryModal baseCurrency={baseCurrency} onClose={() => setShowSummary(false)} />
       )}
     </div>
   );
