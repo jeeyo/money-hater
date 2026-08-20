@@ -7,6 +7,7 @@ import {
   localDateString,
   shiftDate,
   startOfWeek,
+  wallClockBound,
   wallClockDay,
 } from '../lib/format';
 
@@ -19,21 +20,35 @@ const RANGE_LABELS: Record<RangeKey, string> = {
   mtd: 'Month to date',
 };
 
-/** Wall-clock day bounds as the API expects them: a bare date reused as a
- *  midnight instant, same convention as `fromWallClockInput`. */
-function dayBound(dateStr: string): string {
-  return `${dateStr}T00:00:00Z`;
-}
-
 function useRanges(): Record<RangeKey, { from: string; to: string }> {
   const today = localDateString(new Date());
-  const to = dayBound(shiftDate(today, 1));
+  const to = wallClockBound(shiftDate(today, 1));
   return {
-    last7: { from: dayBound(shiftDate(today, -6)), to },
-    wtd: { from: dayBound(startOfWeek(today)), to },
-    last30: { from: dayBound(shiftDate(today, -29)), to },
-    mtd: { from: dayBound(`${today.slice(0, 7)}-01`), to },
+    last7: { from: wallClockBound(shiftDate(today, -6)), to },
+    wtd: { from: wallClockBound(startOfWeek(today)), to },
+    last30: { from: wallClockBound(shiftDate(today, -29)), to },
+    mtd: { from: wallClockBound(`${today.slice(0, 7)}-01`), to },
   };
+}
+
+/** The headline figure — spend with no date bound at all, so it reads at a
+ *  glance above the four scoped tiles below it. */
+function TotalSpentCard() {
+  const { data, isLoading } = useExpenseSummary();
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4">
+      <p className="text-xs text-ink-3">Total spent</p>
+      <p className="mt-0.5 text-3xl font-bold text-ink tabular-nums">
+        {isLoading || !data ? '—' : formatMoney(data.spend.base_total_minor, data.spend.base_currency)}
+      </p>
+      {data && data.spend.by_currency.length > 1 && (
+        <p className="mt-1 text-xs text-ink-3">
+          Paid in{' '}
+          {data.spend.by_currency.map((c) => formatMoney(c.total_minor, c.currency)).join(' · ')}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** One headline total — a stat tile, not a chart: each range answers a single
@@ -67,8 +82,8 @@ const CHART_DAYS = 30;
  *  hue (magnitude, not identity), today picked out in the darker step. */
 function DailySpendChart({ baseCurrency }: { baseCurrency: string }) {
   const today = localDateString(new Date());
-  const from = dayBound(shiftDate(today, -(CHART_DAYS - 1)));
-  const to = dayBound(shiftDate(today, 1));
+  const from = wallClockBound(shiftDate(today, -(CHART_DAYS - 1)));
+  const to = wallClockBound(shiftDate(today, 1));
   const { data: expenses, isLoading } = useExpenses(undefined, from, to);
 
   const days = useMemo(() => {
@@ -145,6 +160,10 @@ export function ExpenseSummaryModal({
           >
             <X className="size-5" />
           </button>
+        </div>
+
+        <div className="mb-4">
+          <TotalSpentCard />
         </div>
 
         <div className="grid grid-cols-2 gap-2">

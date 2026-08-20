@@ -22,7 +22,7 @@ import {
   useExpensesGrouped,
   useImage,
 } from '../hooks/useData';
-import { formatDateTime, formatMoney } from '../lib/format';
+import { formatDateTime, formatMoney, last30DayRange } from '../lib/format';
 import type { Expense, ExpenseGroup, MerchantTotal } from '../types';
 
 /** Single-hue magnitude bars: one series, values in ink rather than series color. */
@@ -265,6 +265,8 @@ export function ExpensesPage() {
   const { user } = useAuth();
   const baseCurrency = user?.preferred_currency ?? 'THB';
   const { data: summary } = useExpenseSummary();
+  const { from: last30From, to: last30To } = last30DayRange();
+  const { data: last30 } = useExpenseSummary(last30From, last30To);
   const { data: needsReview } = useExpenses(true);
   const [page, setPage] = useState(1);
   const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page);
@@ -308,32 +310,32 @@ export function ExpensesPage() {
         </button>
       )}
 
-      {summary && (
-        <div className="rounded-2xl border border-line bg-surface p-4">
+      {last30 && (
+        <button
+          type="button"
+          onClick={() => setShowSummary(true)}
+          className="w-full rounded-2xl border border-line bg-surface p-4 text-left active:bg-surface-2"
+        >
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-xs text-ink-3">Total spent</p>
+              <p className="text-xs text-ink-3">Last 30 days</p>
               <p className="mt-0.5 text-3xl font-bold text-ink tabular-nums">
-                {formatMoney(summary.spend.base_total_minor, summary.spend.base_currency)}
+                {formatMoney(last30.spend.base_total_minor, last30.spend.base_currency)}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowSummary(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-ink-2 active:bg-surface-2"
-            >
+            <span className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-ink-2">
               <BarChart3 className="size-3.5" /> Summary
-            </button>
+            </span>
           </div>
-          {summary.spend.by_currency.length > 1 && (
+          {last30.spend.by_currency.length > 1 && (
             <p className="mt-1 text-xs text-ink-3">
               Paid in{' '}
-              {summary.spend.by_currency
+              {last30.spend.by_currency
                 .map((c) => formatMoney(c.total_minor, c.currency))
                 .join(' · ')}
             </p>
           )}
-        </div>
+        </button>
       )}
 
       {summary && summary.by_merchant.length > 0 && (
