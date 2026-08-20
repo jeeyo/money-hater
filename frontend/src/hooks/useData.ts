@@ -148,11 +148,15 @@ export function useDeleteTrip() {
   });
 }
 
-export function useExpenses(needsReview?: boolean) {
-  const query = needsReview === undefined ? '' : `?needs_review=${needsReview}`;
+export function useExpenses(needsReview?: boolean, dateFrom?: string, dateTo?: string) {
+  const params = new URLSearchParams();
+  if (needsReview !== undefined) params.set('needs_review', String(needsReview));
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  const qs = params.toString();
   return useQuery({
-    queryKey: ['expenses', 'list', needsReview ?? 'all'],
-    queryFn: () => apiJson<Expense[]>(`/api/expenses${query}`),
+    queryKey: ['expenses', 'list', needsReview ?? 'all', dateFrom ?? null, dateTo ?? null],
+    queryFn: () => apiJson<Expense[]>(`/api/expenses${qs ? `?${qs}` : ''}`),
   });
 }
 

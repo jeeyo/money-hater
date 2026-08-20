@@ -1,6 +1,14 @@
 import { X } from 'lucide-react';
-import { useExpenseSummary } from '../hooks/useData';
-import { formatMoney, localDateString, shiftDate, startOfWeek } from '../lib/format';
+import { useMemo } from 'react';
+import { useExpenseSummary, useExpenses } from '../hooks/useData';
+import {
+  formatMoney,
+  formatMoneyCompact,
+  localDateString,
+  shiftDate,
+  startOfWeek,
+  wallClockDay,
+} from '../lib/format';
 
 type RangeKey = 'last7' | 'wtd' | 'last30' | 'mtd';
 
@@ -28,27 +36,84 @@ function useRanges(): Record<RangeKey, { from: string; to: string }> {
   };
 }
 
-function SummaryRow({
+/** One headline total — a stat tile, not a chart: each range answers a single
+ *  "how much" question, so the number is the whole story. */
+function SummaryTile({
   label,
   from,
   to,
-  baseCurrency,
 }: {
   label: string;
   from: string;
   to: string;
-  baseCurrency: string;
 }) {
   const { data, isLoading } = useExpenseSummary(from, to);
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3">
-      <span className="text-sm font-medium text-ink-2">{label}</span>
-      <span className="text-lg font-bold text-ink tabular-nums">
+    <div className="rounded-xl border border-line bg-surface p-3">
+      <p className="text-xs text-ink-3">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-ink">
         {isLoading || !data
           ? '—'
-          : formatMoney(data.spend.base_total_minor, data.spend.base_currency || baseCurrency)}
-      </span>
+          : formatMoneyCompact(data.spend.base_total_minor, data.spend.base_currency)}
+      </p>
     </div>
+  );
+}
+
+const CHART_DAYS = 30;
+
+/** Where the trend actually moved, day by day — a bar chart, not a tile: the
+ *  point is the shape over time, which a single number can't carry. Single
+ *  hue (magnitude, not identity), today picked out in the darker step. */
+function DailySpendChart({ baseCurrency }: { baseCurrency: string }) {
+  const today = localDateString(new Date());
+  const from = dayBound(shiftDate(today, -(CHART_DAYS - 1)));
+  const to = dayBound(shiftDate(today, 1));
+  const { data: expenses, isLoading } = useExpenses(undefined, from, to);
+
+  const days = useMemo(() => {
+    const keys = Array.from({ length: CHART_DAYS }, (_, i) =>
+      shiftDate(today, -(CHART_DAYS - 1 - i))
+    );
+    const totals = new Map(keys.map((k) => [k, 0]));
+    for (const expense of expenses ?? []) {
+      if (!expense.spent_at || expense.base_total_minor == null) continue;
+      const day = wallClockDay(expense.spent_at);
+      if (totals.has(day)) totals.set(day, (totals.get(day) ?? 0) + expense.base_total_minor);
+    }
+    return keys.map((date) => ({ date, total: totals.get(date) ?? 0 }));
+  }, [expenses, today]);
+
+  const max = Math.max(...days.map((d) => d.total), 1);
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold text-ink-3">Daily spend — last 30 days</h3>
+      <div className="rounded-xl border border-line bg-surface p-3">
+        {isLoading ? (
+          <p className="py-6 text-center text-xs text-ink-4">Loading…</p>
+        ) : (
+          <>
+            <div className="flex h-24 items-end gap-[2px]">
+              {days.map(({ date, total }) => (
+                <div
+                  key={date}
+                  title={`${date}: ${formatMoney(total, baseCurrency)}`}
+                  className={`min-w-0 flex-1 rounded-t-[2px] ${
+                    date === today ? 'bg-brand-600' : 'bg-brand-500'
+                  }`}
+                  style={{ height: `${Math.max((total / max) * 100, 3)}%` }}
+                />
+              ))}
+            </div>
+            <div className="mt-1.5 flex justify-between text-[10px] text-ink-4">
+              <span>{days[0].date}</span>
+              <span>Today</span>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -81,16 +146,20 @@ export function ExpenseSummaryModal({
             <X className="size-5" />
           </button>
         </div>
-        <div className="space-y-2">
+
+        <div className="grid grid-cols-2 gap-2">
           {(Object.keys(RANGE_LABELS) as RangeKey[]).map((key) => (
-            <SummaryRow
+            <SummaryTile
               key={key}
               label={RANGE_LABELS[key]}
               from={ranges[key].from}
               to={ranges[key].to}
-              baseCurrency={baseCurrency}
             />
           ))}
+        </div>
+
+        <div className="mt-4">
+          <DailySpendChart baseCurrency={baseCurrency} />
         </div>
       </div>
     </div>
