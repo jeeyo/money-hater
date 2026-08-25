@@ -41,7 +41,15 @@ export function VisitCard({ visit }: { visit: Visit }) {
           )}
         </div>
         {visit.images.length > 0 && (
-          <div className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div
+            className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1"
+            // This row scrolls itself horizontally; without stopping the
+            // gesture here it also bubbles to the day view's swipe handler,
+            // so flicking through photos pages the timeline underneath them.
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             {visit.images.map((image) => (
               <ImageThumb key={image.id} image={image} onClick={() => setOpenImage(image)} />
             ))}
