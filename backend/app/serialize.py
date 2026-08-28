@@ -296,9 +296,19 @@ def timeline_range_out(
     for image in images:
         day_images[day_key(image_moment(image))].append(image)
 
-    day_expenses: dict[str, list[Expense]] = defaultdict(list)
+    # A day's total has to match the visits shown on it, so a visit's
+    # expenses are filed under every day the visit touches — not just the
+    # day the expense's own timestamp claims, which a misread receipt can
+    # put somewhere else entirely. Keyed by id per day to dedupe the expense
+    # against itself when it also lands there by its own timestamp.
+    day_expenses: dict[str, dict[int, Expense]] = defaultdict(dict)
     for expense in expenses:
-        day_expenses[day_key(expense_moment(expense))].append(expense)
+        key = day_key(expense_moment(expense))
+        day_expenses[key][expense.id] = expense
+    for visit in visits:
+        for key in _days_touched(visit):
+            for expense in _visit_expenses(visit):
+                day_expenses[key][expense.id] = expense
 
     summaries = []
     for day in days:
@@ -313,17 +323,21 @@ def timeline_range_out(
                 visit_count=len(of_day),
                 image_count=len(photos),
                 thumbs=[image_out(image) for image in photos[:THUMBS_PER_DAY]],
-                spend=spend_out(day_expenses[key], base_currency),
+                spend=spend_out(list(day_expenses[key].values()), base_currency),
             )
         )
 
     # Deduplicated in day order: one chip per trip the span runs through
     trips = {trip.id: trip for trip in trips_by_day.values()}
+    all_expenses = {expense.id: expense for expense in expenses}
+    for visit in visits:
+        for expense in _visit_expenses(visit):
+            all_expenses[expense.id] = expense
     return TimelineRangeOut(
         span=span,
         start=days[0].isoformat(),
         end=days[-1].isoformat(),
         days=summaries,
         trips=[trip_ref(trip) for trip in trips.values()],
-        spend=spend_out(expenses, base_currency),
+        spend=spend_out(list(all_expenses.values()), base_currency),
     )

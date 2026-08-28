@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useExpenseSummary, useExpenses } from '../hooks/useData';
 import {
   formatMoney,
@@ -80,11 +80,22 @@ const CHART_DAYS = 30;
 /** Where the trend actually moved, day by day — a bar chart, not a tile: the
  *  point is the shape over time, which a single number can't carry. Single
  *  hue (magnitude, not identity), today picked out in the darker step. */
+/** "Aug 27", from a bare YYYY-MM-DD — parsed and read back in UTC so the
+ *  calendar day never shifts under the viewer's own timezone. */
+function formatDayShort(date: string): string {
+  return new Date(date).toLocaleDateString(undefined, {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 function DailySpendChart({ baseCurrency }: { baseCurrency: string }) {
   const today = localDateString(new Date());
   const from = wallClockBound(shiftDate(today, -(CHART_DAYS - 1)));
   const to = wallClockBound(shiftDate(today, 1));
   const { data: expenses, isLoading } = useExpenses(undefined, from, to);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const days = useMemo(() => {
     const keys = Array.from({ length: CHART_DAYS }, (_, i) =>
@@ -100,6 +111,7 @@ function DailySpendChart({ baseCurrency }: { baseCurrency: string }) {
   }, [expenses, today]);
 
   const max = Math.max(...days.map((d) => d.total), 1);
+  const active = days.find((d) => d.date === selected) ?? days[days.length - 1];
 
   return (
     <section className="space-y-2">
@@ -109,20 +121,35 @@ function DailySpendChart({ baseCurrency }: { baseCurrency: string }) {
           <p className="py-6 text-center text-xs text-ink-4">Loading…</p>
         ) : (
           <>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <p className="text-sm font-semibold text-ink tabular-nums">
+                {formatMoney(active.total, baseCurrency)}
+              </p>
+              <p className="text-[10px] text-ink-4">
+                {selected ? formatDayShort(active.date) : 'Today'}
+              </p>
+            </div>
             <div className="flex h-24 items-end gap-[2px]">
               {days.map(({ date, total }) => (
-                <div
+                <button
                   key={date}
+                  type="button"
+                  onClick={() => setSelected(date === selected ? null : date)}
                   title={`${date}: ${formatMoney(total, baseCurrency)}`}
-                  className={`min-w-0 flex-1 rounded-t-[2px] ${
-                    date === today ? 'bg-brand-600' : 'bg-brand-500'
+                  aria-label={`${formatDayShort(date)}: ${formatMoney(total, baseCurrency)}`}
+                  className={`min-w-0 flex-1 appearance-none rounded-t-[2px] border-0 p-0 ${
+                    date === selected
+                      ? 'bg-money'
+                      : date === today
+                        ? 'bg-brand-600'
+                        : 'bg-brand-500'
                   }`}
                   style={{ height: `${Math.max((total / max) * 100, 3)}%` }}
                 />
               ))}
             </div>
             <div className="mt-1.5 flex justify-between text-[10px] text-ink-4">
-              <span>{days[0].date}</span>
+              <span>{formatDayShort(days[0].date)}</span>
               <span>Today</span>
             </div>
           </>
