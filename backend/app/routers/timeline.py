@@ -154,9 +154,19 @@ async def get_timeline(
         .all()
     )
 
+    # A visit's expenses count toward this day's total even when a receipt's
+    # own timestamp — parsed from the photo, occasionally wrong — disagrees
+    # with the day the visit itself is shown on: the banner has to match the
+    # cards visibly on the page, not a second, independent day-window query.
+    by_id = {expense.id: expense for expense in expenses}
+    for visit in visits:
+        for expense in visit.expenses:
+            by_id[expense.id] = expense
+    expenses = list(by_id.values())
+
     trip = await trip_overlapping(db, user, start, end, tz_offset_minutes)
     return timeline_day_out(
-        date, trip, list(visits), list(unassigned), list(expenses), user.preferred_currency
+        date, trip, list(visits), list(unassigned), expenses, user.preferred_currency
     )
 
 
@@ -220,7 +230,7 @@ async def get_timeline_range(
                     Visit.ended_at >= start,
                 )
                 .order_by(Visit.started_at)
-                .options(selectinload(Visit.place))
+                .options(selectinload(Visit.place), selectinload(Visit.expenses))
             )
         )
         .scalars()
