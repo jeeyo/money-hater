@@ -160,14 +160,12 @@ export function useExpenses(needsReview?: boolean, dateFrom?: string, dateTo?: s
   });
 }
 
-export type ExpenseSort = 'place' | 'date';
-
-/** The "All expenses" list, either sectioned by place or flat by date —
- *  see the /grouped endpoint for how groups are formed either way. */
-export function useExpensesGrouped(page: number, sort: ExpenseSort = 'place') {
+/** The "All expenses" list, sectioned by place and paginated a page of
+ *  sections at a time — see the /grouped endpoint for how groups are formed. */
+export function useExpensesGrouped(page: number) {
   return useQuery({
-    queryKey: ['expenses', 'grouped', sort, page],
-    queryFn: () => apiJson<ExpensePage>(`/api/expenses/grouped?page=${page}&sort=${sort}`),
+    queryKey: ['expenses', 'grouped', page],
+    queryFn: () => apiJson<ExpensePage>(`/api/expenses/grouped?page=${page}`),
     placeholderData: keepPreviousData,
   });
 }

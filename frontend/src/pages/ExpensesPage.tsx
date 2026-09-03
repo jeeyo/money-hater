@@ -1,11 +1,9 @@
 import {
   AlertTriangle,
   BarChart3,
-  CalendarClock,
   ChevronLeft,
   ChevronRight,
   MapPin,
-  MapPinned,
   Pencil,
   Plus,
   Receipt,
@@ -17,7 +15,6 @@ import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
 import { ExpenseSummaryModal } from '../components/ExpenseSummaryModal';
 import { ImageModal } from '../components/ImageModal';
 import { useAuth } from '../context/AuthContext';
-import type { ExpenseSort } from '../hooks/useData';
 import {
   useDeleteExpense,
   useExpenseSummary,
@@ -264,32 +261,6 @@ function ExpenseGroupSection({
   );
 }
 
-/** Two-way toggle between the "All expenses" list orderings. */
-function SortToggle({ sort, onChange }: { sort: ExpenseSort; onChange: (s: ExpenseSort) => void }) {
-  const options: { value: ExpenseSort; label: string; icon: typeof CalendarClock }[] = [
-    { value: 'date', label: 'Date', icon: CalendarClock },
-    { value: 'place', label: 'Place', icon: MapPinned },
-  ];
-  return (
-    <div className="flex shrink-0 rounded-lg bg-surface-2 p-0.5" role="group" aria-label="Sort expenses">
-      {options.map(({ value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => onChange(value)}
-          aria-pressed={sort === value}
-          className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-            sort === value ? 'bg-surface text-ink shadow-sm' : 'text-ink-3'
-          }`}
-        >
-          <Icon className="size-3.5" />
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function ExpensesPage() {
   const { user } = useAuth();
   const baseCurrency = user?.preferred_currency ?? 'THB';
@@ -297,9 +268,8 @@ export function ExpensesPage() {
   const { from: last30From, to: last30To } = last30DayRange();
   const { data: last30 } = useExpenseSummary(last30From, last30To);
   const { data: needsReview } = useExpenses(true);
-  const [sort, setSort] = useState<ExpenseSort>('place');
   const [page, setPage] = useState(1);
-  const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page, sort);
+  const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
@@ -311,11 +281,6 @@ export function ExpensesPage() {
   useEffect(() => {
     if (expensePage && page > expensePage.total_pages) setPage(expensePage.total_pages);
   }, [expensePage, page]);
-
-  const changeSort = (next: ExpenseSort) => {
-    setSort(next);
-    setPage(1);
-  };
 
   return (
     <div className="space-y-6">
@@ -383,10 +348,7 @@ export function ExpensesPage() {
       )}
 
       <section className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-ink-3">All expenses</h2>
-          <SortToggle sort={sort} onChange={changeSort} />
-        </div>
+        <h2 className="text-sm font-semibold text-ink-3">All expenses</h2>
         {isLoading && <p className="py-8 text-center text-sm text-ink-4">Loading…</p>}
         {expensePage?.groups.length === 0 && (
           <p className="py-12 text-center text-sm text-ink-3">
