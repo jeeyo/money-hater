@@ -102,6 +102,36 @@ async def list_expenses(
     return [expense_out(expense) for expense in result.scalars()]
 
 
+async def _list_expenses_by_date(
+    db: DbSession, user_id: int, _filtered, page: int, page_size: int
+) -> ExpensePageOut:
+    total = await db.scalar(
+        sa.select(sa.func.count()).select_from(_filtered(sa.select(Expense.id)).subquery())
+    )
+    total = total or 0
+
+    query = _filtered(
+        sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place))
+    )
+    rows = (
+        await db.execute(
+            query.order_by(_spent.desc()).limit(page_size).offset((page - 1) * page_size)
+        )
+    ).scalars()
+
+    groups = [
+        ExpenseGroupOut(place=None, merchant=None, expenses=[expense_out(expense)])
+        for expense in rows
+    ]
+    return ExpensePageOut(
+        groups=groups,
+        page=page,
+        page_size=page_size,
+        total_groups=total,
+        total_pages=max(1, math.ceil(total / page_size)),
+    )
+
+
 @router.get("/grouped", response_model=ExpensePageOut)
 async def list_expenses_grouped(
     user: CurrentUser,
@@ -109,24 +139,33 @@ async def list_expenses_grouped(
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     needs_review: bool | None = Query(default=None),
+    sort: str = Query(default="place", pattern="^(place|date)$"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=50),
 ):
-    """The "All expenses" list, sectioned by place.
+    """The "All expenses" list, either sectioned by place or flat by date.
 
-    Expenses sharing a resolved place — or, failing that, the same typed
-    merchant name — are shown as one group, ordered by that place's most
-    recent visit; an expense with neither stands alone. Paginated over groups
-    (not raw rows) so a page always reads as complete sections rather than a
-    place cut off mid-list.
+    ``sort=place`` (default): expenses sharing a resolved place — or, failing
+    that, the same typed merchant name — are shown as one group, ordered by
+    that place's most recent visit; an expense with neither stands alone.
+    Paginated over groups (not raw rows) so a page always reads as complete
+    sections rather than a place cut off mid-list.
+
+    ``sort=date``: every expense stands alone, most recent first, paginated
+    a page of expenses at a time. Reuses the same group shape (one expense
+    per group) so the frontend renders it with the same list component.
     """
-    group_key = _group_key_sql()
 
     def _filtered(query):
         query = _range_filter(query, user.id, date_from, date_to)
         if needs_review is not None:
             query = query.where(Expense.needs_review.is_(needs_review))
         return query
+
+    if sort == "date":
+        return await _list_expenses_by_date(db, user.id, _filtered, page, page_size)
+
+    group_key = _group_key_sql()
 
     groups_q = _filtered(
         sa.select(group_key.label("gkey"), sa.func.max(_spent).label("last_spent"))

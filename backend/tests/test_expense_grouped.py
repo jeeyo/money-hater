@@ -140,3 +140,39 @@ async def test_grouped_respects_needs_review_filter(client, db_sessionmaker):
     ).json()
     assert page["groups"] == []
     assert page["total_groups"] == 0
+
+
+async def test_sort_by_date_leaves_expenses_ungrouped_and_newest_first(client, db_sessionmaker):
+    """Even same-place, same-merchant expenses each stand alone under sort=date."""
+    await register(client)
+    place_id = await _a_place(db_sessionmaker, "Kopi 1930")
+
+    await _spend(client, "60.00", "Coffee", place_id, "2026-08-10T08:00:00Z")
+    await _spend(client, "180.00", "Lunch", place_id, "2026-08-11T12:00:00Z")
+    await _spend(client, "40.00", "Tip", spent_at="2026-08-12T09:00:00Z")
+
+    page = (await client.get("/api/expenses/grouped", params={"sort": "date"})).json()
+    assert page["total_groups"] == 3
+    assert [g["place"] for g in page["groups"]] == [None, None, None]
+    assert [len(g["expenses"]) for g in page["groups"]] == [1, 1, 1]
+    amounts = [g["expenses"][0]["total_minor"] for g in page["groups"]]
+    assert amounts == [4000, 18000, 6000]
+
+
+async def test_sort_by_date_paginates_over_raw_expenses(client, db_sessionmaker):
+    place_id = await _a_place(db_sessionmaker, "Same Place")
+    await register(client)
+    for i in range(17):
+        await _spend(client, "10.00", "x", place_id, f"2026-08-{i + 1:02d}T08:00:00Z")
+
+    first = (
+        await client.get("/api/expenses/grouped", params={"sort": "date", "page": 1})
+    ).json()
+    assert first["total_groups"] == 17
+    assert first["total_pages"] == 2
+    assert len(first["groups"]) == 15
+
+    second = (
+        await client.get("/api/expenses/grouped", params={"sort": "date", "page": 2})
+    ).json()
+    assert len(second["groups"]) == 2
