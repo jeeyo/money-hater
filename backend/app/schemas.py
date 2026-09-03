@@ -142,13 +142,26 @@ class ExpenseOut(BaseModel):
     items: list[ExpenseItemOut]
 
 
-class ExpensePageOut(BaseModel):
-    """The "All expenses" list, most recent first, paginated a page at a time."""
+class ExpenseGroupOut(BaseModel):
+    """Expenses sharing a resolved place — or, absent that, the same typed
+    merchant name — most recent first.
 
+    ``place`` is set when the group shares a resolved place. ``merchant`` is
+    set instead when the group shares free-text merchant text with no
+    resolved place (e.g. a receipt from a vending machine Google has no entry
+    for). Both null means the expense has neither and stands alone.
+    """
+
+    place: PlaceOut | None
+    merchant: str | None
     expenses: list[ExpenseOut]
+
+
+class ExpensePageOut(BaseModel):
+    groups: list[ExpenseGroupOut]
     page: int
     page_size: int
-    total: int
+    total_groups: int
     total_pages: int
 
 

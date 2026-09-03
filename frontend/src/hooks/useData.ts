@@ -160,10 +160,11 @@ export function useExpenses(needsReview?: boolean, dateFrom?: string, dateTo?: s
   });
 }
 
-/** The "All expenses" list, most recent first, paginated a page at a time. */
-export function useExpensesPage(page: number) {
+/** The "All expenses" list, sectioned by place and paginated a page of
+ *  sections at a time — see the /grouped endpoint for how groups are formed. */
+export function useExpensesGrouped(page: number) {
   return useQuery({
-    queryKey: ['expenses', 'page', page],
+    queryKey: ['expenses', 'grouped', page],
     queryFn: () => apiJson<ExpensePage>(`/api/expenses/grouped?page=${page}`),
     placeholderData: keepPreviousData,
   });

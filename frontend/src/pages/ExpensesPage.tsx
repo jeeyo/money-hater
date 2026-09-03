@@ -19,11 +19,11 @@ import {
   useDeleteExpense,
   useExpenseSummary,
   useExpenses,
-  useExpensesPage,
+  useExpensesGrouped,
   useImage,
 } from '../hooks/useData';
 import { formatDateTime, formatMoney, last30DayRange } from '../lib/format';
-import type { Expense, MerchantTotal } from '../types';
+import type { Expense, ExpenseGroup, MerchantTotal } from '../types';
 
 /** Single-hue magnitude bars: one series, values in ink rather than series color. */
 function MerchantBars({ merchants }: { merchants: MerchantTotal[] }) {
@@ -65,11 +65,7 @@ function ExpenseRow({
   const remove = useDeleteExpense();
 
   const isForeign = expense.currency !== expense.base_currency;
-  // The place (or, absent a resolved place, the typed merchant text) leads
-  // the row — where you spent matters more here than what you bought.
   const whereLabel = expense.place?.name ?? expense.merchant;
-  const primary = whereLabel ?? expense.description ?? 'Expense';
-  const secondary = whereLabel ? expense.description : null;
 
   return (
     <li className="rounded-2xl border border-line bg-surface">
@@ -92,14 +88,14 @@ function ExpenseRow({
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1 text-sm font-medium text-ink">
-            {whereLabel && <MapPin className="size-3.5 shrink-0 text-ink-4" />}
-            <span className="truncate">{primary}</span>
+          <span className="block truncate text-sm font-medium text-ink">
+            {expense.description ?? whereLabel ?? 'Expense'}
           </span>
           <span className="flex items-center gap-1 text-xs text-ink-3">
-            {secondary && (
+            {expense.description && whereLabel && (
               <>
-                <span className="max-w-32 truncate">{secondary}</span>
+                <MapPin className="size-3 shrink-0 text-ink-4" />
+                <span className="max-w-32 truncate">{whereLabel}</span>
                 <span className="text-ink-4">·</span>
               </>
             )}
@@ -202,6 +198,69 @@ function ExpenseRow({
   );
 }
 
+/** One section of the All expenses list — expenses sharing a resolved place
+ *  or, absent that, matching merchant text, under a header; otherwise a
+ *  single ungrouped expense standing on its own. */
+function ExpenseGroupSection({
+  group,
+  baseCurrency,
+  onConfirm,
+  onEdit,
+}: {
+  group: ExpenseGroup;
+  baseCurrency: string;
+  onConfirm: (expense: Expense) => void;
+  onEdit: (expense: Expense) => void;
+}) {
+  const label = group.place?.name ?? group.merchant;
+  // A shared place always gets a header, even for one visit; shared merchant
+  // text only earns one once it has actually merged something — otherwise
+  // every plain manual expense would grow a header that just repeats its own
+  // row.
+  const showHeader = group.place != null || (label != null && group.expenses.length > 1);
+
+  if (!showHeader) {
+    return (
+      <>
+        {group.expenses.map((expense) => (
+          <ExpenseRow
+            key={expense.id}
+            expense={expense}
+            onConfirm={() => onConfirm(expense)}
+            onEdit={() => onEdit(expense)}
+          />
+        ))}
+      </>
+    );
+  }
+
+  const total = group.expenses.reduce((sum, e) => sum + (e.base_total_minor ?? 0), 0);
+
+  return (
+    <li className="space-y-2">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-ink-3">
+          <MapPin className="size-3.5 shrink-0 text-ink-4" />
+          <span className="truncate">{label}</span>
+        </span>
+        <span className="shrink-0 text-xs font-medium text-ink-4 tabular-nums">
+          {formatMoney(total, baseCurrency)} · {group.expenses.length}
+        </span>
+      </div>
+      <ul className="space-y-2">
+        {group.expenses.map((expense) => (
+          <ExpenseRow
+            key={expense.id}
+            expense={expense}
+            onConfirm={() => onConfirm(expense)}
+            onEdit={() => onEdit(expense)}
+          />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
 export function ExpensesPage() {
   const { user } = useAuth();
   const baseCurrency = user?.preferred_currency ?? 'THB';
@@ -210,7 +269,7 @@ export function ExpensesPage() {
   const { data: last30 } = useExpenseSummary(last30From, last30To);
   const { data: needsReview } = useExpenses(true);
   const [page, setPage] = useState(1);
-  const { data: expensePage, isLoading, isFetching } = useExpensesPage(page);
+  const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
@@ -291,18 +350,19 @@ export function ExpensesPage() {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-ink-3">All expenses</h2>
         {isLoading && <p className="py-8 text-center text-sm text-ink-4">Loading…</p>}
-        {expensePage?.expenses.length === 0 && (
+        {expensePage?.groups.length === 0 && (
           <p className="py-12 text-center text-sm text-ink-3">
             Nothing yet — upload a receipt photo, or add an expense by hand.
           </p>
         )}
         <ul className={`space-y-2 ${isFetching ? 'opacity-60' : ''}`}>
-          {expensePage?.expenses.map((expense) => (
-            <ExpenseRow
-              key={expense.id}
-              expense={expense}
-              onConfirm={() => setConfirming(expense)}
-              onEdit={() => setEditing(expense)}
+          {expensePage?.groups.map((group) => (
+            <ExpenseGroupSection
+              key={group.place ? `place:${group.place.id}` : `expense:${group.expenses[0].id}`}
+              group={group}
+              baseCurrency={baseCurrency}
+              onConfirm={setConfirming}
+              onEdit={setEditing}
             />
           ))}
         </ul>

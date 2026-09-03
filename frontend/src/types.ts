@@ -226,11 +226,19 @@ export interface Expense {
   items: ExpenseItem[];
 }
 
-export interface ExpensePage {
+export interface ExpenseGroup {
+  /** Set when the group shares a resolved place. */
+  place: Place | null;
+  /** Set instead when the group shares typed merchant text with no resolved place. */
+  merchant: string | null;
   expenses: Expense[];
+}
+
+export interface ExpensePage {
+  groups: ExpenseGroup[];
   page: number;
   page_size: number;
-  total: number;
+  total_groups: number;
   total_pages: number;
 }
 
