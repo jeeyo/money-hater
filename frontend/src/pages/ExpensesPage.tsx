@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   MapPin,
@@ -212,6 +213,7 @@ function ExpenseGroupSection({
   onConfirm: (expense: Expense) => void;
   onEdit: (expense: Expense) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
   const label = group.place?.name ?? group.merchant;
   // A shared place always gets a header, even for one visit; shared merchant
   // text only earns one once it has actually merged something — otherwise
@@ -238,25 +240,35 @@ function ExpenseGroupSection({
 
   return (
     <li className="space-y-2">
-      <div className="flex items-center justify-between gap-2 px-1">
+      <button
+        type="button"
+        onClick={() => setCollapsed((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-1 py-0.5"
+        aria-expanded={!collapsed}
+      >
         <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-ink-3">
+          <ChevronDown
+            className={`size-3.5 shrink-0 text-ink-4 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+          />
           <MapPin className="size-3.5 shrink-0 text-ink-4" />
           <span className="truncate">{label}</span>
         </span>
         <span className="shrink-0 text-xs font-medium text-ink-4 tabular-nums">
           {formatMoney(total, baseCurrency)} · {group.expenses.length}
         </span>
-      </div>
-      <ul className="space-y-2">
-        {group.expenses.map((expense) => (
-          <ExpenseRow
-            key={expense.id}
-            expense={expense}
-            onConfirm={() => onConfirm(expense)}
-            onEdit={() => onEdit(expense)}
-          />
-        ))}
-      </ul>
+      </button>
+      {!collapsed && (
+        <ul className="space-y-2">
+          {group.expenses.map((expense) => (
+            <ExpenseRow
+              key={expense.id}
+              expense={expense}
+              onConfirm={() => onConfirm(expense)}
+              onEdit={() => onEdit(expense)}
+            />
+          ))}
+        </ul>
+      )}
     </li>
   );
 }
