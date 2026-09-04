@@ -19,7 +19,7 @@ from app.schemas import (
     MerchantTotal,
     RateOut,
 )
-from app.serialize import expense_out, place_out, spend_out
+from app.serialize import expense_moment, expense_out, place_out, spend_out
 from app.services import fx
 from app.services.expenses import (
     apply_conversion,
@@ -41,6 +41,22 @@ def _range_filter(query, user_id: int, date_from: datetime | None, date_to: date
     if date_to:
         query = query.where(_spent < date_to)
     return query
+
+
+def _group_key_sql():
+    """Same-place expenses share a key: the resolved place, else the merchant
+    text typed on the receipt (trimmed, case-folded), else the expense stands
+    alone. ``.concat`` rather than ``+``/``func.concat`` so this compiles on
+    both Postgres (prod) and SQLite (tests) without a dialect-specific op.
+    """
+    merchant_norm = sa.func.lower(sa.func.trim(Expense.merchant))
+    place_key = sa.literal("p:").concat(sa.cast(Expense.place_id, sa.String))
+    merchant_key = sa.literal("m:").concat(merchant_norm)
+    return sa.case(
+        (Expense.place_id.isnot(None), place_key),
+        (sa.and_(Expense.merchant.isnot(None), sa.func.trim(Expense.merchant) != ""), merchant_key),
+        else_=sa.literal("e:").concat(sa.cast(Expense.id, sa.String)),
+    )
 
 
 def _group_key_py(expense: Expense) -> str:
@@ -96,16 +112,15 @@ async def list_expenses_grouped(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=50),
 ):
-    """The "All expenses" list, most recent first, paginated over raw
-    expenses (not groups) so a page always covers the same slice of time.
+    """The "All expenses" list, sectioned by place.
 
-    A place's history never jumps the queue: only expenses that already
-    fall consecutively in that date order — a back-to-back run at the same
-    place, or with the same typed merchant text — collapse into one
-    section. A place visited again after other spending in between gets a
-    fresh section at its new position instead of pulling the earlier visit
-    forward with it.
+    Expenses sharing a resolved place — or, failing that, the same typed
+    merchant name — are shown as one group, ordered by that place's most
+    recent visit; an expense with neither stands alone. Paginated over groups
+    (not raw rows) so a page always reads as complete sections rather than a
+    place cut off mid-list.
     """
+    group_key = _group_key_sql()
 
     def _filtered(query):
         query = _range_filter(query, user.id, date_from, date_to)
@@ -113,33 +128,38 @@ async def list_expenses_grouped(
             query = query.where(Expense.needs_review.is_(needs_review))
         return query
 
-    total = await db.scalar(
-        sa.select(sa.func.count()).select_from(_filtered(sa.select(Expense.id)).subquery())
-    )
-    total = total or 0
+    groups_q = _filtered(
+        sa.select(group_key.label("gkey"), sa.func.max(_spent).label("last_spent"))
+    ).group_by(group_key)
 
-    query = _filtered(
-        sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place))
-    )
-    rows = (
+    total_groups = await db.scalar(sa.select(sa.func.count()).select_from(groups_q.subquery()))
+    total_groups = total_groups or 0
+
+    page_rows = (
         await db.execute(
-            query.order_by(_spent.desc()).limit(page_size).offset((page - 1) * page_size)
+            groups_q.order_by(sa.desc("last_spent"))
+            .limit(page_size)
+            .offset((page - 1) * page_size)
         )
-    ).scalars()
+    ).all()
+    keys = [row.gkey for row in page_rows]
 
     groups: list[ExpenseGroupOut] = []
-    run_keys: list[str] = []
-    for expense in rows:
-        key = _group_key_py(expense)
-        if run_keys and run_keys[-1] == key:
-            groups[-1].expenses.append(expense_out(expense))
-        else:
-            run_keys.append(key)
+    if keys:
+        expenses_q = _filtered(
+            sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place))
+        ).where(group_key.in_(keys))
+        buckets: dict[str, list[Expense]] = {key: [] for key in keys}
+        for expense in (await db.execute(expenses_q)).scalars():
+            buckets[_group_key_py(expense)].append(expense)
+        for key in keys:
+            bucket = sorted(buckets[key], key=expense_moment, reverse=True)
+            head = bucket[0]
             groups.append(
                 ExpenseGroupOut(
-                    place=place_out(expense.place),
-                    merchant=expense.merchant if expense.place is None else None,
-                    expenses=[expense_out(expense)],
+                    place=place_out(head.place),
+                    merchant=head.merchant if head.place is None else None,
+                    expenses=[expense_out(e) for e in bucket],
                 )
             )
 
@@ -147,8 +167,8 @@ async def list_expenses_grouped(
         groups=groups,
         page=page,
         page_size=page_size,
-        total=total,
-        total_pages=max(1, math.ceil(total / page_size)),
+        total_groups=total_groups,
+        total_pages=max(1, math.ceil(total_groups / page_size)),
     )
 
 

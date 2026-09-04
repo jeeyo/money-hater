@@ -238,7 +238,7 @@ export interface ExpensePage {
   groups: ExpenseGroup[];
   page: number;
   page_size: number;
-  total: number;
+  total_groups: number;
   total_pages: number;
 }
 

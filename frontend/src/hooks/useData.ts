@@ -160,8 +160,8 @@ export function useExpenses(needsReview?: boolean, dateFrom?: string, dateTo?: s
   });
 }
 
-/** The "All expenses" list, most recent first and paginated over raw
- *  expenses — see the /grouped endpoint for how runs collapse into groups. */
+/** The "All expenses" list, sectioned by place and paginated a page of
+ *  sections at a time — see the /grouped endpoint for how groups are formed. */
 export function useExpensesGrouped(page: number) {
   return useQuery({
     queryKey: ['expenses', 'grouped', page],
