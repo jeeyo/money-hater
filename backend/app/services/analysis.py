@@ -56,7 +56,12 @@ async def _apply_exif(image: Image, data: bytes) -> None:
 
 
 async def _apply_receipt(
-    db: AsyncSession, image: Image, result: VisionResult, user: User
+    db: AsyncSession,
+    image: Image,
+    result: VisionResult,
+    user: User,
+    *,
+    previous_place_id: int | None = None,
 ) -> None:
     receipt = result.receipt
     if result.kind != "receipt" or receipt is None or receipt.total is None:
@@ -72,8 +77,11 @@ async def _apply_receipt(
         log.info("image %s already has expense %s; leaving it", image.id, existing)
         # Except for the place and the time: a re-analysis that finally
         # resolved one is the answer to the question the button was pressed to
-        # ask, and an expense with none of its own should get it.
-        await sync_place_from_image(db, image)
+        # ask, and an expense with none of its own should get it. One still
+        # carrying what this photo said last time follows the new answer too —
+        # the reading it was given here has changed, and "Re-analyze" was
+        # pressed to change it.
+        await sync_place_from_image(db, image, previous_place_id=previous_place_id)
         await sync_time_from_image(db, image)
         return
     # Everything below comes from a vision model reading a photo, so nothing is
@@ -199,6 +207,10 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
         log.warning("analyze: image %s vanished", image_id)
         return
     user = await db.get(User, image.user_id)
+    # Where this photo said it was before this run, so an expense still
+    # carrying that answer can be moved on to the new one. Read before the
+    # re-resolution below overwrites it.
+    previous_place_id = image.place_id
     image.status = "processing"
     await db.commit()
 
@@ -235,7 +247,13 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
 
         if vision:
             await _record_analysis(db, image, vision)
-            await _apply_receipt(db, image, vision, user)
+            await _apply_receipt(
+                db,
+                image,
+                vision,
+                user,
+                previous_place_id=previous_place_id,
+            )
 
         image.status = "analyzed"
         image.error = None

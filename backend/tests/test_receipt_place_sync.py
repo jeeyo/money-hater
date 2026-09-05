@@ -151,3 +151,63 @@ async def test_reanalysis_hands_over_a_place_resolved_late(
         await run_image_analysis(db, image_id)
 
     assert (await _expense(db_sessionmaker)).place_id == place_id
+
+
+async def test_reanalysis_moves_the_place_the_photo_had_handed_over(
+    client, db_sessionmaker, monkeypatch
+):
+    """The photo changed its mind, and the expense was carrying its old answer."""
+    await register(client)
+    wrong = await _a_place(db_sessionmaker, name="Shop next door")
+
+    def resolves_to(place_id):
+        async def resolved(db, lat, lng, hint=None):
+            return await db.get(Place, place_id)
+
+        return resolved
+
+    monkeypatch.setattr(analysis_mod, "resolve_place", resolves_to(wrong))
+    image_id = await _a_receipt_photo(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        lat=BKK[0],
+        lng=BKK[1],
+        taken_at=datetime(2026, 8, 8, 13, 0, tzinfo=UTC),
+    )
+    assert (await _expense(db_sessionmaker)).place_id == wrong
+
+    right = await _a_place(db_sessionmaker, name="Kopi 1930")
+    monkeypatch.setattr(analysis_mod, "resolve_place", resolves_to(right))
+    async with db_sessionmaker() as db:
+        await run_image_analysis(db, image_id)
+
+    assert (await _expense(db_sessionmaker)).place_id == right
+
+
+async def test_reanalysis_leaves_a_place_picked_on_the_expense_alone(
+    client, db_sessionmaker, monkeypatch
+):
+    await register(client)
+    wrong = await _a_place(db_sessionmaker, name="Shop next door")
+
+    async def resolved(db, lat, lng, hint=None):
+        return await db.get(Place, wrong)
+
+    monkeypatch.setattr(analysis_mod, "resolve_place", resolved)
+    image_id = await _a_receipt_photo(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        lat=BKK[0],
+        lng=BKK[1],
+        taken_at=datetime(2026, 8, 8, 13, 0, tzinfo=UTC),
+    )
+    theirs = await _a_place(db_sessionmaker, name="Sarnies")
+    expense = await _expense(db_sessionmaker)
+    await client.patch(f"/api/expenses/{expense.id}", json={"place_id": theirs})
+
+    async with db_sessionmaker() as db:
+        await run_image_analysis(db, image_id)
+
+    assert (await _expense(db_sessionmaker)).place_id == theirs
