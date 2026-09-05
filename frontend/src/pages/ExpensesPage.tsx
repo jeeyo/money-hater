@@ -370,7 +370,12 @@ export function ExpensesPage() {
         <ul className={`space-y-2 ${isFetching ? 'opacity-60' : ''}`}>
           {expensePage?.groups.map((group) => (
             <ExpenseGroupSection
-              key={group.place ? `place:${group.place.id}` : `expense:${group.expenses[0].id}`}
+              // Keyed by the group's first expense, not its place: a place
+              // visited again after other spending gets a second section on
+              // the same page, and keying both on `place:<id>` made React
+              // reconcile them as one — rows from the outgoing page stuck at
+              // the top when the list re-rendered.
+              key={group.expenses[0].id}
               group={group}
               baseCurrency={baseCurrency}
               onConfirm={setConfirming}
