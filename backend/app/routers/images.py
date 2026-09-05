@@ -14,7 +14,7 @@ from app.serialize import image_out
 from app.services import storage
 from app.services.clustering import place_edit_regroups, recluster_user, refresh_visit_place
 from app.services.exif import ExifData, extract_exif
-from app.services.expenses import sync_place_from_image
+from app.services.expenses import sync_place_from_image, sync_time_from_image
 from app.services.localtime import MAX_OFFSET_MINUTES, local_now
 from app.services.places import search_place_by_text
 
@@ -221,6 +221,7 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
     sent = body.model_dump(exclude_unset=True)
 
     if "taken_at" in sent:
+        previous_taken_at = image.taken_at
         if body.taken_at is None:
             if image.exif_taken_at is None:
                 raise HTTPException(
@@ -231,6 +232,9 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
         else:
             image.taken_at = body.taken_at
             image.taken_at_source = "custom"
+        # A receipt photo dates its expense as well as itself, so a day fixed
+        # here does not have to be fixed again on the money.
+        await sync_time_from_image(db, image, previous_taken_at=previous_taken_at)
         await db.commit()
         # Time determines both the day and the stop, so refresh the itinerary
         # immediately after a correction rather than waiting for analysis.

@@ -24,7 +24,7 @@ from app.models import Expense, ExpenseItem, Image, ImageAnalysis, User
 from app.services import storage
 from app.services.clustering import recluster_user
 from app.services.exif import extract_exif
-from app.services.expenses import create_expense, sync_place_from_image
+from app.services.expenses import create_expense, sync_place_from_image, sync_time_from_image
 from app.services.money import normalize_currency, to_minor
 from app.services.places import resolve_place
 from app.services.vision import (
@@ -70,10 +70,11 @@ async def _apply_receipt(
     existing = await db.scalar(sa.select(Expense.id).where(Expense.image_id == image.id))
     if existing is not None:
         log.info("image %s already has expense %s; leaving it", image.id, existing)
-        # Except for the place: a re-analysis that finally resolved one is the
-        # answer to the question the button was pressed to ask, and an expense
-        # with no place of its own should get it.
+        # Except for the place and the time: a re-analysis that finally
+        # resolved one is the answer to the question the button was pressed to
+        # ask, and an expense with none of its own should get it.
         await sync_place_from_image(db, image)
+        await sync_time_from_image(db, image)
         return
     # Everything below comes from a vision model reading a photo, so nothing is
     # the shape the columns promise until it is made so. What the model read is
