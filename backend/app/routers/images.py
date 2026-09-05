@@ -14,6 +14,7 @@ from app.serialize import image_out
 from app.services import storage
 from app.services.clustering import place_edit_regroups, recluster_user, refresh_visit_place
 from app.services.exif import ExifData, extract_exif
+from app.services.expenses import sync_place_from_image
 from app.services.localtime import MAX_OFFSET_MINUTES, local_now
 from app.services.places import search_place_by_text
 
@@ -237,7 +238,10 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
 
     if "place_id" in sent or "place_query" in sent:
         place = await _place_from(db, image, body)
+        previous_place_id = image.place_id
         image.place_id = place.id if place is not None else None
+        # A receipt photo answers for its expense as well as for the stop.
+        await sync_place_from_image(db, image, previous_place_id=previous_place_id)
         # Taking one off is an answer too, so it pins as well: re-analysis must
         # not put back the place the user just rejected.
         image.place_pinned = True

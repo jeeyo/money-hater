@@ -6,7 +6,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Expense, Place, User, Visit
+from app.models import Expense, Image, Place, User, Visit
 from app.services import fx
 from app.services.money import convert_minor
 
@@ -84,6 +84,38 @@ async def resolve_where(
     if place is None:
         return None, merchant
     return place.id, merchant or place.name
+
+
+async def sync_place_from_image(
+    db: AsyncSession, image: Image, *, previous_place_id: int | None = None
+) -> Expense | None:
+    """Carry a photo's place onto the expense that was read off it.
+
+    A receipt photo is the expense's own evidence of where the money went, so
+    a photo that only gets a place later — resolved on a second analysis, or
+    picked by hand because it had no GPS — hands it to an expense that has
+    none. An expense still carrying the photo's previous answer
+    (``previous_place_id``) follows a correction too: that place came from
+    here in the first place, and leaving it behind would keep the shop next
+    door on the money while the photo says otherwise.
+
+    Anything else on the expense is the user's own answer and is left alone.
+    """
+    if image.place_id is None:
+        return None
+    expense = await db.scalar(sa.select(Expense).where(Expense.image_id == image.id))
+    if expense is None or expense.place_id == image.place_id:
+        return None
+    if expense.place_id is not None and expense.place_id != previous_place_id:
+        return None
+    place = await db.get(Place, image.place_id)
+    if place is None:
+        return None
+    expense.place_id = place.id
+    # Same rule as `resolve_where`: a place fills the free-text name when
+    # there is none, so merchant grouping keeps working either way.
+    expense.merchant = expense.merchant or place.name
+    return expense
 
 
 async def create_expense(
