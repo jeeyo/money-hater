@@ -63,6 +63,11 @@ function DayCell({
         <span className="absolute left-1/2 top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500" />
       )}
 
+      {/* ...and so would a day that was only ever paid for */}
+      {!cover && day.visit_count === 0 && day.expense_count > 0 && (
+        <span className="absolute left-1/2 top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-money" />
+      )}
+
       {spent && (
         <span
           className={`absolute inset-x-0.5 bottom-1 truncate text-center text-[10px] font-semibold ${

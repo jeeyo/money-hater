@@ -1,4 +1,4 @@
-import { ChevronRight, Images, MapPin } from 'lucide-react';
+import { ChevronRight, Images, MapPin, Receipt } from 'lucide-react';
 import { formatSpend, parseLocalDate } from '../lib/format';
 import type { TimelineDaySummary, TimelineRange } from '../types';
 
@@ -22,7 +22,7 @@ function DayRow({
 }) {
   const date = parseLocalDate(day.date);
   const spent = day.spend.base_total_minor > 0;
-  const empty = day.visit_count === 0 && day.image_count === 0 && !spent;
+  const empty = day.visit_count === 0 && day.image_count === 0 && day.expense_count === 0;
 
   return (
     <button
@@ -48,8 +48,8 @@ function DayRow({
               ? stopLine(day)
               : day.image_count > 0
                 ? 'Photos, no stop yet'
-                : spent
-                  ? 'Spending, no stops'
+                : day.expense_count > 0
+                  ? 'Spending only'
                   : 'Nothing logged'}
           </p>
           {spent && (
@@ -79,7 +79,7 @@ function DayRow({
           </div>
         )}
 
-        {day.visit_count + day.image_count > 0 && (
+        {day.visit_count + day.image_count + day.expense_count > 0 && (
           <p className="flex items-center gap-3 text-xs text-ink-4">
             {day.visit_count > 0 && (
               <span className="inline-flex items-center gap-1">
@@ -91,6 +91,13 @@ function DayRow({
               <span className="inline-flex items-center gap-1">
                 <Images className="size-3" />
                 {day.image_count}
+              </span>
+            )}
+            {/* A day paid for in cash has nothing else to count */}
+            {day.expense_count > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <Receipt className="size-3" />
+                {day.expense_count}
               </span>
             )}
           </p>

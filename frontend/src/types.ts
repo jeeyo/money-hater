@@ -74,6 +74,9 @@ export interface Visit {
   lng: number | null;
   pinned: boolean;
   images: ImageRecord[];
+  /** What was spent here with no photo of its own — receipt-backed spending is
+   *  already on the card as its photo. `spend` totals both alike. */
+  expenses: Expense[];
   spend: Spend;
 }
 
@@ -96,6 +99,8 @@ export interface Trip {
 export interface TripDay {
   date: string;
   visits: Visit[];
+  /** Photoless spending outside every stop — see TimelineDay.expenses */
+  expenses: Expense[];
   spend: Spend;
 }
 
@@ -167,6 +172,9 @@ export interface TimelineDay {
   trip: TripRef | null;
   visits: Visit[];
   unassigned_images: ImageRecord[];
+  /** Spending with neither a photo nor a stop to hang it on: entries of the
+   *  day in their own right, shown on the rail among the stops. */
+  expenses: Expense[];
   spend: Spend;
 }
 
@@ -180,6 +188,7 @@ export interface TimelineDaySummary {
   stops: string[];
   visit_count: number;
   image_count: number;
+  expense_count: number;
   thumbs: ImageRecord[];
   spend: Spend;
 }

@@ -1,9 +1,23 @@
 import { MapPin, Pin } from 'lucide-react';
 import { useState } from 'react';
-import { formatSpend, formatTime } from '../lib/format';
-import type { ImageRecord, Visit } from '../types';
+import { formatMoney, formatSpend, formatTime } from '../lib/format';
+import type { Expense, ImageRecord, Visit } from '../types';
 import { ImageModal } from './ImageModal';
 import { ImageThumb } from './ImageThumb';
+
+/** What was paid for here with no receipt to photograph: the badge above says
+ *  how much the stop cost, these say what the money went on. */
+function ExpenseLine({ expense }: { expense: Expense }) {
+  const where = expense.place?.name ?? expense.merchant;
+  return (
+    <li className="flex items-baseline justify-between gap-2 text-xs">
+      <span className="truncate text-ink-2">{expense.description ?? where ?? 'Expense'}</span>
+      <span className="shrink-0 text-ink-3 tabular-nums">
+        {formatMoney(expense.total_minor, expense.currency)}
+      </span>
+    </li>
+  );
+}
 
 export function VisitCard({ visit }: { visit: Visit }) {
   const [openImage, setOpenImage] = useState<ImageRecord | null>(null);
@@ -54,6 +68,13 @@ export function VisitCard({ visit }: { visit: Visit }) {
               <ImageThumb key={image.id} image={image} onClick={() => setOpenImage(image)} />
             ))}
           </div>
+        )}
+        {visit.expenses.length > 0 && (
+          <ul className="mt-2 space-y-1 border-t border-line-soft pt-2">
+            {visit.expenses.map((expense) => (
+              <ExpenseLine key={expense.id} expense={expense} />
+            ))}
+          </ul>
         )}
       </div>
       {openImage && <ImageModal image={openImage} onClose={() => setOpenImage(null)} />}

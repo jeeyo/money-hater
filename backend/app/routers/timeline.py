@@ -107,7 +107,9 @@ async def get_timeline(
                 .order_by(Visit.started_at)
                 .options(
                     selectinload(Visit.place),
-                    selectinload(Visit.expenses),
+                    selectinload(Visit.expenses).options(
+                        selectinload(Expense.items), selectinload(Expense.place)
+                    ),
                     selectinload(Visit.images).selectinload(Image.analysis),
                     selectinload(Visit.images).selectinload(Image.expense),
                     selectinload(Visit.images).selectinload(Image.place),
@@ -145,9 +147,9 @@ async def get_timeline(
     expenses = (
         (
             await db.execute(
-                sa.select(Expense).where(
-                    Expense.user_id == user.id, spent >= start, spent < end
-                )
+                sa.select(Expense)
+                .where(Expense.user_id == user.id, spent >= start, spent < end)
+                .options(selectinload(Expense.items), selectinload(Expense.place))
             )
         )
         .scalars()
