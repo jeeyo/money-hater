@@ -200,7 +200,7 @@ async def test_a_database_failure_is_not_shown_as_sql(client, db_sessionmaker, m
     _stub_vision(monkeypatch, A_RECEIPT)
 
     # Where the reported failure actually landed: writing the expense
-    async def explode(db, image, result, user):
+    async def explode(db, image, result, user, **kwargs):
         raise DBAPIError(
             "INSERT INTO expenses (user_id, image_id, currency) VALUES ($1, $2, $3)",
             {"currency": "PPTN"},

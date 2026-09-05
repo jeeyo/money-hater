@@ -1,6 +1,6 @@
 """Expense creation shared by the receipt pipeline and manual entry."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -115,6 +115,55 @@ async def sync_place_from_image(
     # Same rule as `resolve_where`: a place fills the free-text name when
     # there is none, so merchant grouping keeps working either way.
     expense.merchant = expense.merchant or place.name
+    return expense
+
+
+def _same_instant(a: datetime | None, b: datetime | None) -> bool:
+    """Compare two stored moments without tripping over a missing offset.
+
+    The columns are `timestamptz`, but sqlite has no zone to give back and
+    hands over a naive value where Postgres hands over an aware one. Plain
+    `==` between the two is silently False, which would read as "the user
+    changed this" and stop a sync that should have run.
+    """
+    if a is None or b is None:
+        return a is None and b is None
+    if a.tzinfo is None:
+        a = a.replace(tzinfo=UTC)
+    if b.tzinfo is None:
+        b = b.replace(tzinfo=UTC)
+    return a == b
+
+
+async def sync_time_from_image(
+    db: AsyncSession, image: Image, *, previous_taken_at: datetime | None = None
+) -> Expense | None:
+    """Carry a photo's time onto the expense that was read off it.
+
+    A receipt photo lands on the wrong day often enough — a screenshot whose
+    camera never wrote a timestamp is filed under when it was uploaded — and
+    the fix is made on the photo, where the date picker is. The expense read
+    off it took its time from that same photo, so it has to follow rather than
+    leave the user correcting the same day twice, once on each side.
+
+    Only the time this photo gave it moves: an expense with no time at all
+    takes the photo's, and one still carrying the photo's previous answer
+    (``previous_taken_at``) follows the correction. A time the user set on the
+    expense itself, and the date printed on the receipt — which is what the
+    money was actually spent at, whenever the photo was taken — are their own
+    answers and are left alone.
+
+    The caller reclusters afterwards, which is what re-files a receipt-backed
+    expense under the stop its photo now belongs to.
+    """
+    if image.taken_at is None:
+        return None
+    expense = await db.scalar(sa.select(Expense).where(Expense.image_id == image.id))
+    if expense is None or _same_instant(expense.spent_at, image.taken_at):
+        return None
+    if expense.spent_at is not None and not _same_instant(expense.spent_at, previous_taken_at):
+        return None
+    expense.spent_at = image.taken_at
     return expense
 
 
