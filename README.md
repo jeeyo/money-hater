@@ -18,7 +18,7 @@ places, expenses, and trips.
 
 | Timeline | Trip | Expenses |
 | --- | --- | --- |
-| ![Day timeline of stops with photos and spend](docs/screenshots/timeline.webp) | ![Trip detail with days, stops, and route map](docs/screenshots/trip-detail.webp) | ![Expenses converted into the base currency](docs/screenshots/expenses.webp) |
+| ![Day timeline of stops and cash expenses, with photos and spend](docs/screenshots/timeline.webp) | ![Trip detail with days, stops, and route map](docs/screenshots/trip-detail.webp) | ![Expenses converted into the base currency](docs/screenshots/expenses.webp) |
 
 | Add expense | Confirm rate | Trip in progress |
 | --- | --- | --- |
