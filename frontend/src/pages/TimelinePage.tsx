@@ -1,10 +1,10 @@
 import { ChevronLeft, ChevronRight, Luggage } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { DayRail } from '../components/DayRail';
 import { ImageModal } from '../components/ImageModal';
 import { ImageThumb } from '../components/ImageThumb';
 import { MonthView } from '../components/MonthView';
-import { VisitCard } from '../components/VisitCard';
 import { WeekView } from '../components/WeekView';
 import { useTimeline, useTimelineRange } from '../hooks/useData';
 import {
@@ -90,8 +90,13 @@ export function TimelinePage() {
   const trips: TripRef[] =
     view === 'day' ? (day.data?.trip ? [day.data.trip] : []) : (range.data?.trips ?? []);
 
+  // Spending counts as something logged here too: a day whose only entry is a
+  // cash fare has a card on it, so it is not the empty state.
   const dayIsEmpty =
-    day.data && day.data.visits.length === 0 && day.data.unassigned_images.length === 0;
+    day.data &&
+    day.data.visits.length === 0 &&
+    day.data.expenses.length === 0 &&
+    day.data.unassigned_images.length === 0;
   const showingNow =
     view === 'day'
       ? date === today
@@ -215,12 +220,8 @@ export function TimelinePage() {
           </div>
         )}
 
-        {view === 'day' && day.data && day.data.visits.length > 0 && (
-          <div className="space-y-3 border-l border-line [&>*]:-ml-px">
-            {day.data.visits.map((visit) => (
-              <VisitCard key={visit.id} visit={visit} />
-            ))}
-          </div>
+        {view === 'day' && day.data && (
+          <DayRail visits={day.data.visits} expenses={day.data.expenses} />
         )}
 
         {view === 'day' && day.data && day.data.unassigned_images.length > 0 && (

@@ -223,7 +223,9 @@ async def visits_in(db: AsyncSession, user: User, window: TripWindow) -> list[Vi
         .order_by(Visit.started_at)
         .options(
             selectinload(Visit.place),
-            selectinload(Visit.expenses),
+            selectinload(Visit.expenses).options(
+                selectinload(Expense.items), selectinload(Expense.place)
+            ),
             selectinload(Visit.images).selectinload(Image.analysis),
             selectinload(Visit.images).selectinload(Image.expense),
             selectinload(Visit.images).selectinload(Image.place),

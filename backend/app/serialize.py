@@ -149,6 +149,32 @@ def _visit_expenses(visit: Visit) -> list[Expense]:
     return list(visit.expenses)
 
 
+def expense_moment(expense: Expense) -> datetime:
+    """When an expense counts as having happened — when spent, else when logged."""
+    return expense.spent_at or expense.created_at
+
+
+def in_time_order(expenses: list[Expense]) -> list[Expense]:
+    return sorted(expenses, key=expense_moment)
+
+
+def shown_as_text(expenses: list[Expense]) -> list[Expense]:
+    """The expenses that need a row of their own, in time order.
+
+    An expense with a receipt photo is already on screen as that photo — in
+    its stop's card, or under "not yet placed" — so it is left to it. One
+    without a photo has nothing standing for it, and a total in a banner is
+    not the same as being able to see what the money went on. Those are the
+    ones a card or a line is drawn for.
+    """
+    return in_time_order([expense for expense in expenses if expense.image_id is None])
+
+
+def loose(expenses: list[Expense]) -> list[Expense]:
+    """Photoless expenses that no stop claimed either — nothing shows these."""
+    return [expense for expense in shown_as_text(expenses) if expense.visit_id is None]
+
+
 def visit_out(visit: Visit, base_currency: str) -> VisitOut:
     return VisitOut(
         id=visit.id,
@@ -160,6 +186,7 @@ def visit_out(visit: Visit, base_currency: str) -> VisitOut:
         lng=coord(visit.lng),
         pinned=visit.pinned,
         images=[image_out(image) for image in visit.images],
+        expenses=[expense_out(expense) for expense in shown_as_text(_visit_expenses(visit))],
         spend=spend_out(_visit_expenses(visit), base_currency),
     )
 
@@ -174,19 +201,34 @@ def day_key(moment: datetime) -> str:
     return moment.date().isoformat()
 
 
-def group_by_day(visits: list[Visit], base_currency: str) -> list[TripDayOut]:
-    days: dict[str, list[Visit]] = defaultdict(list)
+def group_by_day(
+    visits: list[Visit], expenses: list[Expense], base_currency: str
+) -> list[TripDayOut]:
+    """The trip's days, in order — one per day that has anything on it.
+
+    A day is not made only by photographs: a day you spent cash on and took no
+    picture of is still a day of the trip, so the loose expenses open a day of
+    their own where no stop did.
+    """
+    day_visits: dict[str, list[Visit]] = defaultdict(list)
     for visit in visits:
-        days[day_key(visit.started_at)].append(visit)
+        day_visits[day_key(visit.started_at)].append(visit)
+
+    day_loose: dict[str, list[Expense]] = defaultdict(list)
+    for expense in loose(expenses):
+        day_loose[day_key(expense_moment(expense))].append(expense)
+
     return [
         TripDayOut(
-            date=date,
-            visits=[visit_out(v, base_currency) for v in day_visits],
+            date=key,
+            visits=[visit_out(v, base_currency) for v in day_visits[key]],
+            expenses=[expense_out(e) for e in day_loose[key]],
             spend=spend_out(
-                [e for v in day_visits for e in _visit_expenses(v)], base_currency
+                [e for v in day_visits[key] for e in _visit_expenses(v)] + day_loose[key],
+                base_currency,
             ),
         )
-        for date, day_visits in sorted(days.items())
+        for key in sorted(day_visits.keys() | day_loose.keys())
     ]
 
 
@@ -227,7 +269,7 @@ def trip_out(trip: Trip, window, visits, expenses, base_currency: str) -> TripOu
 def trip_detail_out(trip: Trip, window, visits, expenses, base_currency: str) -> TripDetailOut:
     return TripDetailOut(
         **_trip_fields(trip, window, visits, expenses, base_currency),
-        days=group_by_day(visits, base_currency),
+        days=group_by_day(visits, expenses, base_currency),
         expenses=[expense_out(expense) for expense in expenses],
     )
 
@@ -245,6 +287,7 @@ def timeline_day_out(
         trip=trip_ref(trip),
         visits=[visit_out(visit, base_currency) for visit in visits],
         unassigned_images=[image_out(image) for image in unassigned],
+        expenses=[expense_out(expense) for expense in loose(expenses)],
         spend=spend_out(expenses, base_currency),
     )
 
@@ -257,10 +300,6 @@ THUMBS_PER_DAY = 6
 def image_moment(image: Image) -> datetime:
     """When a photo counts as having happened — when it was taken, else uploaded."""
     return image.taken_at or image.uploaded_at
-
-
-def expense_moment(expense: Expense) -> datetime:
-    return expense.spent_at or expense.created_at
 
 
 def _days_touched(visit: Visit) -> list[str]:
@@ -322,6 +361,7 @@ def timeline_range_out(
                 stops=[visit_label(visit) for visit in of_day],
                 visit_count=len(of_day),
                 image_count=len(photos),
+                expense_count=len(day_expenses[key]),
                 thumbs=[image_out(image) for image in photos[:THUMBS_PER_DAY]],
                 spend=spend_out(list(day_expenses[key].values()), base_currency),
             )

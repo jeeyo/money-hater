@@ -343,7 +343,9 @@ async def update_visit(visit_id: int, body: VisitUpdate, user: CurrentUser, db: 
         .where(Visit.id == visit_id, Visit.user_id == user.id)
         .options(
             selectinload(Visit.place),
-            selectinload(Visit.expenses),
+            selectinload(Visit.expenses).options(
+                selectinload(Expense.items), selectinload(Expense.place)
+            ),
             selectinload(Visit.images).selectinload(Image.analysis),
             selectinload(Visit.images).selectinload(Image.expense),
             selectinload(Visit.images).selectinload(Image.place),

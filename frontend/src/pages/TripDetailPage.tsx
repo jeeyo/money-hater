@@ -1,9 +1,9 @@
 import { ArrowLeft, Check, Flag, Pencil, Trash2 } from 'lucide-react';
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { DayRail } from '../components/DayRail';
 import { EndTripSheet } from '../components/EndTripSheet';
 import { RecommendationsPanel } from '../components/RecommendationsPanel';
-import { VisitCard } from '../components/VisitCard';
 import { useDeleteTrip, useEndTrip, useTrip, useUpdateTrip } from '../hooks/useData';
 import { dayColor } from '../lib/dayColors';
 import { formatDay, formatSpend, formatTripRange, isOpenTrip } from '../lib/format';
@@ -144,7 +144,8 @@ export function TripDetailPage() {
 
       {trip.days.length === 0 && (
         <p className="rounded-2xl bg-surface-2 px-4 py-6 text-center text-sm text-ink-3">
-          No photographed stops in this window yet — the expenses are still counted below.
+          Nothing logged in this window yet — photos and expenses you add to these days
+          join the trip on their own.
         </p>
       )}
 
@@ -168,11 +169,7 @@ export function TripDetailPage() {
               </span>
             )}
           </div>
-          <div className="space-y-3 border-l border-line [&>*]:-ml-px">
-            {day.visits.map((visit) => (
-              <VisitCard key={visit.id} visit={visit} />
-            ))}
-          </div>
+          <DayRail visits={day.visits} expenses={day.expenses} />
         </section>
       ))}
 

@@ -433,6 +433,18 @@ async def build(db) -> User:
         description="Songthaew ride", spent_at=at(0, 14, 30),
         note="cash, no receipt", source="manual",
     )
+    # ...one of them inside a stop, so the temple card shows what was paid there
+    await create_expense(
+        db, user, total_minor=to_minor(200, "THB"), currency="THB",
+        description="Temple entry", merchant="Wat Pho", spent_at=at(0, 15, 10),
+        source="manual",
+    )
+    # ...and one on the Chiang Mai weekend, an evening nobody photographed
+    await create_expense(
+        db, user, total_minor=to_minor(340, "THB"), currency="THB",
+        description="Khao soi dinner", merchant="Khao Soi Khun Yai",
+        spent_at=at(7, 19, 10), note="cash", source="manual",
+    )
 
     await db.commit()
     await recluster_user(db, user)

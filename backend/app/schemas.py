@@ -259,6 +259,10 @@ class VisitOut(BaseModel):
     lng: float | None
     pinned: bool
     images: list[ImageOut]
+    # What was spent here with no photo of its own — a cash fare, a tip, a
+    # split bill. A receipt-backed expense is already on the card as its
+    # photo, so it is not repeated here; the badge totals both alike.
+    expenses: list["ExpenseOut"]
     spend: SpendOut
 
 
@@ -289,6 +293,8 @@ class TripOut(BaseModel):
 class TripDayOut(BaseModel):
     date: str
     visits: list[VisitOut]
+    # Photoless spending that fell outside every stop — see TimelineDayOut
+    expenses: list["ExpenseOut"]
     spend: SpendOut
 
 
@@ -355,6 +361,11 @@ class TimelineDayOut(BaseModel):
     trip: TripRef | None
     visits: list[VisitOut]
     unassigned_images: list[ImageOut]
+    # Spending with neither a photo nor a stop to hang it on: a day of nothing
+    # but cash fares would otherwise read as an empty day with a total under
+    # it. These are entries of the day in their own right, placed on the same
+    # rail as the stops by the time they were spent.
+    expenses: list["ExpenseOut"]
     spend: SpendOut
 
 
@@ -373,6 +384,9 @@ class TimelineDaySummaryOut(BaseModel):
     stops: list[str]
     visit_count: int
     image_count: int
+    # Counted so a day paid for in cash still reads as a day with something on
+    # it, rather than an empty one wearing a total.
+    expense_count: int
     thumbs: list[ImageOut]
     spend: SpendOut
 
