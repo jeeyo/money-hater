@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field
@@ -124,6 +124,7 @@ class ExpenseOut(BaseModel):
     id: int
     image_id: int | None
     visit_id: int | None
+    subscription_id: int | None
     source: str
     description: str | None
     merchant: str | None
@@ -246,6 +247,52 @@ class ExpenseSummaryOut(BaseModel):
     spend: SpendOut
     by_merchant: list[MerchantTotal]
     needs_review_count: int
+
+
+# --- Subscriptions ---
+class SubscriptionOut(BaseModel):
+    id: int
+    description: str | None
+    merchant: str | None
+    place: PlaceOut | None
+    currency: str
+    amount_minor: int
+    interval: str  # monthly|yearly
+    day_of_month: int
+    month: int | None
+    next_run_on: str  # YYYY-MM-DD
+    note: str | None
+
+
+class SubscriptionCreate(BaseModel):
+    """Amount is in major units, same convention as ExpenseCreate."""
+
+    amount: Decimal = Field(gt=0)
+    currency: str = Field(min_length=3, max_length=3)
+    description: str | None = Field(default=None, max_length=255)
+    merchant: str | None = Field(default=None, max_length=255)
+    place_id: int | None = None
+    interval: str = Field(pattern="^(monthly|yearly)$")
+    day_of_month: int = Field(ge=1, le=31)
+    # Required when interval is "yearly"; ignored for "monthly"
+    month: int | None = Field(default=None, ge=1, le=12)
+    note: str | None = None
+    # First charge date; defaults to the next occurrence on or after today
+    start_date: date | None = None
+
+
+class SubscriptionUpdate(BaseModel):
+    """Changes apply to future expenses only — see Subscription in models.py."""
+
+    amount: Decimal | None = Field(default=None, gt=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    description: str | None = Field(default=None, max_length=255)
+    merchant: str | None = Field(default=None, max_length=255)
+    place_id: int | None = None
+    interval: str | None = Field(default=None, pattern="^(monthly|yearly)$")
+    day_of_month: int | None = Field(default=None, ge=1, le=31)
+    month: int | None = Field(default=None, ge=1, le=12)
+    note: str | None = None
 
 
 # --- Visits / trips / timeline ---

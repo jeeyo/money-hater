@@ -11,6 +11,7 @@ import type {
   ImageRecord,
   PlaceDetails,
   RateQuote,
+  Subscription,
   TimelineDay,
   TimelineRange,
   TimelineSpan,
@@ -233,6 +234,50 @@ export function useImage(imageId: number | null) {
       const status = query.state.data?.status;
       return status === 'pending' || status === 'processing' ? 2000 : false;
     },
+  });
+}
+
+export interface SubscriptionInput {
+  amount?: number;
+  currency?: string;
+  description?: string | null;
+  merchant?: string | null;
+  place_id?: number | null;
+  interval?: 'monthly' | 'yearly';
+  day_of_month?: number;
+  month?: number | null;
+  note?: string | null;
+  /** Create only: the first charge date. Defaults to the next occurrence. */
+  start_date?: string;
+}
+
+export function useSubscriptions() {
+  return useQuery({
+    queryKey: ['subscriptions'],
+    queryFn: () => apiJson<Subscription[]>('/api/subscriptions'),
+  });
+}
+
+export function useAddSubscription() {
+  return useMutation({
+    mutationFn: (body: SubscriptionInput) => postJson<Subscription>('/api/subscriptions', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }),
+  });
+}
+
+export function useUpdateSubscription() {
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: number } & Partial<SubscriptionInput>) =>
+      postJson<Subscription>(`/api/subscriptions/${id}`, body, 'PATCH'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }),
+  });
+}
+
+export function useDeleteSubscription() {
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiJson<void>(`/api/subscriptions/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subscriptions'] }),
   });
 }
 

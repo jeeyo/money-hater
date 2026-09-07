@@ -205,6 +205,52 @@ class TripRecommendation(Base):
     generated_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
 
 
+class Subscription(Base):
+    """A recurring charge the user set up once: What and Where, an amount, and
+    when it repeats. A periodic job (see `app.services.subscriptions`) creates
+    a real ``Expense`` from it on each due date and links it back via
+    ``Expense.subscription_id``.
+
+    Editing a subscription only changes what future expenses will look like —
+    expenses already created keep the description, amount and place they were
+    given at the time. There is no version history to keep that honest, just
+    the fact that an ``Expense`` copies its fields at creation and never reads
+    them from the subscription again.
+
+    Soft-deleted (``deleted_at`` set) rather than removed outright, so a
+    cancelled subscription's past expenses keep a working link back to it.
+    """
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        sa.CheckConstraint("interval in ('monthly','yearly')", name="ck_subscriptions_interval"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # "What" — same meaning as Expense.description
+    description: Mapped[str | None] = mapped_column(sa.String(255))
+    # "Where" — free text plus an optional resolved Place, same as Expense
+    merchant: Mapped[str | None] = mapped_column(sa.String(255))
+    place_id: Mapped[int | None] = mapped_column(sa.ForeignKey("places.id", ondelete="SET NULL"))
+    currency: Mapped[str] = mapped_column(sa.String(3))
+    amount_minor: Mapped[int] = mapped_column(sa.BigInteger)
+    interval: Mapped[str] = mapped_column(sa.String(16))  # monthly|yearly
+    day_of_month: Mapped[int] = mapped_column(sa.SmallInteger)
+    # Required for interval="yearly"; null for "monthly"
+    month: Mapped[int | None] = mapped_column(sa.SmallInteger)
+    # The next date an expense should be created for. Advanced by one interval
+    # each time the periodic job fires it, from the due date itself rather
+    # than "today" — so a job that runs a few hours late never drifts the
+    # schedule off the day the user picked.
+    next_run_on: Mapped[date] = mapped_column(sa.Date, index=True)
+    note: Mapped[str | None] = mapped_column(sa.Text)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
+
+    place: Mapped[Place | None] = relationship()
+
+
 class Expense(Base):
     __tablename__ = "expenses"
     __table_args__ = (sa.Index("ix_expenses_user_spent_at", "user_id", "spent_at"),)
@@ -216,7 +262,14 @@ class Expense(Base):
         sa.ForeignKey("images.id", ondelete="CASCADE"), unique=True
     )
     visit_id: Mapped[int | None] = mapped_column(sa.ForeignKey("visits.id", ondelete="SET NULL"))
-    source: Mapped[str] = mapped_column(sa.String(16), default="receipt")  # receipt|manual
+    # The subscription that generated this expense, if any. Kept even after
+    # that subscription is soft-deleted or edited — this row is its own
+    # record of what was charged, not a view onto the subscription's fields.
+    subscription_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("subscriptions.id", ondelete="SET NULL"), index=True
+    )
+    # receipt|manual|subscription
+    source: Mapped[str] = mapped_column(sa.String(16), default="receipt")
     # "What" — what the money went on ("Motorbike taxi", "Souvenir")
     description: Mapped[str | None] = mapped_column(sa.String(255))
     # "Where" — the place, as free text plus an optional resolved Place

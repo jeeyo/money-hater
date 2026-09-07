@@ -11,11 +11,12 @@ weekend" no matter when the container is built.
 
 import argparse
 import asyncio
+import calendar
 import io
 import random
 import shutil
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -33,6 +34,7 @@ from app.models import (
     Image,
     ImageAnalysis,
     Place,
+    Subscription,
     Trip,
     TripRecommendation,
     User,
@@ -45,6 +47,7 @@ from app.services.clustering import recluster_user
 from app.services.expenses import create_expense
 from app.services.geo import haversine_m
 from app.services.money import to_minor
+from app.services.subscriptions import advance
 from app.services.trips import latest_visit_in, window_of
 
 DEMO_EMAIL = "demo@moneyhater.dev"
@@ -322,6 +325,7 @@ async def purge(db, user: User) -> None:
     # delete an expense while a trip still points at it.
     await db.execute(sa.delete(Trip).where(Trip.user_id == user.id))
     await db.execute(sa.delete(Expense).where(Expense.user_id == user.id))
+    await db.execute(sa.delete(Subscription).where(Subscription.user_id == user.id))
     await db.execute(sa.delete(ImageAnalysis).where(ImageAnalysis.image_id.in_(image_ids)))
     await db.execute(sa.delete(Image).where(Image.user_id == user.id))
     await db.execute(sa.delete(Visit).where(Visit.user_id == user.id))
@@ -444,6 +448,41 @@ async def build(db) -> User:
         db, user, total_minor=to_minor(340, "THB"), currency="THB",
         description="Khao soi dinner", merchant="Khao Soi Khun Yai",
         spent_at=at(7, 19, 10), note="cash", source="manual",
+    )
+
+    # A monthly subscription that has already fired once, so the demo shows a
+    # subscription-linked expense alongside its upcoming schedule.
+    today = LOCAL_MIDNIGHT.date()
+    prev_year, prev_month = (today.year, today.month - 1) if today.month > 1 else (
+        today.year - 1, 12,
+    )
+    last_month_charge = date(
+        prev_year, prev_month, min(today.day, calendar.monthrange(prev_year, prev_month)[1])
+    )
+    netflix = Subscription(
+        user_id=user.id, description="Streaming", merchant="Netflix",
+        currency="THB", amount_minor=to_minor(199, "THB"), interval="monthly",
+        day_of_month=today.day, next_run_on=today,
+    )
+    db.add(netflix)
+    await db.flush()
+    netflix_charge = await create_expense(
+        db, user, total_minor=to_minor(199, "THB"), currency="THB", description="Streaming",
+        merchant="Netflix", spent_at=datetime.combine(last_month_charge, datetime.min.time())
+        .replace(tzinfo=UTC),
+        source="subscription",
+    )
+    netflix_charge.subscription_id = netflix.id
+
+    # A yearly subscription that has not charged yet, to show the "nothing
+    # created from this one so far" side of the schedule.
+    db.add(
+        Subscription(
+            user_id=user.id, description="Cloud storage", merchant="iCloud+",
+            currency="THB", amount_minor=to_minor(1290, "THB"), interval="yearly",
+            day_of_month=today.day, month=today.month,
+            next_run_on=advance(today, "yearly", today.day, today.month),
+        )
     )
 
     await db.commit()

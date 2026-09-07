@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   Receipt,
+  Repeat,
   Search,
   Trash2,
   X,
@@ -18,6 +19,7 @@ import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
 import { ExpenseSummaryModal } from '../components/ExpenseSummaryModal';
 import { ImageModal } from '../components/ImageModal';
 import { inputClass } from '../components/Sheet';
+import { SubscriptionsSheet } from '../components/SubscriptionsSheet';
 import { useAuth } from '../context/AuthContext';
 import {
   useDeleteExpense,
@@ -94,11 +96,15 @@ function ExpenseRow({
           className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
             expense.source === 'receipt'
               ? 'bg-money-bg text-money'
-              : 'bg-surface-2 text-ink-3'
+              : expense.source === 'subscription'
+                ? 'bg-brand-50 text-brand-600'
+                : 'bg-surface-2 text-ink-3'
           }`}
         >
           {expense.source === 'receipt' ? (
             <Receipt className="size-4" />
+          ) : expense.source === 'subscription' ? (
+            <Repeat className="size-4" />
           ) : (
             <Pencil className="size-4" />
           )}
@@ -303,6 +309,7 @@ export function ExpensesPage() {
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [showSubscriptions, setShowSubscriptions] = useState(false);
 
   const totalPages = expensePage?.total_pages ?? 1;
   // Deleting the last expense on the last page would otherwise strand the
@@ -317,13 +324,22 @@ export function ExpensesPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-ink">Expenses</h1>
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white active:bg-brand-700"
-        >
-          <Plus className="size-4" /> Add
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSubscriptions(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-sm font-medium text-ink-2 active:bg-surface-2"
+          >
+            <Repeat className="size-4" /> Subscriptions
+          </button>
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white active:bg-brand-700"
+          >
+            <Plus className="size-4" /> Add
+          </button>
+        </div>
       </header>
 
       {needsReview && needsReview.length > 0 && (
@@ -470,6 +486,12 @@ export function ExpensesPage() {
       )}
       {showSummary && (
         <ExpenseSummaryModal baseCurrency={baseCurrency} onClose={() => setShowSummary(false)} />
+      )}
+      {showSubscriptions && (
+        <SubscriptionsSheet
+          baseCurrency={baseCurrency}
+          onClose={() => setShowSubscriptions(false)}
+        />
       )}
     </div>
   );
