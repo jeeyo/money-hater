@@ -162,10 +162,13 @@ export function useExpenses(needsReview?: boolean, dateFrom?: string, dateTo?: s
 
 /** The "All expenses" list, most recent first and paginated over raw
  *  expenses — see the /grouped endpoint for how runs collapse into groups. */
-export function useExpensesGrouped(page: number) {
+export function useExpensesGrouped(page: number, q?: string) {
+  const params = new URLSearchParams({ page: String(page) });
+  const term = q?.trim() ?? '';
+  if (term) params.set('q', term);
   return useQuery({
-    queryKey: ['expenses', 'grouped', page],
-    queryFn: () => apiJson<ExpensePage>(`/api/expenses/grouped?page=${page}`),
+    queryKey: ['expenses', 'grouped', page, term],
+    queryFn: () => apiJson<ExpensePage>(`/api/expenses/grouped?${params}`),
     placeholderData: keepPreviousData,
   });
 }

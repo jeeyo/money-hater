@@ -8,13 +8,16 @@ import {
   Pencil,
   Plus,
   Receipt,
+  Search,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ExpenseSheet } from '../components/ExpenseSheet';
 import { ConfirmRateSheet } from '../components/ConfirmRateSheet';
 import { ExpenseSummaryModal } from '../components/ExpenseSummaryModal';
 import { ImageModal } from '../components/ImageModal';
+import { inputClass } from '../components/Sheet';
 import { useAuth } from '../context/AuthContext';
 import {
   useDeleteExpense,
@@ -25,6 +28,18 @@ import {
 } from '../hooks/useData';
 import { formatDateTime, formatMoney, last30DayRange } from '../lib/format';
 import type { Expense, ExpenseGroup, MerchantTotal } from '../types';
+
+const SEARCH_DEBOUNCE_MS = 250;
+
+/** The value as it was `ms` ago, so typing doesn't fire a request per keystroke. */
+function useDebounced(value: string, ms: number) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
+}
 
 /** Single-hue magnitude bars: one series, values in ink rather than series color. */
 function MerchantBars({ merchants }: { merchants: MerchantTotal[] }) {
@@ -281,7 +296,9 @@ export function ExpensesPage() {
   const { data: last30 } = useExpenseSummary(last30From, last30To);
   const { data: needsReview } = useExpenses(true);
   const [page, setPage] = useState(1);
-  const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page);
+  const [query, setQuery] = useState('');
+  const search = useDebounced(query, SEARCH_DEBOUNCE_MS);
+  const { data: expensePage, isLoading, isFetching } = useExpensesGrouped(page, search);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
@@ -293,6 +310,8 @@ export function ExpensesPage() {
   useEffect(() => {
     if (expensePage && page > expensePage.total_pages) setPage(expensePage.total_pages);
   }, [expensePage, page]);
+  // A search from deep in the list has its own, much shorter, run of pages.
+  useEffect(() => setPage(1), [search]);
 
   return (
     <div className="space-y-6">
@@ -361,12 +380,42 @@ export function ExpensesPage() {
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-ink-3">All expenses</h2>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-4" />
+          <input
+            // Not type="search": desktop Chrome draws its own clear button
+            // next to the one below, and this one works on every browser.
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search description, merchant or place"
+            enterKeyHint="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            className={`${inputClass} pl-10 ${query ? 'pr-10' : ''} text-sm`}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-ink-4 active:bg-surface-2"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
         {isLoading && <p className="py-8 text-center text-sm text-ink-4">Loading…</p>}
-        {expensePage?.groups.length === 0 && (
-          <p className="py-12 text-center text-sm text-ink-3">
-            Nothing yet — upload a receipt photo, or add an expense by hand.
-          </p>
-        )}
+        {expensePage?.groups.length === 0 &&
+          (search ? (
+            <p className="py-12 text-center text-sm text-ink-3">
+              No expenses match “{search}”.
+            </p>
+          ) : (
+            <p className="py-12 text-center text-sm text-ink-3">
+              Nothing yet — upload a receipt photo, or add an expense by hand.
+            </p>
+          ))}
         <ul className={`space-y-2 ${isFetching ? 'opacity-60' : ''}`}>
           {expensePage?.groups.map((group) => (
             <ExpenseGroupSection

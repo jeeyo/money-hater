@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
 
 from app.deps import CurrentUser, DbSession
-from app.models import Expense, ExpenseItem, Image, Trip
+from app.models import Expense, ExpenseItem, Image, Place, Trip
 from app.schemas import (
     ExpenseConfirm,
     ExpenseCreate,
@@ -43,6 +43,27 @@ def _range_filter(query, user_id: int, date_from: datetime | None, date_to: date
     return query
 
 
+def _search_filter(query, q: str | None):
+    """Match a typed term against the three things an expense row shows: the
+    description, the merchant text, and the resolved place's name.
+
+    Substring, case-insensitive, and the term is taken literally — a ``%`` or
+    ``_`` someone types is a character to find, not a wildcard.
+    """
+    term = (q or "").strip()
+    if not term:
+        return query
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    return query.outerjoin(Place, Expense.place_id == Place.id).where(
+        sa.or_(
+            Expense.description.ilike(pattern, escape="\\"),
+            Expense.merchant.ilike(pattern, escape="\\"),
+            Place.name.ilike(pattern, escape="\\"),
+        )
+    )
+
+
 def _group_key_py(expense: Expense) -> str:
     """Python-side mirror of ``_group_key_sql``, for bucketing fetched rows."""
     if expense.place_id is not None:
@@ -71,6 +92,7 @@ async def list_expenses(
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     needs_review: bool | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
     limit: int = Query(default=100, le=500),
     offset: int = 0,
 ):
@@ -82,6 +104,7 @@ async def list_expenses(
     )
     if needs_review is not None:
         query = query.where(Expense.needs_review.is_(needs_review))
+    query = _search_filter(query, q)
     result = await db.execute(query.order_by(_spent.desc()).limit(limit).offset(offset))
     return [expense_out(expense) for expense in result.scalars()]
 
@@ -93,6 +116,7 @@ async def list_expenses_grouped(
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     needs_review: bool | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=50),
 ):
@@ -105,13 +129,17 @@ async def list_expenses_grouped(
     section. A place visited again after other spending in between gets a
     fresh section at its new position instead of pulling the earlier visit
     forward with it.
+
+    ``q`` searches description, merchant and place name. Grouping is unchanged
+    by it — runs still collapse only where they are consecutive, now within the
+    matching expenses.
     """
 
     def _filtered(query):
         query = _range_filter(query, user.id, date_from, date_to)
         if needs_review is not None:
             query = query.where(Expense.needs_review.is_(needs_review))
-        return query
+        return _search_filter(query, q)
 
     total = await db.scalar(
         sa.select(sa.func.count()).select_from(_filtered(sa.select(Expense.id)).subquery())
