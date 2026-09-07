@@ -1,4 +1,4 @@
-import { AlertTriangle, MapPin, Pencil } from 'lucide-react';
+import { AlertTriangle, MapPin, Pencil, Repeat } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { formatMoney, formatTime } from '../lib/format';
@@ -40,8 +40,18 @@ export function ExpenseCard({ expense }: { expense: Expense }) {
           onClick={() => setEditing(true)}
           className="flex w-full items-center gap-2.5 p-3 text-left active:bg-surface-2"
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-ink-3">
-            <Pencil className="size-3.5" />
+          <span
+            className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${
+              expense.source === 'subscription'
+                ? 'bg-brand-50 text-brand-600'
+                : 'bg-surface-2 text-ink-3'
+            }`}
+          >
+            {expense.source === 'subscription' ? (
+              <Repeat className="size-3.5" />
+            ) : (
+              <Pencil className="size-3.5" />
+            )}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-ink">{title}</span>

@@ -215,7 +215,8 @@ export interface Expense {
   id: number;
   image_id: number | null;
   visit_id: number | null;
-  source: 'receipt' | 'manual';
+  subscription_id: number | null;
+  source: 'receipt' | 'manual' | 'subscription';
   /** What the money went on */
   description: string | null;
   /** Where it was spent — free text, plus a resolved Place when picked */
@@ -262,6 +263,25 @@ export interface ExpenseSummary {
   spend: Spend;
   by_merchant: MerchantTotal[];
   needs_review_count: number;
+}
+
+/** A recurring charge: creates its own Expense automatically when due.
+ *  Editing one only changes what happens next — past expenses it created
+ *  keep the fields they were given at the time. */
+export interface Subscription {
+  id: number;
+  description: string | null;
+  merchant: string | null;
+  place: Place | null;
+  currency: string;
+  amount_minor: number;
+  interval: 'monthly' | 'yearly';
+  day_of_month: number;
+  /** Set only when interval is "yearly" */
+  month: number | null;
+  /** YYYY-MM-DD the next expense will be created on */
+  next_run_on: string;
+  note: string | null;
 }
 
 export interface RateQuote {

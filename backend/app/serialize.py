@@ -4,7 +4,7 @@ import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from app.models import Expense, Image, Place, Trip, Visit
+from app.models import Expense, Image, Place, Subscription, Trip, Visit
 from app.schemas import (
     AnalysisOut,
     CurrencyTotal,
@@ -13,6 +13,7 @@ from app.schemas import (
     ImageOut,
     PlaceOut,
     SpendOut,
+    SubscriptionOut,
     TimelineDayOut,
     TimelineDaySummaryOut,
     TimelineRangeOut,
@@ -88,6 +89,7 @@ def expense_out(expense: Expense) -> ExpenseOut:
         id=expense.id,
         image_id=expense.image_id,
         visit_id=expense.visit_id,
+        subscription_id=expense.subscription_id,
         source=expense.source,
         description=expense.description,
         merchant=expense.merchant,
@@ -113,6 +115,22 @@ def expense_out(expense: Expense) -> ExpenseOut:
             )
             for item in expense.items
         ],
+    )
+
+
+def subscription_out(subscription: Subscription) -> SubscriptionOut:
+    return SubscriptionOut(
+        id=subscription.id,
+        description=subscription.description,
+        merchant=subscription.merchant,
+        place=place_out(subscription.place),
+        currency=subscription.currency,
+        amount_minor=subscription.amount_minor,
+        interval=subscription.interval,
+        day_of_month=subscription.day_of_month,
+        month=subscription.month,
+        next_run_on=subscription.next_run_on.isoformat(),
+        note=subscription.note,
     )
 
 

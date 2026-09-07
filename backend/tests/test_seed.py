@@ -63,8 +63,9 @@ async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
             assert (place.raw or {}).get("reviews"), "so opening a card shows comments"
 
         expenses = (await db.execute(sa.select(Expense))).scalars().all()
-        # Receipt-backed, hand-entered, and one foreign awaiting confirmation
-        assert {e.source for e in expenses} == {"receipt", "manual"}
+        # Receipt-backed, hand-entered, one subscription-linked, and one
+        # foreign awaiting confirmation
+        assert {e.source for e in expenses} == {"receipt", "manual", "subscription"}
         assert any(e.image_id is None for e in expenses)
         foreign = [e for e in expenses if e.currency != "THB"]
         assert len(foreign) == 1
