@@ -276,6 +276,11 @@ class Expense(Base):
     merchant: Mapped[str | None] = mapped_column(sa.String(255))
     place_id: Mapped[int | None] = mapped_column(sa.ForeignKey("places.id", ondelete="SET NULL"))
     spent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # image|manual|None(=image, for rows written before this column existed).
+    # Only "manual" — set once the user edits spent_at on the expense itself —
+    # stops a later correction to the photo's date from moving it, the same
+    # way a place the user picked outranks what the photo says.
+    spent_at_source: Mapped[str | None] = mapped_column(sa.String(16))
     currency: Mapped[str] = mapped_column(sa.String(3), default="THB")
     total_minor: Mapped[int] = mapped_column(sa.BigInteger, default=0)
     tax_minor: Mapped[int | None] = mapped_column(sa.BigInteger)

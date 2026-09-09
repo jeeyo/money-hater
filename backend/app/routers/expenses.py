@@ -333,6 +333,9 @@ async def update_expense(
         expense.merchant = body.merchant or None
     if body.spent_at is not None:
         expense.spent_at = body.spent_at
+        # The user's own answer now — a photo's date, misread or later fixed,
+        # no longer gets to move it.
+        expense.spent_at_source = "manual"
         await attach_to_visit(db, expense, reattach=True)
     currency_changed = body.currency is not None and body.currency.upper() != expense.currency
     if body.currency is not None:
