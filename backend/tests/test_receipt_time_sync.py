@@ -129,10 +129,15 @@ async def test_a_date_set_on_the_expense_is_not_overwritten(
     assert (await _spent_at(client)).startswith("2026-08-07T20:00")
 
 
-async def test_the_date_printed_on_the_receipt_is_left_alone(
+async def test_correcting_the_photo_moves_the_expense_even_past_a_printed_date(
     client, db_sessionmaker, monkeypatch
 ):
-    """When the receipt says when the money went, the photo's clock does not."""
+    """A date read off the receipt is still just a reading of the same photo —
+    misread often enough (a cropped total, a foreign date format) that fixing
+    the photo has to be able to overrule it, the same way it can overrule any
+    other guess the pipeline made. Only a date set on the expense itself, via
+    `PATCH /expenses/{id}`, is answered for and left alone (see
+    `test_a_date_set_on_the_expense_is_not_overwritten`)."""
     await register(client)
     image_id = await _a_receipt_photo(
         client,
@@ -147,7 +152,7 @@ async def test_the_date_printed_on_the_receipt_is_left_alone(
 
     await client.patch(f"/api/images/{image_id}", json={"taken_at": "2026-08-09T17:45:00Z"})
 
-    assert await _spent_at(client) == printed
+    assert (await _spent_at(client)).startswith("2026-08-09T17:45")
 
 
 async def test_the_expense_follows_the_photo_to_the_stop_it_moved_to(

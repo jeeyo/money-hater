@@ -135,23 +135,21 @@ def _same_instant(a: datetime | None, b: datetime | None) -> bool:
     return a == b
 
 
-async def sync_time_from_image(
-    db: AsyncSession, image: Image, *, previous_taken_at: datetime | None = None
-) -> Expense | None:
+async def sync_time_from_image(db: AsyncSession, image: Image) -> Expense | None:
     """Carry a photo's time onto the expense that was read off it.
 
     A receipt photo lands on the wrong day often enough — a screenshot whose
-    camera never wrote a timestamp is filed under when it was uploaded — and
-    the fix is made on the photo, where the date picker is. The expense read
-    off it took its time from that same photo, so it has to follow rather than
-    leave the user correcting the same day twice, once on each side.
+    camera never wrote a timestamp is filed under when it was uploaded, or the
+    date printed on the receipt itself is misread — and the fix is made on the
+    photo, where the date picker is. The expense read off it follows, the same
+    way it follows a corrected place, rather than leaving the user to fix the
+    same day twice, once on each side.
 
-    Only the time this photo gave it moves: an expense with no time at all
-    takes the photo's, and one still carrying the photo's previous answer
-    (``previous_taken_at``) follows the correction. A time the user set on the
-    expense itself, and the date printed on the receipt — which is what the
-    money was actually spent at, whenever the photo was taken — are their own
-    answers and are left alone.
+    Only a time this expense never had of its own moves: ``spent_at_source``
+    is "manual" once the user has set the date directly on the expense (see
+    `update_expense`), and that answer is left alone from here on — a receipt
+    misread once is not grounds to keep overwriting a date someone has since
+    typed in by hand.
 
     The caller reclusters afterwards, which is what re-files a receipt-backed
     expense under the stop its photo now belongs to.
@@ -159,9 +157,9 @@ async def sync_time_from_image(
     if image.taken_at is None:
         return None
     expense = await db.scalar(sa.select(Expense).where(Expense.image_id == image.id))
-    if expense is None or _same_instant(expense.spent_at, image.taken_at):
+    if expense is None or expense.spent_at_source == "manual":
         return None
-    if expense.spent_at is not None and not _same_instant(expense.spent_at, previous_taken_at):
+    if _same_instant(expense.spent_at, image.taken_at):
         return None
     expense.spent_at = image.taken_at
     return expense
@@ -183,8 +181,14 @@ async def create_expense(
     image_id: int | None = None,
     source: str = "manual",
     fx_rate: Decimal | None = None,
+    spent_at_source: str | None = None,
 ) -> Expense:
     place_id, merchant = await resolve_where(db, user, place_id, merchant)
+    # An expense tied to a photo derives its date from that photo (and follows
+    # a later correction to it) unless told otherwise; one with no photo has
+    # nothing to derive from, so it is its own answer from the start.
+    if spent_at_source is None:
+        spent_at_source = "image" if image_id is not None else "manual"
     expense = Expense(
         user_id=user.id,
         image_id=image_id,
@@ -193,6 +197,7 @@ async def create_expense(
         merchant=merchant,
         place_id=place_id,
         spent_at=spent_at,
+        spent_at_source=spent_at_source,
         currency=currency.upper(),
         total_minor=total_minor,
         tax_minor=tax_minor,

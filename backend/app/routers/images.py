@@ -221,7 +221,6 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
     sent = body.model_dump(exclude_unset=True)
 
     if "taken_at" in sent:
-        previous_taken_at = image.taken_at
         if body.taken_at is None:
             if image.exif_taken_at is None:
                 raise HTTPException(
@@ -234,7 +233,7 @@ async def update_image(image_id: int, body: ImageUpdate, user: CurrentUser, db: 
             image.taken_at_source = "custom"
         # A receipt photo dates its expense as well as itself, so a day fixed
         # here does not have to be fixed again on the money.
-        await sync_time_from_image(db, image, previous_taken_at=previous_taken_at)
+        await sync_time_from_image(db, image)
         await db.commit()
         # Time determines both the day and the stop, so refresh the itinerary
         # immediately after a correction rather than waiting for analysis.
