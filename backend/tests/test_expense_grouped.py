@@ -1,5 +1,6 @@
-"""The "All expenses" list: most recent first, with only back-to-back runs
-at the same place (or merchant) collapsed into one section."""
+"""The "All expenses" list: most recent first, with every visit to the same
+place (or matching merchant text) collapsed into one section regardless of
+how far apart in time they happened."""
 
 from app.models import Place
 from tests.conftest import register
@@ -43,7 +44,7 @@ async def test_a_back_to_back_run_at_the_same_place_is_grouped(client, db_sessio
     await _spend(client, "40.00", "Tip", spent_at="2026-08-12T09:00:00Z")
 
     page = (await client.get("/api/expenses/grouped")).json()
-    assert page["total"] == 3
+    assert page["total"] == 2
     assert page["total_pages"] == 1
     assert len(page["groups"]) == 2
 
@@ -56,13 +57,10 @@ async def test_a_back_to_back_run_at_the_same_place_is_grouped(client, db_sessio
     assert amounts == [18000, 6000]
 
 
-async def test_a_return_visit_gets_its_own_section_instead_of_pulling_the_old_one_forward(
-    client, db_sessionmaker
-):
-    """The bug this guards against: grouping a place globally (rather than by
-    adjacency) let an old visit ride along with a much newer one, so it
-    showed up out of its actual chronological position — and, worse, a
-    page's boundary no longer lined up with a clean slice of time."""
+async def test_a_return_visit_still_merges_into_the_earlier_section(client, db_sessionmaker):
+    """A place's history never splits into separate sections just because
+    other spending happened in between — every visit lands in one group,
+    positioned by its most recent visit."""
     await register(client)
     old_place = await _a_place(db_sessionmaker, "Old Cafe")
     new_place = await _a_place(db_sessionmaker, "New Cafe")
@@ -73,14 +71,17 @@ async def test_a_return_visit_gets_its_own_section_instead_of_pulling_the_old_on
     await _spend(client, "10.00", "x", old_place, "2026-08-20T08:00:00Z")  # a fresh visit
 
     page = (await client.get("/api/expenses/grouped")).json()
-    assert page["total"] == 4
-    # Four ungrouped sections in strict date order — the old visit stays put.
-    assert len(page["groups"]) == 4
+    # Three groups: the two old_place visits merged into one, positioned by
+    # its newest visit (08-20), ahead of new_place (08-14) and the unrelated
+    # expense (08-05).
+    assert len(page["groups"]) == 3
     ids = [g["place"]["id"] if g["place"] else None for g in page["groups"]]
-    assert ids == [old_place, new_place, None, old_place]
+    assert ids == [old_place, new_place, None]
+    old_group = page["groups"][0]
+    assert len(old_group["expenses"]) == 2
 
 
-async def test_pagination_splits_over_raw_expenses_not_groups(client, db_sessionmaker):
+async def test_pagination_splits_over_groups_not_raw_expenses(client, db_sessionmaker):
     await register(client)
     for i in range(17):
         place_id = await _a_place(db_sessionmaker, f"Place {i}")
@@ -89,10 +90,10 @@ async def test_pagination_splits_over_raw_expenses_not_groups(client, db_session
     first = (await client.get("/api/expenses/grouped", params={"page": 1})).json()
     assert first["total"] == 17
     assert first["total_pages"] == 2
-    assert sum(len(g["expenses"]) for g in first["groups"]) == 15
+    assert len(first["groups"]) == 15
 
     second = (await client.get("/api/expenses/grouped", params={"page": 2})).json()
-    assert sum(len(g["expenses"]) for g in second["groups"]) == 2
+    assert len(second["groups"]) == 2
 
     first_ids = {g["place"]["id"] for g in first["groups"]}
     second_ids = {g["place"]["id"] for g in second["groups"]}
@@ -110,7 +111,7 @@ async def test_a_back_to_back_run_with_the_same_merchant_text_is_grouped_without
     await _spend(client, "60.00", "Different kiosk", spent_at="2026-08-13T09:00:00Z")
 
     page = (await client.get("/api/expenses/grouped")).json()
-    assert page["total"] == 3
+    assert page["total"] == 2
     assert len(page["groups"]) == 2
 
     kiosk_group, turtle_group = page["groups"]
@@ -127,7 +128,7 @@ async def test_merchant_grouping_ignores_case_and_surrounding_whitespace(client,
     await _spend(client, "10.00", "  turtle VENDING machine  ", spent_at="2026-08-12T08:00:00Z")
 
     page = (await client.get("/api/expenses/grouped")).json()
-    assert page["total"] == 2
+    assert page["total"] == 1
     assert len(page["groups"]) == 1
     assert len(page["groups"][0]["expenses"]) == 2
 

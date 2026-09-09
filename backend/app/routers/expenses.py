@@ -120,19 +120,15 @@ async def list_expenses_grouped(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=50),
 ):
-    """The "All expenses" list, most recent first, paginated over raw
-    expenses (not groups) so a page always covers the same slice of time.
+    """The "All expenses" list, most recent first, grouped by place (or, absent
+    that, matching merchant text) across the whole filtered history — every
+    visit to a place lands in the same section, however far apart in time.
+    Each group sorts by its own most recent expense, and pagination is over
+    groups, not raw expenses, so a place's section never splits across a
+    page boundary.
 
-    A place's history never jumps the queue: only expenses that already
-    fall consecutively in that date order — a back-to-back run at the same
-    place, or with the same typed merchant text — collapse into one
-    section. A place visited again after other spending in between gets a
-    fresh section at its new position instead of pulling the earlier visit
-    forward with it.
-
-    ``q`` searches description, merchant and place name. Grouping is unchanged
-    by it — runs still collapse only where they are consecutive, now within the
-    matching expenses.
+    ``q`` searches description, merchant and place name; grouping runs over
+    whatever matches the search.
     """
 
     def _filtered(query):
@@ -141,35 +137,31 @@ async def list_expenses_grouped(
             query = query.where(Expense.needs_review.is_(needs_review))
         return _search_filter(query, q)
 
-    total = await db.scalar(
-        sa.select(sa.func.count()).select_from(_filtered(sa.select(Expense.id)).subquery())
-    )
-    total = total or 0
-
     query = _filtered(
         sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place))
     )
-    rows = (
-        await db.execute(
-            query.order_by(_spent.desc()).limit(page_size).offset((page - 1) * page_size)
-        )
-    ).scalars()
+    rows = (await db.execute(query.order_by(_spent.desc()))).scalars()
 
-    groups: list[ExpenseGroupOut] = []
-    run_keys: list[str] = []
+    all_groups: list[ExpenseGroupOut] = []
+    group_index: dict[str, int] = {}
     for expense in rows:
         key = _group_key_py(expense)
-        if run_keys and run_keys[-1] == key:
-            groups[-1].expenses.append(expense_out(expense))
+        pos = group_index.get(key)
+        if pos is not None:
+            all_groups[pos].expenses.append(expense_out(expense))
         else:
-            run_keys.append(key)
-            groups.append(
+            group_index[key] = len(all_groups)
+            all_groups.append(
                 ExpenseGroupOut(
                     place=place_out(expense.place),
                     merchant=expense.merchant if expense.place is None else None,
                     expenses=[expense_out(expense)],
                 )
             )
+
+    total = len(all_groups)
+    start = (page - 1) * page_size
+    groups = all_groups[start : start + page_size]
 
     return ExpensePageOut(
         groups=groups,

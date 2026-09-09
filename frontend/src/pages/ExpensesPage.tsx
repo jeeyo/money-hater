@@ -220,9 +220,10 @@ function ExpenseRow({
   );
 }
 
-/** One section of the All expenses list — expenses sharing a resolved place
- *  or, absent that, matching merchant text, under a header; otherwise a
- *  single ungrouped expense standing on its own. */
+/** One section of the All expenses list — every expense sharing a resolved
+ *  place or, absent that, matching merchant text, under a header regardless
+ *  of when each one happened; otherwise a single ungrouped expense standing
+ *  on its own. */
 function ExpenseGroupSection({
   group,
   baseCurrency,
@@ -435,11 +436,9 @@ export function ExpensesPage() {
         <ul className={`space-y-2 ${isFetching ? 'opacity-60' : ''}`}>
           {expensePage?.groups.map((group) => (
             <ExpenseGroupSection
-              // Keyed by the group's first expense, not its place: a place
-              // visited again after other spending gets a second section on
-              // the same page, and keying both on `place:<id>` made React
-              // reconcile them as one — rows from the outgoing page stuck at
-              // the top when the list re-rendered.
+              // Keyed by the group's first expense: with grouping now global,
+              // a place or merchant appears in at most one group per page, so
+              // this is already a stable, unique key across re-renders.
               key={group.expenses[0].id}
               group={group}
               baseCurrency={baseCurrency}

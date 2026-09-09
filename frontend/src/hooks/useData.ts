@@ -161,8 +161,9 @@ export function useExpenses(needsReview?: boolean, dateFrom?: string, dateTo?: s
   });
 }
 
-/** The "All expenses" list, most recent first and paginated over raw
- *  expenses — see the /grouped endpoint for how runs collapse into groups. */
+/** The "All expenses" list, most recent first, with every visit to a place
+ *  collapsed into one group regardless of when it happened — see the
+ *  /grouped endpoint for how groups are built and paginated. */
 export function useExpensesGrouped(page: number, q?: string) {
   const params = new URLSearchParams({ page: String(page) });
   const term = q?.trim() ?? '';

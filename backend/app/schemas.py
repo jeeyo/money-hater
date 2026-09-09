@@ -144,11 +144,10 @@ class ExpenseOut(BaseModel):
 
 
 class ExpenseGroupOut(BaseModel):
-    """A run of consecutive (in date order) expenses sharing a resolved
-    place — or, absent that, the same typed merchant name — most recent
-    first. Expenses at the same place separated by other spending in
-    between are never merged, so a group's position always matches its
-    most recent expense's actual place in the date order.
+    """All expenses sharing a resolved place — or, absent that, the same
+    typed merchant name — regardless of how far apart in time they
+    happened, most recent first. A group's position in the page is
+    determined by its own most recent expense.
 
     ``place`` is set when the group shares a resolved place. ``merchant`` is
     set instead when the group shares free-text merchant text with no
@@ -165,7 +164,7 @@ class ExpensePageOut(BaseModel):
     groups: list[ExpenseGroupOut]
     page: int
     page_size: int
-    total: int
+    total: int  # number of groups matching the filter, not raw expenses
     total_pages: int
 
 
