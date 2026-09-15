@@ -74,7 +74,12 @@ Classify what it mainly shows:
 Always produce a short caption and a few lowercase labels.
 If a venue or shop name is readable in the image, set place_hint.
 If it is a receipt, extract merchant, currency (ISO 4217), totals, and line
-items exactly as printed; use the receipt's own numbers, do not invent values."""
+items exactly as printed; use the receipt's own numbers, do not invent values.
+Read datetime_iso off the receipt as printed: the till's own local clock, with
+no timezone conversion and no offset appended. Leave it null rather than guess
+— an unreadable date, a date with no year, or a printed date that is not the
+moment of purchase (a "valid until", a reprint stamp) is better absent than
+wrong."""
 
 
 def parse_receipt_datetime(value: str | None) -> datetime | None:

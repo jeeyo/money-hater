@@ -149,9 +149,7 @@ async def sync_time_from_image(
     Only the time this photo gave it moves: an expense with no time at all
     takes the photo's, and one still carrying the photo's previous answer
     (``previous_taken_at``) follows the correction. A time the user set on the
-    expense itself, and the date printed on the receipt — which is what the
-    money was actually spent at, whenever the photo was taken — are their own
-    answers and are left alone.
+    expense itself is their own answer and is left alone.
 
     The caller reclusters afterwards, which is what re-files a receipt-backed
     expense under the stop its photo now belongs to.
