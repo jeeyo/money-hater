@@ -29,6 +29,21 @@ UNDATED_RECEIPT = VisionResult(
 )
 
 
+# What a model hands back when it reads the print a day out — a smudged digit,
+# or 08/07 read the American way round.
+MISREAD_RECEIPT = VisionResult(
+    kind="receipt",
+    caption="Receipt from a ramen shop",
+    labels=["receipt"],
+    receipt=ReceiptData(
+        merchant="Ramen Ya",
+        datetime_iso="2026-08-07T20:35:00",
+        currency="THB",
+        total=345.50,
+    ),
+)
+
+
 async def _a_receipt_photo(client, db_sessionmaker, monkeypatch, result, **jpeg) -> int:
     async def fake_vision(path, mime):
         return result
@@ -137,18 +152,18 @@ async def test_correcting_the_photo_moves_the_expense_even_past_a_printed_date(
     the photo has to be able to overrule it, the same way it can overrule any
     other guess the pipeline made. Only a date set on the expense itself, via
     `PATCH /expenses/{id}`, is answered for and left alone (see
-    `test_a_date_set_on_the_expense_is_not_overwritten`)."""
+    `test_a_date_set_on_the_expense_is_not_overwritten`).
+
+    The photo here carries no clock of its own, which is the case where the
+    printed date is the best evidence there is and so dates both it and the
+    money (see `test_a_photo_with_no_clock_takes_the_printed_date_for_both`).
+    That is what makes this the printed date, and it still has to give way."""
     await register(client)
     image_id = await _a_receipt_photo(
-        client,
-        db_sessionmaker,
-        monkeypatch,
-        RECEIPT_RESULT,
-        taken_at=datetime(2026, 8, 8, 20, 0, tzinfo=UTC),
+        client, db_sessionmaker, monkeypatch, RECEIPT_RESULT
     )
-    # 13:05 as the receipt printed it, not the 20:00 the photo was taken at.
-    printed = await _spent_at(client)
-    assert printed.startswith("2026-08-08T13:05")
+    # 13:05 as the receipt printed it.
+    assert (await _spent_at(client)).startswith("2026-08-08T13:05")
 
     await client.patch(f"/api/images/{image_id}", json={"taken_at": "2026-08-09T17:45:00Z"})
 
@@ -176,3 +191,60 @@ async def test_the_expense_follows_the_photo_to_the_stop_it_moved_to(
         expense = await db.scalar(sa.select(Expense))
         image = await db.get(Image, image_id)
         assert expense.visit_id == image.visit_id
+
+
+async def test_the_photos_own_clock_dates_the_money_over_the_printed_line(
+    client, db_sessionmaker, monkeypatch
+):
+    """Right after upload, with nothing edited: the camera outranks the model.
+
+    Correcting the photo afterwards already drags the expense along, but the
+    two had no business disagreeing in the first place — the printed date is a
+    vision model's reading of a thermal print, and a photo with EXIF of its own
+    is the better witness to when the money went.
+    """
+    await register(client)
+    await _a_receipt_photo(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        MISREAD_RECEIPT,  # prints the 7th
+        taken_at=datetime(2026, 8, 8, 20, 35, tzinfo=UTC),  # the shutter says the 8th
+    )
+
+    assert (await _spent_at(client)).startswith("2026-08-08T20:35")
+
+
+async def test_a_photo_with_no_clock_takes_the_printed_date_for_both(
+    client, db_sessionmaker, monkeypatch
+):
+    """A screenshot carries no EXIF, so the print is the best evidence there is.
+
+    It dates the photo as well as the money, which keeps the two agreeing.
+    """
+    await register(client)
+    image_id = await _a_receipt_photo(
+        client, db_sessionmaker, monkeypatch, RECEIPT_RESULT  # no EXIF written
+    )
+
+    image = (await client.get(f"/api/images/{image_id}")).json()
+    assert image["taken_at_source"] == "receipt"
+    assert image["taken_at"].startswith("2026-08-08T13:05")
+    assert (await _spent_at(client)).startswith("2026-08-08T13:05")
+
+
+async def test_the_photo_and_the_money_agree_right_after_upload(
+    client, db_sessionmaker, monkeypatch
+):
+    """The invariant the rest of this file rests on, before anyone edits anything."""
+    await register(client)
+    image_id = await _a_receipt_photo(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        MISREAD_RECEIPT,
+        taken_at=datetime(2026, 8, 8, 20, 35, tzinfo=UTC),
+    )
+
+    image = (await client.get(f"/api/images/{image_id}")).json()
+    assert image["taken_at"] == (await _spent_at(client))

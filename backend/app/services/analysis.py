@@ -102,7 +102,18 @@ async def _apply_receipt(
                 currency,
             )
             note = f"Currency read as {receipt.currency.strip()[:16]!r}; recorded as {currency}."
-    spent_at = parse_receipt_datetime(receipt.datetime_iso)
+    printed_at = parse_receipt_datetime(receipt.datetime_iso)
+    # A photo that carries a clock of its own — EXIF, or a time the user set —
+    # dates the money, and the printed line does not get to argue. That line is
+    # a vision model's reading of a thermal print, and it comes back a day out
+    # often enough (a smudged digit, 08/07 read the American way round, the
+    # card-authorization line instead of the sale) that the camera is the
+    # better witness. Where the photo has nothing but the moment it was
+    # uploaded, the print is the best evidence there is, and it dates the photo
+    # as well — leaving both reading the same moment either way.
+    if printed_at and image.taken_at_source == "upload":
+        image.taken_at = printed_at
+        image.taken_at_source = "receipt"
     expense = await create_expense(
         db,
         user,
@@ -111,7 +122,7 @@ async def _apply_receipt(
         merchant=receipt.merchant[:255] if receipt.merchant else None,
         # The photo's own GPS already told us where this was
         place_id=image.place_id,
-        spent_at=spent_at or image.taken_at,
+        spent_at=image.taken_at or printed_at,
         currency=currency,
         total_minor=to_minor(receipt.total, currency) or 0,
         tax_minor=to_minor(receipt.tax, currency),
@@ -128,10 +139,6 @@ async def _apply_receipt(
                 amount_minor=to_minor(item.amount, currency) or 0,
             )
         )
-    # A receipt's printed time beats the upload-time fallback for the timeline
-    if spent_at and image.taken_at_source == "upload":
-        image.taken_at = spent_at
-        image.taken_at_source = "receipt"
 
 
 async def _run_vision(source: Path) -> VisionResult | None:
