@@ -36,7 +36,7 @@ async def _a_place(db_sessionmaker, name="Kopi 1930") -> int:
 
 
 async def _a_receipt_photo(client, db_sessionmaker, monkeypatch, **jpeg) -> int:
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)

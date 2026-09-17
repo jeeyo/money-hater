@@ -1,6 +1,6 @@
 """The per-image analysis pipeline run by the worker.
 
-Stages: EXIF -> thumbnail -> place resolution -> vision -> expense -> recluster.
+Stages: EXIF -> thumbnail -> vision -> place resolution -> expense -> recluster.
 Each stage degrades gracefully (no GPS, no API keys, unreadable receipt) so an
 upload always ends in 'analyzed' unless something truly unexpected happens.
 
@@ -20,14 +20,20 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Expense, ExpenseItem, Image, ImageAnalysis, User
+from app.models import Expense, ExpenseItem, Image, ImageAnalysis, Place, User
 from app.services import storage
 from app.services.clustering import recluster_user
 from app.services.exif import extract_exif
 from app.services.expenses import create_expense, sync_place_from_image, sync_time_from_image
 from app.services.money import normalize_currency, to_minor
-from app.services.places import resolve_place
+from app.services.places import (
+    anchor_for_time,
+    find_merchant_place,
+    known_place_near,
+    resolve_place,
+)
 from app.services.vision import (
+    PhotoContext,
     VisionResult,
     analyze_image_content,
     parse_receipt_datetime,
@@ -102,7 +108,13 @@ async def _apply_receipt(
                 currency,
             )
             note = f"Currency read as {receipt.currency.strip()[:16]!r}; recorded as {currency}."
-    printed_at = parse_receipt_datetime(receipt.datetime_iso)
+    # Against the photo's own clock, so a year misread off a faded print is
+    # dropped rather than filed. `taken_at` is set by the time this runs —
+    # from EXIF, from the upload, or from the user — so the fallback is only
+    # for the impossible case.
+    printed_at = parse_receipt_datetime(
+        receipt.datetime_iso, reference=image.taken_at or datetime.now(UTC)
+    )
     # A photo that carries a clock of its own — EXIF, or a time the user set —
     # dates the money, and the printed line does not get to argue. That line is
     # a vision model's reading of a thermal print, and it comes back a day out
@@ -141,7 +153,82 @@ async def _apply_receipt(
         )
 
 
-async def _run_vision(source: Path) -> VisionResult | None:
+async def _photo_context(db: AsyncSession, image: Image) -> PhotoContext:
+    """When and where the photo was, for the model to read the print against.
+
+    The model is good at pixels and bad at knowing what year it is, and the
+    phone is the other way round — so it is told, rather than left to infer a
+    date from a print it can barely see. Free of API calls by construction: the
+    place is the one the photo already has or one already in the cache near the
+    fix, never a fresh Google lookup, because this runs for every photo.
+    """
+    place: Place | None = None
+    if image.place_id is not None:
+        place = await db.get(Place, image.place_id)
+    if place is None and image.lat is not None and image.lng is not None:
+        place = await known_place_near(db, image.lat, image.lng)
+    return PhotoContext(
+        captured_at=image.taken_at,
+        captured_at_source=image.taken_at_source,
+        now=datetime.now(UTC),
+        lat=image.lat,
+        lng=image.lng,
+        place_name=place.name if place else None,
+        place_address=place.formatted_address if place else None,
+    )
+
+
+async def _resolve_location(
+    db: AsyncSession, image: Image, user: User, vision: VisionResult | None
+) -> None:
+    """Name the place this photo was taken at, by fix or by what it says.
+
+    Only a photo the user has not answered for: a place they picked is the
+    answer to this exact question, so re-analysis must not talk over it —
+    pressing "Re-analyze" after correcting a photo would otherwise hand it
+    straight back to the shop next door.
+
+    The GPS fix goes first when there is one, because it is measured rather
+    than read. A receipt is the case where there usually is not one, or where
+    the one there is resolves to nothing: a screenshot carries no GPS at all,
+    and a fix taken inside a mall lands under no shop in particular. The name
+    printed across the top is then the way in — matched near wherever the user
+    was at the time, which is the photo's own fix if it has one and otherwise
+    the stop they were in.
+    """
+    if image.place_pinned:
+        return
+    fix = (image.lat, image.lng) if image.lat is not None and image.lng is not None else None
+    if fix is not None:
+        place = await resolve_place(db, *fix, hint=vision.kind if vision else None)
+        if place is not None:
+            image.place_id = place.id
+            return
+
+    merchant = _printed_name(vision)
+    if merchant is None:
+        if image.place_id is None and fix is not None:
+            log.info("no place resolved for image %s at %s,%s", image.id, *fix)
+        return
+    near = fix or await anchor_for_time(db, user, image.taken_at)
+    place = await find_merchant_place(db, merchant, near=near)
+    if place is not None:
+        log.info("image %s: matched %r to %s", image.id, merchant, place.name)
+        image.place_id = place.id
+    elif image.place_id is None:
+        log.info("no place resolved for image %s (merchant %r)", image.id, merchant)
+
+
+def _printed_name(vision: VisionResult | None) -> str | None:
+    """The venue this photo names itself: the receipt's merchant, or a sign in it."""
+    if vision is None:
+        return None
+    merchant = vision.receipt.merchant if vision.receipt else None
+    name = (merchant or vision.place_hint or "").strip()
+    return name or None
+
+
+async def _run_vision(source: Path, context: PhotoContext) -> VisionResult | None:
     """Read the photo, or give up on it within a bounded time.
 
     The provider call is the one step here with no natural end: the SDK's own
@@ -153,7 +240,7 @@ async def _run_vision(source: Path) -> VisionResult | None:
     """
     try:
         async with asyncio.timeout(settings.vision_timeout_seconds):
-            return await analyze_image_content(source, "image/jpeg")
+            return await analyze_image_content(source, "image/jpeg", context=context)
     except TimeoutError:
         log.warning(
             "vision analysis timed out after %ss for %s", settings.vision_timeout_seconds, source
@@ -235,22 +322,13 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
         if await _analysis_allowed(db, image):
             try:
                 source = Path(image.thumb_path) if image.thumb_path else original
-                vision = await _run_vision(source)
+                vision = await _run_vision(source, await _photo_context(db, image))
             except Exception:
                 log.exception("vision analysis failed for image %s", image_id)
 
-        # Only a fix of its own can be reverse-geocoded, and only a photo the
-        # user has not answered for. A place they picked is the answer to this
-        # exact question, so re-analysis must not talk over it — pressing
-        # "Re-analyze" after correcting a photo would otherwise hand it
-        # straight back to the shop next door.
-        if image.lat is not None and image.lng is not None and not image.place_pinned:
-            hint = vision.kind if vision else None
-            place = await resolve_place(db, image.lat, image.lng, hint=hint)
-            if place:
-                image.place_id = place.id
-            elif image.place_id is None:
-                log.info("no place resolved for image %s at %s,%s", image_id, image.lat, image.lng)
+        # After the model, not before: what it read off a receipt is half the
+        # evidence for where the photo was taken.
+        await _resolve_location(db, image, user, vision)
 
         if vision:
             await _record_analysis(db, image, vision)

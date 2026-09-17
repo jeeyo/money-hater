@@ -45,7 +45,7 @@ MISREAD_RECEIPT = VisionResult(
 
 
 async def _a_receipt_photo(client, db_sessionmaker, monkeypatch, result, **jpeg) -> int:
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return result
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)

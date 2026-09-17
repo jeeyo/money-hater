@@ -113,9 +113,15 @@ limited. OpenAI SDK tracing is disabled by default.
 ## How it works
 
 1. Uploaded images are deduplicated, stored under `MEDIA_ROOT`, and queued for processing.
-2. The worker extracts timestamps and optional GPS data, creates thumbnails, and looks up places.
-3. A vision model captions and classifies images and turns detected receipts into expenses.
-4. Nearby images taken within a similar time window are clustered into stops and daily timelines.
+2. The worker extracts timestamps and optional GPS data and creates thumbnails.
+3. A vision model captions and classifies images and turns detected receipts into expenses. It is
+   told when and roughly where the photo was taken, so an ambiguous date printed on a receipt is
+   read against the day of the photo — and a printed date years away from it is discarded rather
+   than filed.
+4. Places are looked up from the photo's coordinates; a receipt with no usable fix — a screenshot,
+   or a fix taken indoors — is placed by matching the merchant printed on it to a Google place near
+   where the user was at the time.
+5. Nearby images taken within a similar time window are clustered into stops and daily timelines.
 
 Photos without GPS can join the nearest stop by time or be assigned a place manually. User edits
 to dates, places, expenses, and stop names are preserved when the timeline is rebuilt.

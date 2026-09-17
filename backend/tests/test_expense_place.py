@@ -93,7 +93,7 @@ async def test_a_place_holds_receipts_and_hand_entered_spending_together(
         )
     ).json()
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
@@ -124,13 +124,13 @@ async def test_a_receipt_with_no_gps_still_reaches_its_stop(
             await run_image_analysis(db, created[0]["id"])
         return created[0]["id"]
 
-    async def no_receipt(path, mime):
+    async def no_receipt(path, mime, context=None):
         return None
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", no_receipt)
     await upload("lunch.jpg", make_jpeg(*BKK, taken_at=datetime(2026, 8, 8, 13, 0, tzinfo=UTC)))
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)

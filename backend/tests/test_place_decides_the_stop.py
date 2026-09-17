@@ -145,7 +145,7 @@ async def test_the_expense_follows_the_photo(client, db_sessionmaker, monkeypatc
     total to the wrong shop — the number the day's header adds up.
     """
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return VisionResult(
             kind="receipt",
             caption="Receipt",
