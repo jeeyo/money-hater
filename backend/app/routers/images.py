@@ -59,6 +59,13 @@ async def upload_images(
         le=MAX_OFFSET_MINUTES,
         description="The uploader's UTC offset, for photos whose own clock is missing",
     ),
+    lat: float | None = Query(
+        default=None,
+        ge=-90,
+        le=90,
+        description="Where the uploader's device is, for photos whose own fix is missing",
+    ),
+    lng: float | None = Query(default=None, ge=-180, le=180),
 ):
     if not files:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "No files provided")
@@ -96,6 +103,10 @@ async def upload_images(
     # UTC instant into it would put a photo uploaded over dinner in Bangkok at
     # lunchtime, hours from the photos it was taken beside.
     arrived_at = local_now(tz_offset_minutes)
+    # Both or neither. Half a coordinate pair is not a location, and the two
+    # are separate query parameters, so a caller that sends one of them is
+    # telling us nothing.
+    from_here = (lat, lng) if lat is not None and lng is not None else (None, None)
 
     created: list[Image] = []
     for data, mime, exif in accepted:
@@ -120,6 +131,11 @@ async def upload_images(
             status="pending",
             lat=exif.lat,
             lng=exif.lng,
+            # Recorded even when the photo has a fix of its own: this is where
+            # the person was, not where the shutter went, and the two are
+            # different facts. The analyst prefers the photo's own.
+            upload_lat=from_here[0],
+            upload_lng=from_here[1],
             taken_at=exif.taken_at or arrived_at,
             exif_taken_at=exif.taken_at,
             taken_at_source="exif" if exif.taken_at else "upload",

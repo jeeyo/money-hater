@@ -1,4 +1,14 @@
-import { AlertTriangle, Camera, Check, Clock, ImagePlus, Loader2, MapPin, RefreshCw } from 'lucide-react';
+import {
+  AlertTriangle,
+  Camera,
+  Check,
+  Clock,
+  ImagePlus,
+  Loader2,
+  LocateFixed,
+  MapPin,
+  RefreshCw,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -12,6 +22,8 @@ import {
   useUploadImages,
 } from '../hooks/useData';
 import type { UploadOutcome } from '../hooks/useData';
+import { useUploadLocation } from '../hooks/useUploadLocation';
+import type { UploadLocationStatus } from '../hooks/useUploadLocation';
 import { looksLikeImage } from '../lib/files';
 import { formatDateTime } from '../lib/format';
 import { takeSharedFiles } from '../lib/sharedFiles';
@@ -125,8 +137,70 @@ function UploadedImage({ initial, onOpen }: { initial: ImageRecord; onOpen: () =
   );
 }
 
+/** The one line on this page about the phone's own location.
+ *
+ * Offered rather than taken: a permission dialog that appears the moment
+ * someone taps "Choose photos", with nothing on screen to explain it, is the
+ * kind that gets denied once and for all. So the sentence comes first and the
+ * prompt only after they ask for it.
+ */
+function UploadLocationNote({
+  status,
+  onEnable,
+}: {
+  status: UploadLocationStatus;
+  onEnable: () => void;
+}) {
+  if (status === 'unsupported') return null;
+
+  const action = (label: string) => (
+    <button
+      type="button"
+      onClick={onEnable}
+      className="font-medium text-brand-600 underline underline-offset-2"
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-left text-xs text-ink-3">
+      {status === 'asking' ? (
+        <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin" aria-hidden />
+      ) : (
+        <LocateFixed
+          className={`mt-0.5 size-3.5 shrink-0 ${status === 'on' ? 'text-brand-600' : ''}`}
+          aria-hidden
+        />
+      )}
+      <span>
+        {status === 'on' && (
+          <>
+            Using <b className="font-medium text-ink-2">where you are now</b> for photos that
+            carry no location — a receipt can still be matched to the shop that printed it.
+          </>
+        )}
+        {status === 'asking' && <>Asking your browser where you are…</>}
+        {status === 'offer' && (
+          <>
+            A receipt rarely carries a location of its own. {action('Use where you are')} and one
+            can still be matched to the shop that printed it.
+          </>
+        )}
+        {status === 'blocked' && (
+          <>
+            Your browser would not say where you are, so photos without a location of their own
+            are placed from your last stop. {action('Try again')}
+          </>
+        )}
+      </span>
+    </p>
+  );
+}
+
 export function UploadPage() {
   const upload = useUploadImages();
+  const location = useUploadLocation();
   const [uploaded, setUploaded] = useState<ImageRecord[]>([]);
   const [skipped, setSkipped] = useState<UploadOutcome[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -144,6 +218,8 @@ export function UploadPage() {
   // dependencies — the shared photos must be claimed exactly once.
   const uploadRef = useRef(upload);
   uploadRef.current = upload;
+  const locationRef = useRef(location);
+  locationRef.current = location;
 
   function record(outcomes: UploadOutcome[]) {
     const added = outcomes
@@ -168,9 +244,16 @@ export function UploadPage() {
       setSkipped(rejected);
       return;
     }
-    uploadRef.current.mutate(list, {
-      onSuccess: (outcomes) => record([...outcomes, ...rejected]),
-    });
+    // The fix is asked for before the first request rather than per photo, so a
+    // batch of twenty carries one answer — and it never holds the upload up for
+    // long: `currentFix` gives up quickly and hands back null.
+    void (async () => {
+      const at = await locationRef.current.fixForUpload();
+      uploadRef.current.mutate(
+        { files: list, at },
+        { onSuccess: (outcomes) => record([...outcomes, ...rejected]) },
+      );
+    })();
   }
 
   // Photos sent from the phone's share sheet are parked by the service worker;
@@ -229,6 +312,7 @@ export function UploadPage() {
             </button>
           </span>
         </p>
+        <UploadLocationNote status={location.status} onEnable={() => void location.enable()} />
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
             type="button"
