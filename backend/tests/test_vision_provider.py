@@ -99,7 +99,7 @@ async def test_stored_analysis_names_the_model_that_produced_it(
 
     monkeypatch.setattr(settings, "llm_model", "gpt-4.1-mini")
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return VisionResult(kind="food", caption="a bowl of ramen", labels=["ramen"])
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)

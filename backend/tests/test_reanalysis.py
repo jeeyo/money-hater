@@ -51,7 +51,7 @@ async def _upload(client, name="a.jpg", color=(4, 4, 4)) -> int:
 
 
 def _stub_vision(monkeypatch, result: VisionResult | None):
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return result
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
@@ -171,7 +171,7 @@ async def test_a_model_that_never_answers_does_not_park_the_photo(
     image_id = await _upload(client)
     monkeypatch.setattr(settings, "vision_timeout_seconds", 0.05)
 
-    async def hangs(path, mime):
+    async def hangs(path, mime, context=None):
         await asyncio.sleep(30)
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", hangs)

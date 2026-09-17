@@ -26,7 +26,7 @@ def configured(monkeypatch):
     # recommender's own agent, which each test stubs for itself.
     import app.services.analysis as analysis_mod
 
-    async def no_vision(path, mime):
+    async def no_vision(path, mime, context=None):
         return None
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", no_vision)

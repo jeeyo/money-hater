@@ -131,7 +131,7 @@ async def test_receipt_expense_inherits_the_photo_place(
         )
     ).json()
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)

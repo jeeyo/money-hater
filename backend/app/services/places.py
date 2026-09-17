@@ -46,6 +46,12 @@ DETAILS_TTL_HOURS = 24
 SEARCH_RADIUS_M = 150.0
 # Reuse a cached place if it's within this distance of the photo
 CACHE_RADIUS_M = 120.0
+# How far from where the user was a merchant read off a receipt may be and
+# still be the one they were handed it by. Google's text search treats a
+# location bias as a suggestion, not a filter, so "Ramen Ya" asked from Bangkok
+# will happily answer with one in Tokyo — generous enough for a chain branch
+# across a city, tight enough that the wrong continent is thrown away.
+MERCHANT_MAX_DISTANCE_M = 40_000.0
 # Suggestions are biased to, not restricted to, this radius around the user
 SUGGEST_BIAS_RADIUS_M = 3000.0
 # Shortest query worth sending to Google
@@ -171,6 +177,68 @@ async def resolve_place(
         return None
     candidate = _pick_candidate(items, hint)
     return await _upsert_place(db, candidate) if candidate else None
+
+
+async def known_place_near(db: AsyncSession, lat: float, lng: float) -> Place | None:
+    """A place we have already learned the name of near here — no API call.
+
+    The photo analyst is told where a photo was taken so it can read a faint
+    merchant line and an unlabelled currency, and that has to cost nothing: it
+    runs for every photo, including the ones nobody will ever ask a question
+    about. This is the free half of `resolve_place` on its own.
+    """
+    return await _cached_nearby(db, lat, lng)
+
+
+async def find_merchant_place(
+    db: AsyncSession, merchant: str, near: tuple[float, float] | None = None
+) -> Place | None:
+    """Match a merchant name off a receipt to a real place near where it was paid.
+
+    The other way round from `resolve_place`, and the answer for every receipt
+    that reverse-geocodes to nothing: a screenshot carries no GPS at all, and a
+    fix taken indoors lands in the middle of a mall with no shop under it. What
+    those receipts do have is a name printed across the top, and a name plus a
+    rough location is enough to find the place on the map.
+
+    `near` is what keeps that honest, so there is no lookup without one: a bare
+    name matches a franchise in every city on earth, and the nearest one to
+    nothing in particular is not evidence of anything. Anything Google answers
+    from beyond `MERCHANT_MAX_DISTANCE_M` is dropped for the same reason.
+    """
+    needle = (merchant or "").strip()
+    if len(needle) < MIN_QUERY_FOR_GOOGLE or near is None:
+        return None
+
+    def within(place: Place) -> float | None:
+        distance = haversine_m(near[0], near[1], place.lat, place.lng)
+        return distance if distance <= MERCHANT_MAX_DISTANCE_M else None
+
+    # Somewhere already known by that name answers first and for free — the
+    # second receipt from the same cafe costs nothing, and an install with no
+    # Google key still names everything it has learned once.
+    known = await db.execute(sa.select(Place).where(sa.func.lower(Place.name) == needle.lower()))
+    nearest: tuple[float, Place] | None = None
+    for place in known.scalars():
+        distance = within(place)
+        if distance is not None and (nearest is None or distance < nearest[0]):
+            nearest = (distance, place)
+    if nearest is not None:
+        return nearest[1]
+
+    for item in await _google_text_search(needle, near, limit=5):
+        place = await _upsert_place(db, item)
+        if place is None:
+            continue
+        if within(place) is None:
+            log.info(
+                "ignoring %r for merchant %r: too far from where it was paid",
+                place.name,
+                needle,
+            )
+            continue
+        return place
+    return None
 
 
 async def anchor_for_time(

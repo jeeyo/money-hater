@@ -230,7 +230,7 @@ async def test_deleting_receipt_image_removes_its_expense(client, db_sessionmake
         )
     ).json()
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)

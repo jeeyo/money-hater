@@ -63,7 +63,7 @@ async def test_receipt_creates_expense(client, db_sessionmaker, monkeypatch):
     ).json()
     image_id = created[0]["id"]
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
@@ -110,7 +110,7 @@ async def test_expense_manual_correction(client, db_sessionmaker, monkeypatch):
         )
     ).json()
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
@@ -141,7 +141,7 @@ async def test_force_mark_image_as_receipt(client, db_sessionmaker, monkeypatch)
     ).json()
     image_id = created[0]["id"]
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return VisionResult(kind="food", caption="A plate of noodles", labels=["food"])
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
@@ -262,7 +262,7 @@ async def test_a_currency_the_model_invented_does_not_sink_the_receipt(
     ).json()
     image_id = created[0]["id"]
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return VisionResult(
             kind="receipt",
             caption="Receipt from a hotpot place",
@@ -301,7 +301,7 @@ async def test_a_merchant_longer_than_the_column_is_kept_not_fatal(
         )
     ).json()
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return VisionResult(
             kind="receipt",
             caption="A receipt",

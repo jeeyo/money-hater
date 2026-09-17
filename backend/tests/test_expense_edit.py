@@ -218,7 +218,7 @@ async def test_editing_a_receipt_expense_is_allowed(client, db_sessionmaker, mon
         )
     ).json()
 
-    async def fake_vision(path, mime):
+    async def fake_vision(path, mime, context=None):
         return RECEIPT_RESULT
 
     monkeypatch.setattr(analysis_mod, "analyze_image_content", fake_vision)
