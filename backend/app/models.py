@@ -135,6 +135,16 @@ class Image(Base):
     taken_at_source: Mapped[str] = mapped_column(sa.String(16), default="upload")
     lat: Mapped[float | None] = mapped_column(sa.Float)
     lng: Mapped[float | None] = mapped_column(sa.Float)
+    # Where the phone said it was when this photo was uploaded, if the browser
+    # offered it. Kept apart from `lat`/`lng` on purpose: that pair is the
+    # camera's own fix, and it decides the map pin and the stop the photo
+    # clusters into. Someone who photographs a receipt at the till and uploads
+    # it from the hotel would otherwise have the evening's stop rewritten
+    # around the hotel. This is only ever used as the rough "and where were
+    # you" the analyst is given — near enough to match a merchant name, never
+    # a claim about where the shutter went.
+    upload_lat: Mapped[float | None] = mapped_column(sa.Float)
+    upload_lng: Mapped[float | None] = mapped_column(sa.Float)
     exif: Mapped[dict | None] = mapped_column(JSONType)
     place_id: Mapped[int | None] = mapped_column(sa.ForeignKey("places.id", ondelete="SET NULL"))
     # The user named this place themselves, so the pipeline must not answer

@@ -153,6 +153,20 @@ async def _apply_receipt(
         )
 
 
+def _photo_fix(image: Image) -> tuple[float, float] | None:
+    """The camera's own coordinates, if it wrote any."""
+    if image.lat is None or image.lng is None:
+        return None
+    return image.lat, image.lng
+
+
+def _uploader_fix(image: Image) -> tuple[float, float] | None:
+    """Where the phone was when the photo went up, if the browser offered it."""
+    if image.upload_lat is None or image.upload_lng is None:
+        return None
+    return image.upload_lat, image.upload_lng
+
+
 async def _photo_context(db: AsyncSession, image: Image) -> PhotoContext:
     """When and where the photo was, for the model to read the print against.
 
@@ -161,18 +175,27 @@ async def _photo_context(db: AsyncSession, image: Image) -> PhotoContext:
     date from a print it can barely see. Free of API calls by construction: the
     place is the one the photo already has or one already in the cache near the
     fix, never a fresh Google lookup, because this runs for every photo.
+
+    The camera's fix is the one described where there is one. Failing that —
+    which is most receipts — the phone's own location at upload time stands in,
+    said plainly for what it is, because "somewhere in this city" is already
+    enough to settle a currency and to read a half-legible shop name.
     """
+    described = _photo_fix(image) or _uploader_fix(image)
     place: Place | None = None
     if image.place_id is not None:
         place = await db.get(Place, image.place_id)
-    if place is None and image.lat is not None and image.lng is not None:
-        place = await known_place_near(db, image.lat, image.lng)
+    if place is None and described is not None:
+        place = await known_place_near(db, *described)
+    uploader = _uploader_fix(image) if _photo_fix(image) is None else None
     return PhotoContext(
         captured_at=image.taken_at,
         captured_at_source=image.taken_at_source,
         now=datetime.now(UTC),
         lat=image.lat,
         lng=image.lng,
+        uploader_lat=uploader[0] if uploader else None,
+        uploader_lng=uploader[1] if uploader else None,
         place_name=place.name if place else None,
         place_address=place.formatted_address if place else None,
     )
@@ -193,12 +216,17 @@ async def _resolve_location(
     the one there is resolves to nothing: a screenshot carries no GPS at all,
     and a fix taken inside a mall lands under no shop in particular. The name
     printed across the top is then the way in — matched near wherever the user
-    was at the time, which is the photo's own fix if it has one and otherwise
-    the stop they were in.
+    was: the photo's own fix, else where their phone was when they uploaded it,
+    else the stop they were in at the time.
+
+    Note what the uploader's fix is *not* allowed to do: name the photo on its
+    own. It says where a person was when they pressed upload, which is only
+    where the photo was taken if it went up on the spot — so it anchors a name
+    the receipt itself supplies, and never becomes a map pin by itself.
     """
     if image.place_pinned:
         return
-    fix = (image.lat, image.lng) if image.lat is not None and image.lng is not None else None
+    fix = _photo_fix(image)
     if fix is not None:
         place = await resolve_place(db, *fix, hint=vision.kind if vision else None)
         if place is not None:
@@ -210,7 +238,7 @@ async def _resolve_location(
         if image.place_id is None and fix is not None:
             log.info("no place resolved for image %s at %s,%s", image.id, *fix)
         return
-    near = fix or await anchor_for_time(db, user, image.taken_at)
+    near = fix or _uploader_fix(image) or await anchor_for_time(db, user, image.taken_at)
     place = await find_merchant_place(db, merchant, near=near)
     if place is not None:
         log.info("image %s: matched %r to %s", image.id, merchant, place.name)

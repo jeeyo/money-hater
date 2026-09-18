@@ -57,6 +57,13 @@ class PhotoContext:
     now: datetime | None = None
     lat: float | None = None
     lng: float | None = None
+    # Where the phone was when the photo was uploaded. Only described when the
+    # photo has no fix of its own, and always as what it is — someone who
+    # photographs a receipt at the till and uploads it from the hotel is at the
+    # hotel, and the model has to be told that rather than handed a location
+    # dressed up as the shutter's.
+    uploader_lat: float | None = None
+    uploader_lng: float | None = None
     place_name: str | None = None
     place_address: str | None = None
 
@@ -81,6 +88,14 @@ class PhotoContext:
         if self.lat is not None and self.lng is not None:
             fix = f"{self.lat:.5f}, {self.lng:.5f}"
             lines.append(f"- Taken at {fix}" + (f", by {where}." if where else "."))
+        elif self.uploader_lat is not None and self.uploader_lng is not None:
+            fix = f"{self.uploader_lat:.5f}, {self.uploader_lng:.5f}"
+            lines.append(
+                f"- The camera recorded no location. The phone was at {fix}"
+                + (f", by {where}," if where else "")
+                + " when the photo was uploaded, which is where it was taken only if it"
+                " went up soon after."
+            )
         elif where:
             lines.append(f"- Filed under {where}.")
         if not lines:

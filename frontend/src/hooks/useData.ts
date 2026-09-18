@@ -2,6 +2,8 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiJson, postJson } from '../lib/api';
 import { tzOffsetMinutes } from '../lib/format';
+import { fixParams } from '../lib/location';
+import type { Fix } from '../lib/location';
 import { queryClient } from '../lib/queryClient';
 import type {
   AuthConfig,
@@ -319,7 +321,7 @@ function codeFor(httpStatus: number): UploadOutcome['code'] {
  *  big; three keeps the link busy without stalling on a bad connection. */
 const UPLOAD_CONCURRENCY = 3;
 
-async function uploadOne(file: File): Promise<UploadOutcome> {
+async function uploadOne(file: File, at: Fix | null): Promise<UploadOutcome> {
   const form = new FormData();
   form.append('files', file);
   let code: UploadOutcome['code'];
@@ -327,8 +329,10 @@ async function uploadOne(file: File): Promise<UploadOutcome> {
     // A photo whose camera wrote no timestamp is filed under when it arrived,
     // and that has to be your clock rather than the server's — otherwise a
     // screenshot uploaded over dinner lands hours from the photos beside it.
+    // `at` is the same idea for the other missing half: where the phone is,
+    // for a photo that carries no coordinates of its own.
     const response = await fetch(
-      `/api/images?tz_offset_minutes=${tzOffsetMinutes()}`,
+      `/api/images?tz_offset_minutes=${tzOffsetMinutes()}${fixParams(at)}`,
       { method: 'POST', body: form },
     );
     if (!response.ok) {
@@ -363,7 +367,7 @@ export function useUploadImages() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   const mutation = useMutation({
-    mutationFn: async (files: File[]) => {
+    mutationFn: async ({ files, at = null }: { files: File[]; at?: Fix | null }) => {
       setProgress({ done: 0, total: files.length });
       const outcomes: UploadOutcome[] = new Array(files.length);
       let next = 0;
@@ -372,7 +376,7 @@ export function useUploadImages() {
       async function worker() {
         while (next < files.length) {
           const index = next++;
-          outcomes[index] = await uploadOne(files[index]);
+          outcomes[index] = await uploadOne(files[index], at);
           done += 1;
           setProgress({ done, total: files.length });
         }

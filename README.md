@@ -120,7 +120,10 @@ limited. OpenAI SDK tracing is disabled by default.
    than filed.
 4. Places are looked up from the photo's coordinates; a receipt with no usable fix — a screenshot,
    or a fix taken indoors — is placed by matching the merchant printed on it to a Google place near
-   where the user was at the time.
+   where the user was at the time. "Near" is the photo's own coordinates, else the location the
+   browser offered when it was uploaded, else their last stop. The uploader's location is only ever
+   used to anchor a name the photo supplies itself: it never becomes the photo's own coordinates,
+   and so never moves a map pin or a stop.
 5. Nearby images taken within a similar time window are clustered into stops and daily timelines.
 
 Photos without GPS can join the nearest stop by time or be assigned a place manually. User edits
