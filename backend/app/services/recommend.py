@@ -31,6 +31,13 @@ log = logging.getLogger(__name__)
 
 MAX_CANDIDATE_RADIUS_M = 4000.0
 
+# How long a failure stays on screen: long enough to read and retry, not the
+# ninety minutes a set of suggestions is worth.
+FAILURE_SHOWN_FOR = timedelta(minutes=10)
+# How long to keep waiting on a queued run before calling it abandoned.
+STALLED_AFTER = timedelta(minutes=10)
+STALLED_ERROR = "That run never finished — the suggester may be down."
+
 
 class Recommendation(BaseModel):
     google_place_id: str = Field(
@@ -276,20 +283,53 @@ async def within_daily_cap(db: AsyncSession, user: User) -> bool:
     return (used or 0) < settings.daily_recommendation_cap
 
 
-def is_fresh(row: TripRecommendation, anchor_visit_id: int | None, now: datetime) -> bool:
-    """Still worth showing without spending another model call?"""
-    if row.status == "failed":
-        return False
-    if row.anchor_visit_id != anchor_visit_id:
-        return False  # they have moved on since
+def _generated_at(row: TripRecommendation) -> datetime | None:
     generated = row.generated_at
     if generated is None:
-        return False
+        return None
     if generated.tzinfo is None:
-        generated = generated.replace(tzinfo=UTC)  # sqlite hands back naive datetimes
+        return generated.replace(tzinfo=UTC)  # sqlite hands back naive datetimes
+    return generated
+
+
+def is_stalled(row: TripRecommendation, now: datetime) -> bool:
+    """A queued run nothing is coming back from — the worker died, or is down.
+
+    Without this the row stays "pending" forever: the panel spins, and the
+    POST hands that same pending row back, so there is no way to try again.
+    """
+    if row.status != "pending":
+        return False
+    generated = _generated_at(row)
+    return generated is None or generated < now - STALLED_AFTER
+
+
+def is_current(row: TripRecommendation, anchor_visit_id: int | None, now: datetime) -> bool:
+    """Is this row still about where they are, and recent enough to show at all?
+
+    Failures count: one that is hidden leaves the user pressing a button that
+    appears to do nothing, which is worse than the error itself.
+    """
+    if row.anchor_visit_id != anchor_visit_id:
+        return False  # they have moved on since
+    generated = _generated_at(row)
+    if generated is None:
+        return False
     if row.status == "pending":
-        return True  # a job is in flight; the UI polls it
-    return generated >= now - timedelta(minutes=settings.recommendation_ttl_minutes)
+        return not is_stalled(row, now)  # a job is in flight; the UI polls it
+    ttl = (
+        FAILURE_SHOWN_FOR
+        if row.status == "failed"
+        else timedelta(minutes=settings.recommendation_ttl_minutes)
+    )
+    return generated >= now - ttl
+
+
+def is_fresh(row: TripRecommendation, anchor_visit_id: int | None, now: datetime) -> bool:
+    """Still worth showing *instead of* spending another model call?"""
+    if row.status == "failed":
+        return False  # an error is shown, but it is never a reason not to retry
+    return is_current(row, anchor_visit_id, now)
 
 
 async def newest_for_trip(db: AsyncSession, trip_id: int) -> TripRecommendation | None:

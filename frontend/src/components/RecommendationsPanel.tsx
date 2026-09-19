@@ -82,6 +82,13 @@ export function RecommendationsPanel({ tripId }: { tripId: number }) {
   const status = data?.status ?? 'none';
   const pending = status === 'pending' || generate.isPending;
   const items = data?.items ?? [];
+  // Two ways this goes wrong: the request to queue a run is refused (no key, a
+  // finished trip, the daily cap), or the run itself comes back failed. Either
+  // way the panel says so — dropping silently back to the button reads as a
+  // button that does nothing.
+  const requestError = generate.isError ? generate.error.message : null;
+  const failure =
+    requestError ?? (status === 'failed' ? (data?.error ?? 'The run failed.') : null);
 
   return (
     <section className={PANEL}>
@@ -121,25 +128,33 @@ export function RecommendationsPanel({ tripId }: { tripId: number }) {
 
       {!pending && status !== 'ready' && !isLoading && (
         <div className="space-y-2">
-          <p className="text-sm text-ink-3">
-            {data?.anchor_label
-              ? `Ideas for where to go next from ${data.anchor_label}, based on this trip and the time of day.`
-              : 'Ideas for where to go next, based on this trip and the time of day.'}
-          </p>
+          {failure ? (
+            // Clamped: a provider error can be a paragraph of JSON, and the
+            // first line is the part worth reading. `title` keeps the rest.
+            <p className="line-clamp-3 text-sm text-danger" title={failure}>
+              Could not suggest anything: {failure}
+            </p>
+          ) : (
+            <p className="text-sm text-ink-3">
+              {data?.anchor_label
+                ? `Ideas for where to go next from ${data.anchor_label}, based on this trip and the time of day.`
+                : 'Ideas for where to go next, based on this trip and the time of day.'}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => generate.mutate({})}
             className="w-full rounded-xl border border-brand-600 py-2.5 text-sm font-semibold text-brand-700 active:bg-brand-50"
           >
-            Suggest somewhere
+            {failure ? 'Try again' : 'Suggest somewhere'}
           </button>
         </div>
       )}
 
-      {status === 'failed' && data?.error && (
-        <p className="text-sm text-danger">Could not suggest anything: {data.error}</p>
+      {/* A refresh that was refused, with the previous set still on screen. */}
+      {status === 'ready' && requestError && (
+        <p className="text-sm text-danger">{requestError}</p>
       )}
-      {generate.isError && <p className="text-sm text-danger">{generate.error.message}</p>}
 
       {opened && <RecommendationSheet item={opened} onClose={() => setOpened(null)} />}
     </section>
