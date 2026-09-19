@@ -348,6 +348,11 @@ class TripDayOut(BaseModel):
 class TripDetailOut(TripOut):
     days: list[TripDayOut]
     expenses: list["ExpenseOut"]
+    # How many photos an export of this trip would carry. Not `image_count`:
+    # that counts every photo in the window, and one still being analyzed has no
+    # thumbnail yet, so it is not in the file. The share sheet says how big the
+    # download is about to be, and deciding what goes in it is this side's job.
+    export_photo_count: int
 
 
 class TripCreate(BaseModel):

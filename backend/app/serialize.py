@@ -289,6 +289,11 @@ def trip_detail_out(trip: Trip, window, visits, expenses, base_currency: str) ->
         **_trip_fields(trip, window, visits, expenses, base_currency),
         days=group_by_day(visits, expenses, base_currency),
         expenses=[expense_out(expense) for expense in expenses],
+        # The same rule the exporter uses to pick photos off disk — see
+        # `app.services.export.photos`.
+        export_photo_count=sum(
+            1 for visit in visits for image in visit.images if image.thumb_path
+        ),
     )
 
 

@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
@@ -19,6 +20,7 @@ from app.schemas import (
     VisitUpdate,
 )
 from app.serialize import trip_detail_out, trip_out, visit_label, visit_out
+from app.services import export as export_service
 from app.services import recommend as recommend_service
 from app.services import trips as trip_service
 from app.services.llm import llm_enabled
@@ -129,6 +131,39 @@ async def get_trip(
     ),
 ):
     return await _render(db, user, await _load(db, user, trip_id), tz_offset_minutes, detail=True)
+
+
+@router.get("/trips/{trip_id}/export.html")
+async def export_trip(
+    trip_id: int,
+    user: CurrentUser,
+    db: DbSession,
+    photos: bool = Query(default=True, description="Inline the trip's photos"),
+    spending: bool = Query(default=True, description="Include every amount"),
+    tz_offset_minutes: int = Query(
+        default=0, ge=-MAX_OFFSET_MINUTES, le=MAX_OFFSET_MINUTES
+    ),
+):
+    """The trip as one self-contained HTML page, to send to someone.
+
+    Served as a download rather than a page of this app: it is a file the user
+    keeps and forwards, and it answers to nobody's session once it leaves here.
+    Built once per version of the trip and cached on disk — see
+    `app.services.export.cache` for why the fingerprint is the name there and
+    the trip is the name here.
+    """
+    trip = await _render(db, user, await _load(db, user, trip_id), tz_offset_minutes, detail=True)
+    page = await export_service.export_page(
+        db, user.id, trip, export_service.ExportOptions(photos=photos, spending=spending)
+    )
+    return FileResponse(
+        page.path,
+        media_type="text/html; charset=utf-8",
+        filename=page.filename,
+        # The page is one version of a private trip: shared deliberately, by
+        # sending the file, never by a cache in between.
+        headers={"Cache-Control": "private, no-store", "X-Trip-Fingerprint": page.fingerprint},
+    )
 
 
 @router.patch("/trips/{trip_id}", response_model=TripDetailOut)
@@ -346,6 +381,7 @@ async def delete_trip(trip_id: int, user: CurrentUser, db: DbSession):
     trip = await _load(db, user, trip_id)
     await db.delete(trip)
     await db.commit()
+    export_service.clear_for_trip(user.id, trip_id)
 
 
 @router.patch("/visits/{visit_id}", response_model=VisitOut)

@@ -1,9 +1,10 @@
-import { ArrowLeft, Check, Flag, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, Flag, Pencil, Share2, Trash2 } from 'lucide-react';
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DayRail } from '../components/DayRail';
 import { EndTripSheet } from '../components/EndTripSheet';
 import { RecommendationsPanel } from '../components/RecommendationsPanel';
+import { ShareTripSheet } from '../components/ShareTripSheet';
 import { useDeleteTrip, useEndTrip, useTrip, useUpdateTrip } from '../hooks/useData';
 import { dayColor } from '../lib/dayColors';
 import { formatDay, formatSpend, formatTripRange, isOpenTrip } from '../lib/format';
@@ -22,6 +23,7 @@ export function TripDetailPage() {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [choosingEnd, setChoosingEnd] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   // One route per day, so the map shows which stops belonged to which day
   const mapDays = useMemo(
@@ -142,6 +144,16 @@ export function TripDetailPage() {
         </Suspense>
       )}
 
+      {/* Under the map, where someone is already looking at the trip as a whole —
+          the header row is for naming and ending it. */}
+      <button
+        type="button"
+        onClick={() => setSharing(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-surface py-2.5 text-sm font-medium text-ink-2 active:bg-surface-2"
+      >
+        <Share2 className="size-4" /> Save as a page to share
+      </button>
+
       {trip.days.length === 0 && (
         <p className="rounded-2xl bg-surface-2 px-4 py-6 text-center text-sm text-ink-3">
           Nothing logged in this window yet — photos and expenses you add to these days
@@ -186,6 +198,7 @@ export function TripDetailPage() {
       </button>
 
       {choosingEnd && <EndTripSheet trip={trip} onClose={() => setChoosingEnd(false)} />}
+      {sharing && <ShareTripSheet trip={trip} onClose={() => setSharing(false)} />}
     </div>
   );
 }
