@@ -10,6 +10,7 @@ places, expenses, and trips.
 - Extracts merchants, totals, and line items from receipts; manual expenses are supported too.
 - Tracks spending in multiple currencies with user-confirmed exchange rates.
 - Groups days into optional finished or ongoing trips.
+- Exports a trip as one self-contained HTML page — map, days and photos in a single file to send.
 - Suggests nearby places to visit while a trip is in progress.
 - Supports photo sharing from compatible devices, offline app-shell access, and PWA installation.
 - Includes responsive desktop and mobile layouts plus system-aware light and OLED-black themes.

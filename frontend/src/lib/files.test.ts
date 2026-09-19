@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, looksLikeImage } from './files';
+import { downloadFilename, formatBytes, looksLikeImage } from './files';
 
 function file(name: string, type: string): File {
   return new File([new Uint8Array([1, 2, 3])], name, { type });
@@ -29,5 +29,28 @@ describe('formatBytes', () => {
     expect(formatBytes(512)).toBe('512 B');
     expect(formatBytes(2048)).toBe('2 KB');
     expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB');
+  });
+});
+
+describe('downloadFilename', () => {
+  it('reads the name the export endpoint asks to be saved under', () => {
+    expect(
+      downloadFilename('attachment; filename="chiang-mai-weekend-2026-09-12.html"'),
+    ).toBe('chiang-mai-weekend-2026-09-12.html');
+  });
+
+  it('prefers the encoded form, which is the one that survives a non-ASCII title', () => {
+    const header =
+      "attachment; filename=\"trip-2026-09-12.html\"; filename*=UTF-8''%E4%BA%AC%E9%83%BD.html";
+    expect(downloadFilename(header)).toBe('京都.html');
+  });
+
+  it('gives up quietly rather than losing the download', () => {
+    expect(downloadFilename(null)).toBeNull();
+    expect(downloadFilename('attachment')).toBeNull();
+    // A malformed escape falls back to the plain name beside it
+    expect(downloadFilename('attachment; filename="a.html"; filename*=UTF-8\'\'%E4%A')).toBe(
+      'a.html',
+    );
   });
 });

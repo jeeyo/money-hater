@@ -1,32 +1,24 @@
 import { Check, Download, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { buildTripExport, exportablePhotos } from '../lib/tripExport';
-import { collectTripPhotos } from '../lib/tripPhotos';
+import { apiFetch } from '../lib/api';
+import { downloadFilename, formatBytes, saveBlob } from '../lib/files';
+import { tzOffsetMinutes } from '../lib/format';
 import type { TripDetail } from '../types';
 import { Sheet } from './Sheet';
 
 type State =
   | { phase: 'idle' }
-  | { phase: 'packing'; done: number; total: number }
+  | { phase: 'building' }
   | { phase: 'saved'; name: string; bytes: number }
   | { phase: 'failed'; message: string };
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function save(html: string, name: string): number {
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  // Revoking while the download is still being handed over cancels it in some
-  // browsers, so let the click settle first.
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  return blob.size;
+/** Every photo the exported page would show. */
+function photoCount(trip: TripDetail): number {
+  return trip.days.reduce(
+    (total, day) =>
+      total + day.visits.reduce((n, visit) => n + visit.images.filter((i) => i.thumb_url).length, 0),
+    0,
+  );
 }
 
 /**
@@ -36,29 +28,32 @@ function save(html: string, name: string): number {
  * to its owner's cookie, so a shareable URL would mean public trips, tokens and
  * unauthenticated image serving. A file is the same itinerary with none of that
  * — and it stays shared with exactly the people it was sent to.
+ *
+ * The page itself is built by the server, which has the photographs on disk and
+ * keeps the finished file until the trip changes. A trip exported twice is
+ * therefore a download and nothing more.
  */
 export function ShareTripSheet({ trip, onClose }: { trip: TripDetail; onClose: () => void }) {
   const [withPhotos, setWithPhotos] = useState(true);
   const [withSpending, setWithSpending] = useState(true);
   const [state, setState] = useState<State>({ phase: 'idle' });
 
-  const photoCount = useMemo(() => exportablePhotos(trip).length, [trip]);
-  const packing = state.phase === 'packing';
+  const photos = useMemo(() => photoCount(trip), [trip]);
+  const building = state.phase === 'building';
 
   async function create() {
-    setState({ phase: 'packing', done: 0, total: withPhotos ? photoCount : 0 });
+    setState({ phase: 'building' });
     try {
-      const photos =
-        withPhotos && photoCount > 0
-          ? await collectTripPhotos(trip, (progress) =>
-              setState({ phase: 'packing', ...progress }),
-            )
-          : new Map<number, string>();
-      const { filename, html } = buildTripExport(trip, {
-        photos,
-        includeSpending: withSpending,
+      const query = new URLSearchParams({
+        photos: String(withPhotos),
+        spending: String(withSpending),
+        tz_offset_minutes: String(tzOffsetMinutes()),
       });
-      setState({ phase: 'saved', name: filename, bytes: save(html, filename) });
+      const response = await apiFetch(`/api/trips/${trip.id}/export.html?${query}`);
+      const blob = await response.blob();
+      const name = downloadFilename(response.headers.get('content-disposition')) ?? 'trip.html';
+      saveBlob(blob, name);
+      setState({ phase: 'saved', name, bytes: blob.size });
     } catch (error) {
       setState({ phase: 'failed', message: error instanceof Error ? error.message : 'Unknown' });
     }
@@ -77,16 +72,16 @@ export function ShareTripSheet({ trip, onClose }: { trip: TripDetail; onClose: (
             <input
               type="checkbox"
               checked={withPhotos}
-              disabled={packing || photoCount === 0}
+              disabled={building || photos === 0}
               onChange={(e) => setWithPhotos(e.target.checked)}
               className="mt-0.5 size-4 shrink-0 accent-brand-600 disabled:opacity-50"
             />
             <span className="min-w-0 text-sm">
               <span className="font-medium text-ink">Include photos</span>
               <span className="block text-xs text-ink-3">
-                {photoCount === 0
+                {photos === 0
                   ? 'No photos on this trip yet'
-                  : `${photoCount} photo${photoCount === 1 ? '' : 's'} travel inside the file, which makes it bigger`}
+                  : `${photos} photo${photos === 1 ? '' : 's'} travel inside the file, which makes it bigger`}
               </span>
             </span>
           </label>
@@ -95,7 +90,7 @@ export function ShareTripSheet({ trip, onClose }: { trip: TripDetail; onClose: (
             <input
               type="checkbox"
               checked={withSpending}
-              disabled={packing}
+              disabled={building}
               onChange={(e) => setWithSpending(e.target.checked)}
               className="mt-0.5 size-4 shrink-0 accent-brand-600 disabled:opacity-50"
             />
@@ -111,15 +106,11 @@ export function ShareTripSheet({ trip, onClose }: { trip: TripDetail; onClose: (
         <button
           type="button"
           onClick={create}
-          disabled={packing}
+          disabled={building}
           className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white active:bg-brand-700 disabled:opacity-50"
         >
-          {packing ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {packing
-            ? state.total > 0
-              ? `Packing photos… ${state.done}/${state.total}`
-              : 'Building the page…'
-            : 'Save the page'}
+          {building ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {building ? 'Building the page…' : 'Save the page'}
         </button>
 
         {state.phase === 'saved' && (
