@@ -26,8 +26,10 @@ from .format import format_day, format_money, format_spend, format_time
 
 ASSETS = Path(__file__).parent / "assets"
 
-# Kept in step with the app's own maplibre-gl — `test_export.py` reads
-# frontend/package-lock.json and fails if the two drift.
+# The maplibre-gl an exported page loads from the CDN. Nothing checks it against
+# the one the app bundles (`frontend/package-lock.json`), so raise it here when
+# that one is raised: a recipient rendering the page with a version the page was
+# never built against is a bug nobody here will see.
 MAPLIBRE_VERSION = "5.24.0"
 MAPLIBRE_JS = f"https://cdn.jsdelivr.net/npm/maplibre-gl@{MAPLIBRE_VERSION}/dist/maplibre-gl.js"
 MAPLIBRE_CSS = f"https://cdn.jsdelivr.net/npm/maplibre-gl@{MAPLIBRE_VERSION}/dist/maplibre-gl.css"

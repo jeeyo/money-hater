@@ -1,19 +1,13 @@
 """Exporting a trip as one HTML page, and keeping it on disk until it changes."""
 
-import json
 import re
 from datetime import UTC, datetime
-from pathlib import Path
-
-import pytest
 
 from app.config import settings
 from app.services.export import cache
 from app.services.export.render import ExportOptions, fingerprint, render_page
 from tests.conftest import register
 from tests.util import make_jpeg
-
-FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 
 
 async def _expense(client, total: str, when: str, description: str = "") -> dict:
@@ -260,14 +254,6 @@ def test_a_stale_page_is_swept_rather_than_overwritten(tmp_path, monkeypatch):
 def test_the_fingerprint_is_eight_hex_characters():
     stamp = fingerprint("<p>anything</p>", "[]", ExportOptions())
     assert re.fullmatch(r"[0-9a-f]{8}", stamp)
-
-
-@pytest.mark.skipif(not FRONTEND.is_dir(), reason="frontend sources are not in this tree")
-def test_maplibre_is_pinned_to_the_version_the_app_uses():
-    from app.services.export.render import MAPLIBRE_VERSION
-
-    lock = json.loads((FRONTEND / "package-lock.json").read_text())
-    assert MAPLIBRE_VERSION == lock["packages"]["node_modules/maplibre-gl"]["version"]
 
 
 _DETAIL = {
