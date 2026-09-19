@@ -13,7 +13,7 @@ for.
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 from pydantic import BaseModel, Field
@@ -50,7 +50,18 @@ class Recommendation(BaseModel):
     )
     event: str | None = Field(
         default=None,
-        description="Anything on there today or tonight, if web search found something",
+        description=(
+            "A one-off thing happening there or nearby on this date — a concert, a parade,"
+            " a festival, a match, an exhibition opening. Not something that runs every day"
+            " or every week: a night market, a regular market or a bar's usual happy hour"
+            " is not an event. Leave it out when nothing like that is on, which is usual."
+        ),
+    )
+    # A plain string rather than a `date`: pydantic would emit "format": "date",
+    # which strict structured outputs reject — a 400 on the whole request.
+    event_date: str | None = Field(
+        default=None,
+        description="The date `event` happens, as YYYY-MM-DD. Required whenever event is set.",
     )
 
 
@@ -70,10 +81,11 @@ Work out for yourself what this time of day calls for — nobody wants a cocktai
 bar at 9am or a breakfast place at 10pm — and search for that. Use find_places to
 get real candidates: pass the Google place types you think fit (for example
 cafe, restaurant, bakery, bar, tourist_attraction, market, museum), or a keyword
-when you want something specific. Use web_search for what is happening locally
-on this date — festivals, night markets, temple fairs, exhibitions — and mention
-it in `event` when a suggestion ties to one. Name the place they are in when you
-search: the search tool is not told where they are, you are.
+when you want something specific. Use web_search for one-off things happening
+around them today — a concert, a parade, a festival, a match, an exhibition
+opening — and name it in `event`, with the day it happens in `event_date`. Name
+the place they are in when you search: the search tool is not told where they
+are, you are.
 
 Rules:
 - Every google_place_id MUST come from a find_places result. Never invent one,
@@ -84,6 +96,10 @@ Rules:
 - Lean on what this trip shows they like: the kinds of places they chose, the
   sort of food they bought, what they spend.
 - 3 to 5 suggestions. Make `why` concrete about this trip, not generic praise.
+- `event` is for something on today that would not be on next week. A night
+  market that opens every evening is a kind of place, not an event — that
+  belongs in `category`. Most suggestions have no event; leave it out.
+- An `event` without today's date in `event_date` is dropped, so date it.
 """
 
 
@@ -252,14 +268,36 @@ def validate(result: Recommendations, offered: dict[str, Place]) -> list[Recomme
     return kept
 
 
-def _card(item: Recommendation, place: Place, anchor: tuple[float, float]) -> dict:
+def event_on(item: Recommendation, today: date) -> str | None:
+    """The event, but only if the model dated it to the day they are having.
+
+    `event` is the one claim on a card that no tool backs: the place comes from
+    Google, the rating comes from Google, and this is whatever the model read.
+    Requiring a date is what makes it checkable at all — an undated "festival
+    on tonight" is indistinguishable from one remembered off a page from 2019,
+    and it shows on the card as a reason to go now.
+    """
+    if not item.event:
+        return None
+    try:
+        when = date.fromisoformat((item.event_date or "").strip())
+    except ValueError:
+        log.warning("Dropping undated event on %s: %r", item.name, item.event_date)
+        return None
+    if when != today:
+        log.info("Dropping event on %s: %s is not today (%s)", item.name, when, today)
+        return None
+    return item.event
+
+
+def _card(item: Recommendation, place: Place, anchor: tuple[float, float], today: date) -> dict:
     raw = place.raw or {}
     return {
         "google_place_id": place.google_place_id,
         "name": place.name,
         "category": item.category,
         "why": item.why,
-        "event": item.event,
+        "event": event_on(item, today),
         "address": place.formatted_address,
         "lat": place.lat,
         "lng": place.lng,
@@ -366,7 +404,12 @@ async def run_recommendation(db: AsyncSession, recommendation_id: int) -> None:
         result, offered = await generate(db, trip, context)
         kept = validate(result, offered)
         row.moment = result.moment
-        row.items = [_card(item, offered[item.google_place_id], context.anchor) for item in kept]
+        # `today` is the traveller's day, not the server's: an event is "on
+        # tonight" where they are standing, which is what the prompt states.
+        today = context.local_now.date()
+        row.items = [
+            _card(item, offered[item.google_place_id], context.anchor, today) for item in kept
+        ]
         row.model = settings.llm_model
         row.status = "ready"
         row.error = None
