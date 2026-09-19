@@ -72,7 +72,8 @@ get real candidates: pass the Google place types you think fit (for example
 cafe, restaurant, bakery, bar, tourist_attraction, market, museum), or a keyword
 when you want something specific. Use web_search for what is happening locally
 on this date — festivals, night markets, temple fairs, exhibitions — and mention
-it in `event` when a suggestion ties to one.
+it in `event` when a suggestion ties to one. Name the place they are in when you
+search: the search tool is not told where they are, you are.
 
 Rules:
 - Every google_place_id MUST come from a find_places result. Never invent one,
@@ -177,7 +178,15 @@ def _candidate_payload(place: Place, anchor: tuple[float, float]) -> dict:
 async def generate(
     db: AsyncSession, trip: Trip, context: TripContext
 ) -> tuple[Recommendations, dict[str, Place]]:
-    """Run the agent. Raises on model failure; the job records that."""
+    """Run the agent. Raises on model failure; the job records that.
+
+    The web search tool is left unlocated on purpose. Its `user_location` takes
+    a city, region, two-letter country and IANA timezone — not coordinates, the
+    one form of "where they are" this app actually has — and anything else in
+    there is a 400 on the whole request, before the model sees a word of the
+    prompt. Where they are is in the prompt instead, by name and to five
+    decimal places, which is what steers the searches.
+    """
     # Imported lazily so the app runs without a key (and tests never touch it)
     from agents import Agent, Runner, WebSearchTool, function_tool
 
@@ -219,13 +228,7 @@ async def generate(
         instructions=INSTRUCTIONS,
         model=settings.llm_model,
         tools=[
-            WebSearchTool(
-                user_location={
-                    "type": "approximate",
-                    "latitude": context.anchor[0],
-                    "longitude": context.anchor[1],
-                }
-            ),
+            WebSearchTool(),
             find_places,
         ],
         output_type=Recommendations,
