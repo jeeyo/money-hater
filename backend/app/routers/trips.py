@@ -259,9 +259,21 @@ async def get_recommendations(
     anchor = await trip_service.latest_visit_in(db, user, window, tz_offset_minutes)
     row = await recommend_service.newest_for_trip(db, trip.id)
     label = visit_label(anchor) if anchor is not None else None
-    if row is None or not recommend_service.is_fresh(
-        row, anchor.id if anchor else None, datetime.now(UTC)
-    ):
+    anchor_id = anchor.id if anchor is not None else None
+    now = datetime.now(UTC)
+    # A run that failed, or one nothing ever came back from, is reported as a
+    # failure rather than hidden: the panel has to be able to say why pressing
+    # the button looked like it did nothing.
+    stalled = (
+        row is not None
+        and row.anchor_visit_id == anchor_id
+        and recommend_service.is_stalled(row, now)
+    )
+    if stalled:
+        return RecommendationsOut(
+            status="failed", anchor_label=label, error=recommend_service.STALLED_ERROR
+        )
+    if row is None or not recommend_service.is_current(row, anchor_id, now):
         return RecommendationsOut(status="none", anchor_label=label)
     return _recommendations_out(row, label)
 

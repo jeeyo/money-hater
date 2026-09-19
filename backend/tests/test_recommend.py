@@ -433,23 +433,91 @@ async def test_moving_on_invalidates_the_set(client, db_sessionmaker, monkeypatc
     assert body["status"] == "none"
 
 
+async def _failed_run(client, db_sessionmaker, monkeypatch, trip):
+    async def boom(agent, input):  # noqa: A002 - matches the SDK's signature
+        raise RuntimeError("model is down")
+
+    monkeypatch.setattr("agents.Runner.run", boom)
+    await client.post(f"/api/trips/{trip['id']}/recommendations")
+    await _run_pending_job(db_sessionmaker)
+
+
 async def test_a_failed_run_is_recorded_not_swallowed(client, db_sessionmaker, monkeypatch):
     await register(client)
     await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
     trip = await _open_trip(client)
 
-    async def boom(agent, input):  # noqa: A002 - matches the SDK's signature
-        raise RuntimeError("model is down")
-
-    monkeypatch.setattr("agents.Runner.run", boom)
-
-    await client.post(f"/api/trips/{trip['id']}/recommendations")
-    await _run_pending_job(db_sessionmaker)
+    await _failed_run(client, db_sessionmaker, monkeypatch, trip)
 
     async with db_sessionmaker() as db:
         row = await db.scalar(sa.select(TripRecommendation))
         assert row.status == "failed"
         assert "model is down" in row.error
+
+    # And the panel is told, rather than dropping back to the button as though
+    # nothing had happened — which reads as a button that does nothing at all.
+    body = (await client.get(f"/api/trips/{trip['id']}/recommendations")).json()
+    assert body["status"] == "failed"
+    assert "model is down" in body["error"]
+
+
+async def test_a_failure_can_be_tried_again(
+    client, db_sessionmaker, monkeypatch, in_memory_queue
+):
+    """Showing the error must not also mean serving it back instead of a retry."""
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+    await _failed_run(client, db_sessionmaker, monkeypatch, trip)
+
+    before = len(in_memory_queue.jobs)
+    again = await client.post(f"/api/trips/{trip['id']}/recommendations")
+    assert again.json()["status"] == "pending"
+    assert len(in_memory_queue.jobs) == before + 1
+
+
+async def test_an_old_failure_is_not_still_on_screen(client, db_sessionmaker, monkeypatch):
+    """An error is worth showing while it is news, not for the rest of the day."""
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+    await _failed_run(client, db_sessionmaker, monkeypatch, trip)
+
+    async with db_sessionmaker() as db:
+        row = await db.scalar(sa.select(TripRecommendation))
+        row.generated_at = datetime.now(UTC) - recommend_mod.FAILURE_SHOWN_FOR - timedelta(
+            minutes=1
+        )
+        await db.commit()
+
+    body = (await client.get(f"/api/trips/{trip['id']}/recommendations")).json()
+    assert body["status"] == "none"
+
+
+async def test_a_run_nothing_comes_back_from_stops_spinning(
+    client, db_sessionmaker, in_memory_queue
+):
+    """No worker, so the row stays pending: don't skeleton at them forever."""
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+    await client.post(f"/api/trips/{trip['id']}/recommendations")
+
+    async with db_sessionmaker() as db:
+        row = await db.scalar(sa.select(TripRecommendation))
+        assert row.status == "pending"
+        row.generated_at = datetime.now(UTC) - recommend_mod.STALLED_AFTER - timedelta(minutes=1)
+        await db.commit()
+
+    body = (await client.get(f"/api/trips/{trip['id']}/recommendations")).json()
+    assert body["status"] == "failed"
+    assert body["error"] == recommend_mod.STALLED_ERROR
+
+    # ...and the button works again, rather than handing back the stuck row
+    before = len(in_memory_queue.jobs)
+    again = await client.post(f"/api/trips/{trip['id']}/recommendations")
+    assert again.json()["status"] == "pending"
+    assert len(in_memory_queue.jobs) == before + 1
 
 
 async def test_recommendations_are_user_scoped(client, db_sessionmaker):
