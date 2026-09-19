@@ -1,6 +1,6 @@
 import { Check, Download, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { buildTripHtml, exportablePhotos, tripExportFilename } from '../lib/tripExport';
+import { buildTripExport, exportablePhotos } from '../lib/tripExport';
 import { collectTripPhotos } from '../lib/tripPhotos';
 import type { TripDetail } from '../types';
 import { Sheet } from './Sheet';
@@ -54,9 +54,11 @@ export function ShareTripSheet({ trip, onClose }: { trip: TripDetail; onClose: (
               setState({ phase: 'packing', ...progress }),
             )
           : new Map<number, string>();
-      const name = tripExportFilename(trip);
-      const html = buildTripHtml(trip, { photos, includeSpending: withSpending });
-      setState({ phase: 'saved', name, bytes: save(html, name) });
+      const { filename, html } = buildTripExport(trip, {
+        photos,
+        includeSpending: withSpending,
+      });
+      setState({ phase: 'saved', name: filename, bytes: save(html, filename) });
     } catch (error) {
       setState({ phase: 'failed', message: error instanceof Error ? error.message : 'Unknown' });
     }

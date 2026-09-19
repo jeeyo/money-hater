@@ -2,12 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Expense, ImageRecord, TripDay, TripDetail, Visit } from '../types';
 import { DAY_HUES } from './dayColors';
-import {
-  EXPORT_MAPLIBRE_VERSION,
-  buildTripHtml,
-  exportablePhotos,
-  tripExportFilename,
-} from './tripExport';
+import { EXPORT_MAPLIBRE_VERSION, buildTripExport, exportablePhotos } from './tripExport';
 
 const PIXEL = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
 
@@ -107,8 +102,10 @@ function trip(overrides: Partial<TripDetail> = {}): TripDetail {
   };
 }
 
-function render(detail: TripDetail, options: Partial<Parameters<typeof buildTripHtml>[1]> = {}) {
-  return buildTripHtml(detail, {
+type Options = Parameters<typeof buildTripExport>[1];
+
+function exported(detail: TripDetail, options: Partial<Options> = {}) {
+  return buildTripExport(detail, {
     photos: new Map(),
     includeSpending: true,
     exportedAt: new Date('2026-09-19T00:00:00Z'),
@@ -116,7 +113,11 @@ function render(detail: TripDetail, options: Partial<Parameters<typeof buildTrip
   });
 }
 
-describe('buildTripHtml', () => {
+function render(detail: TripDetail, options: Partial<Options> = {}) {
+  return exported(detail, options).html;
+}
+
+describe('buildTripExport', () => {
   it('carries the trip over: title, range, stops and times', () => {
     const html = render(trip());
     expect(html).toContain('<title>Bangkok</title>');
@@ -216,16 +217,67 @@ describe('buildTripHtml', () => {
   });
 });
 
-describe('tripExportFilename', () => {
-  it('slugifies the title and dates the file', () => {
-    expect(tripExportFilename(trip())).toBe('bangkok-2026-08-01.html');
-    expect(tripExportFilename(trip({ title: 'Chiang Mai & back!' }))).toBe(
-      'chiang-mai-back-2026-08-01.html',
+describe('the filename', () => {
+  const stamp = /-[0-9a-f]{8}\.html$/;
+
+  it('slugifies the title, dates the file and stamps the contents', () => {
+    expect(exported(trip()).filename).toMatch(/^bangkok-2026-08-01-[0-9a-f]{8}\.html$/);
+    expect(exported(trip({ title: 'Chiang Mai & back!' })).filename).toMatch(
+      /^chiang-mai-back-2026-08-01-[0-9a-f]{8}\.html$/,
     );
   });
 
   it('falls back when the title has nothing to slugify', () => {
-    expect(tripExportFilename(trip({ title: '🎌' }))).toBe('trip-2026-08-01.html');
+    expect(exported(trip({ title: '🎌' })).filename).toMatch(/^trip-2026-08-01-/);
+    expect(exported(trip({ title: '🎌' })).filename).toMatch(stamp);
+  });
+});
+
+describe('the fingerprint', () => {
+  it('is the same for the same trip, so a re-export overwrites rather than piles up', () => {
+    // A later export of an unchanged trip, on a different day
+    const again = exported(trip(), { exportedAt: new Date('2026-12-25T00:00:00Z') });
+    expect(again.filename).toBe(exported(trip()).filename);
+    expect(again.html).not.toBe(exported(trip()).html); // the footer's date did move
+  });
+
+  it('moves when anything the page shows moves', () => {
+    const base = exported(trip()).fingerprint;
+    const renamed = exported(
+      trip({ days: [day('2026-08-01', { visits: [visit({ label: 'Wat Arun' })] })] }),
+    ).fingerprint;
+    const moved = exported(
+      trip({ days: [day('2026-08-01', { visits: [visit({ lat: 13.7437 })] })] }),
+    ).fingerprint;
+    const priced = exported(
+      trip({ days: [day('2026-08-01', { visits: [visit({ spend: spend(9900) })] })] }),
+    ).fingerprint;
+
+    expect(new Set([base, renamed, moved, priced]).size).toBe(4);
+  });
+
+  it('tells the itinerary-only page apart from the full one', () => {
+    const detail = trip({
+      days: [day('2026-08-01', { visits: [visit({ spend: spend(12000) })] })],
+    });
+    expect(exported(detail, { includeSpending: false }).fingerprint).not.toBe(
+      exported(detail).fingerprint,
+    );
+  });
+
+  it('follows the photos that are in the file, not the bytes they encoded to', () => {
+    const detail = trip({
+      days: [day('2026-08-01', { visits: [visit({ images: [image(11)] })] })],
+    });
+    const withPhoto = exported(detail, { photos: new Map([[11, PIXEL]]) });
+    // The same photo, re-encoded by another browser to different bytes
+    const reEncoded = exported(detail, {
+      photos: new Map([[11, `${PIXEL}AAAAdifferentbytes`]]),
+    });
+    const without = exported(detail);
+
+    expect(reEncoded.fingerprint).toBe(withPhoto.fingerprint);
+    expect(without.fingerprint).not.toBe(withPhoto.fingerprint);
   });
 });
 

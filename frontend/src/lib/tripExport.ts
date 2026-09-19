@@ -17,6 +17,15 @@ import { DARK_BASEMAP_PAINT, OSM_STYLE } from './basemap';
 import { dayColor, dayDash } from './dayColors';
 import { formatDay, formatMoney, formatSpend, formatTime, isOpenTrip } from './format';
 
+/**
+ * Bumped whenever this file changes the page in a way a reader would notice.
+ *
+ * The filename's fingerprint covers the trip's content; this covers the template
+ * around it, so a page rebuilt by a newer version of the app cannot land under a
+ * name that already means something else.
+ */
+export const EXPORT_FORMAT_VERSION = 1;
+
 /** Kept in step with the app's own maplibre-gl — `tripExport.test.ts` fails if it drifts. */
 export const EXPORT_MAPLIBRE_VERSION = '5.24.0';
 
@@ -100,7 +109,7 @@ function headingColors(trip: TripDetail, plotted: ExportMapDay[]): (string | nul
 function photoTag(image: ImageRecord, src: string): string {
   const caption = image.analysis?.caption ?? 'photo';
   return [
-    '<button type="button" class="photo">',
+    `<button type="button" class="photo" data-image-id="${image.id}">`,
     `<img src="${src}" alt="${esc(caption)}" loading="lazy">`,
     '</button>',
   ].join('');
@@ -449,9 +458,9 @@ h1 { margin: 0; font-size: 22px; line-height: 1.25; }
 `;
 
 /** The page's only script: the map, and tap-to-enlarge on a photo. */
-function pageScript(days: ExportMapDay[]): string {
+function pageScript(mapJson: string): string {
   return `
-const DAYS = ${jsonLiteral(days)};
+const DAYS = ${mapJson};
 const STYLE = ${jsonLiteral(OSM_STYLE)};
 const DARK_PAINT = ${jsonLiteral(DARK_BASEMAP_PAINT)};
 const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -538,17 +547,76 @@ document.addEventListener('keydown', function (event) {
 `;
 }
 
-/** The whole trip as one self-contained HTML document. */
-export function buildTripHtml(trip: TripDetail, options: TripExportOptions): string {
+/**
+ * What the file is named after.
+ *
+ * A trip has no version to read — no `updated_at` anywhere, and its contents are
+ * whatever visits and expenses fall inside its window — so the only honest
+ * answer to "is this the same trip as last time" is to fingerprint what the page
+ * ends up saying. That is exactly what goes in: the rendered markup and the map's
+ * own data, minus two things.
+ *
+ * Photo bytes come out, replaced by the ids that produced them: a JPEG encoder
+ * differs between browsers and browser versions, the trip does not, and a stored
+ * image's file never changes under its id. The footer's export date is not in
+ * here at all — it is the one part of the page that moves on its own.
+ *
+ * The toggles and `EXPORT_FORMAT_VERSION` go in because both change the document
+ * without changing the trip: an itinerary-only page is not the same page, and
+ * neither is one built by a later version of this file.
+ */
+function fingerprintInput(content: string, mapJson: string, options: TripExportOptions): string {
+  return [
+    `v${EXPORT_FORMAT_VERSION}`,
+    options.includeSpending ? 'spending' : 'no-spending',
+    content.replace(/ src="data:[^"]*"/g, ''),
+    mapJson,
+  ].join('\n');
+}
+
+/**
+ * FNV-1a, 32 bits, as eight hex characters.
+ *
+ * Not `crypto.subtle`: it is undefined outside a secure context, and this app is
+ * self-hosted — over plain http on a LAN the export would crash on it. Nothing
+ * here is a security boundary; the hash only has to tell two versions of one
+ * trip apart in a filename, and it has to be synchronous to keep the builder
+ * pure.
+ */
+function fingerprint(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    // The FNV prime, by shifts: `hash * 16777619` overflows a double's exact
+    // integer range and would round.
+    hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+export interface TripExport {
+  /** Includes the fingerprint: the same trip, exported twice, overwrites itself. */
+  filename: string;
+  fingerprint: string;
+  html: string;
+}
+
+/** The whole trip as one self-contained HTML document, and what to call it. */
+export function buildTripExport(trip: TripDetail, options: TripExportOptions): TripExport {
   const days = mapDays(trip);
+  const mapJson = jsonLiteral(days);
   const colors = headingColors(trip, days);
   const exportedAt = options.exportedAt ?? new Date();
   const sections =
     trip.days.length > 0
       ? trip.days.map((_, index) => daySection(trip, index, options, colors[index])).join('')
       : '<p class="empty">Nothing was logged on this trip.</p>';
+  const content = `${header(trip, options)}
+${days.length > 0 ? `<div id="map"></div>${legend(days)}` : ''}
+${sections}`;
+  const stamp = fingerprint(fingerprintInput(content, mapJson, options));
 
-  return `<!doctype html>
+  const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -560,30 +628,31 @@ export function buildTripHtml(trip: TripDetail, options: TripExportOptions): str
 </head>
 <body>
 <main class="page">
-${header(trip, options)}
-${days.length > 0 ? `<div id="map"></div>${legend(days)}` : ''}
-${sections}
+${content}
 <footer class="foot">
 Made with Money Hater · ${esc(formatDay(exportedAt.toISOString()))} · map tiles © OpenStreetMap contributors
 </footer>
 </main>
 <div class="lightbox" id="lightbox" hidden><img alt=""></div>
 <script src="${MAPLIBRE_JS}"></script>
-<script>${pageScript(days)}</script>
+<script>${pageScript(mapJson)}</script>
 </body>
 </html>
 `;
+
+  return { filename: filenameFor(trip, stamp), fingerprint: stamp, html };
 }
 
-/** "bangkok-2026-08-01.html" — the title, or the date alone if it has no letters. */
-export function tripExportFilename(trip: TripDetail): string {
+/** "bangkok-2026-08-01-3f9c1a07.html" — the title, the day it started, and the
+ *  fingerprint of what is inside. Untitled trips fall back to the date alone. */
+function filenameFor(trip: TripDetail, stamp: string): string {
   const slug = trip.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
   const start = trip.started_at.slice(0, 10);
-  return `${slug ? `${slug}-${start}` : `trip-${start}`}.html`;
+  return `${slug || 'trip'}-${start}-${stamp}.html`;
 }
 
 /** Every photo the page would show, in the order it shows them. */
