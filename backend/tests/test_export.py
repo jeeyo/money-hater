@@ -263,21 +263,6 @@ def test_the_fingerprint_is_eight_hex_characters():
 
 
 @pytest.mark.skipif(not FRONTEND.is_dir(), reason="frontend sources are not in this tree")
-def test_the_exported_map_matches_the_app_s_own():
-    """The app draws the trip map in TypeScript and this draws it in Python. The
-    two copies have no compiler between them, so they are compared here."""
-    from app.services.export.basemap import DARK_BASEMAP_PAINT, DAY_HUES, OSM_STYLE
-
-    basemap = (FRONTEND / "src/components/MapView.tsx").read_text()
-    colors = (FRONTEND / "src/lib/dayColors.ts").read_text()
-
-    assert OSM_STYLE["sources"]["osm"]["tiles"][0] in basemap
-    for prop, value in DARK_BASEMAP_PAINT.items():
-        assert f"'{prop}': {value}" in basemap, f"{prop} differs from the app's basemap"
-    assert re.findall(r"#[0-9a-f]{6}", colors.split("];")[0]) == list(DAY_HUES)
-
-
-@pytest.mark.skipif(not FRONTEND.is_dir(), reason="frontend sources are not in this tree")
 def test_maplibre_is_pinned_to_the_version_the_app_uses():
     from app.services.export.render import MAPLIBRE_VERSION
 

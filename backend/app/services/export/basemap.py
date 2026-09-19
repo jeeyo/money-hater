@@ -1,8 +1,14 @@
 """The basemap and the day palette the exported map draws with.
 
-Both are ports of the frontend's `lib/basemap.ts` and `lib/dayColors.ts`, so an
-exported page and the app's own trip map read the same. `test_export.py` checks
-the two copies against each other rather than trusting that they stayed in step.
+Both are ports of what the app itself uses — the style and dark paint inside
+`frontend/src/components/MapView.tsx`, the hues and dashes in
+`frontend/src/lib/dayColors.ts` — so that a trip someone opens from a file reads
+the same as the one its sender is looking at.
+
+Nothing enforces that. There is no compiler between the two copies and no test
+comparing them, so changing a colour, a dash pattern or the tile server here
+means changing it there in the same commit; miss one and the two maps drift
+apart quietly, without either of them looking broken.
 """
 
 # Raster OSM tiles, no API key, no server of ours: a page holding this style
