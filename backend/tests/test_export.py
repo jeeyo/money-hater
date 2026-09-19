@@ -268,7 +268,7 @@ def test_the_exported_map_matches_the_app_s_own():
     two copies have no compiler between them, so they are compared here."""
     from app.services.export.basemap import DARK_BASEMAP_PAINT, DAY_HUES, OSM_STYLE
 
-    basemap = (FRONTEND / "src/lib/basemap.ts").read_text()
+    basemap = (FRONTEND / "src/components/MapView.tsx").read_text()
     colors = (FRONTEND / "src/lib/dayColors.ts").read_text()
 
     assert OSM_STYLE["sources"]["osm"]["tiles"][0] in basemap
