@@ -107,6 +107,10 @@ export interface TripDay {
 export interface TripDetail extends Trip {
   days: TripDay[];
   expenses: Expense[];
+  /** How many photos an export of this trip would carry. Not `image_count`:
+   *  what goes into the exported page is the server's rule, and a photo still
+   *  being analyzed has no thumbnail to put in it. */
+  export_photo_count: number;
 }
 
 export interface Recommendation {

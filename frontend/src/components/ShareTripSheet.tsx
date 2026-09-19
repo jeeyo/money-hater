@@ -1,5 +1,5 @@
 import { Check, Download, Loader2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { downloadFilename, formatBytes, saveBlob } from '../lib/files';
 import { tzOffsetMinutes } from '../lib/format';
@@ -11,15 +11,6 @@ type State =
   | { phase: 'building' }
   | { phase: 'saved'; name: string; bytes: number }
   | { phase: 'failed'; message: string };
-
-/** Every photo the exported page would show. */
-function photoCount(trip: TripDetail): number {
-  return trip.days.reduce(
-    (total, day) =>
-      total + day.visits.reduce((n, visit) => n + visit.images.filter((i) => i.thumb_url).length, 0),
-    0,
-  );
-}
 
 /**
  * Save the trip as one HTML file to send to someone.
@@ -38,7 +29,8 @@ export function ShareTripSheet({ trip, onClose }: { trip: TripDetail; onClose: (
   const [withSpending, setWithSpending] = useState(true);
   const [state, setState] = useState<State>({ phase: 'idle' });
 
-  const photos = useMemo(() => photoCount(trip), [trip]);
+  // Counted by the server, which is what decides the file's contents
+  const photos = trip.export_photo_count;
   const building = state.phase === 'building';
 
   async function create() {

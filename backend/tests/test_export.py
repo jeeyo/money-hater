@@ -146,6 +146,27 @@ async def test_photos_travel_inside_the_file(client, db_sessionmaker):
     assert "data:image/jpeg;base64," not in without.text
 
 
+async def test_the_trip_says_how_many_photos_its_export_would_carry(client, db_sessionmaker):
+    """The share sheet tells the user what they are about to download, and what
+    goes in the file is this side's rule — a photo still being analyzed has no
+    thumbnail, so `image_count` is the wrong number to have shown."""
+    await register(client)
+    await _photo(client, db_sessionmaker, datetime(2026, 9, 12, 10, 15))
+    unanalyzed = make_jpeg(18.79, 98.98, taken_at=datetime(2026, 9, 12, 12, 0))
+    pending = await client.post(
+        "/api/images", files=[("files", ("b.jpg", unanalyzed, "image/jpeg"))]
+    )
+    assert pending.status_code == 201, pending.text
+    trip = await _trip(client)
+
+    detail = (await client.get(f"/api/trips/{trip['id']}")).json()
+    export = (await _export(client, trip["id"])).text
+
+    assert detail["export_photo_count"] == 1
+    assert detail["image_count"] == 1  # the un-analyzed one is in no stop yet
+    assert export.count("data:image/jpeg;base64,") == detail["export_photo_count"]
+
+
 async def test_a_deleted_trip_takes_its_pages_with_it(client):
     await register(client)
     trip = await _trip(client)
@@ -267,6 +288,7 @@ def test_maplibre_is_pinned_to_the_version_the_app_uses():
 _DETAIL = {
     "id": 7,
     "title": "Chiang Mai weekend",
+    "export_photo_count": 1,
     "note": None,
     "start_expense_id": 1,
     "end_expense_id": 2,

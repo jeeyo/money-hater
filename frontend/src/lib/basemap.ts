@@ -1,13 +1,13 @@
 /**
  * The basemap the app draws every route on.
  *
- * Lives here rather than in MapView because the trip export builds a standalone
- * page with the same map in it (see `tripExport.ts`), and that page is written
- * by code that must not pull maplibre-gl into the bundle — hence the type-only
- * import below, which compiles away entirely.
- *
  * Raster OSM tiles, no API key, no server of ours: whatever renders this style
  * needs nothing but the viewer's internet.
+ *
+ * Its twin lives in `backend/app/services/export/basemap.py`, which draws the
+ * map in an exported trip page. Nothing compiles the two together, so
+ * `test_export.py` reads this file and fails if they drift — keep the literals
+ * here simple enough to be read by eye, and change both at once.
  */
 import type { StyleSpecification } from 'maplibre-gl';
 
