@@ -121,6 +121,7 @@ def _stub_agent(monkeypatch, db_sessionmaker, items, *, offered=(("rec-1", "Kopi
         from agents.tool_context import ToolContext
 
         captured["prompt"] = input
+        captured["agent"] = agent
         captured["tools"] = [type(tool).__name__ for tool in agent.tools]
         # Call the tool the way the model would, so `offered` gets populated
         for tool in agent.tools:
@@ -244,6 +245,68 @@ async def test_the_prompt_carries_the_local_time_the_stops_and_the_spending(
     assert trip["title"] in prompt
     # Both tools are on the agent: hosted web search and our places lookup
     assert "WebSearchTool" in captured["tools"]
+
+
+async def test_web_search_is_configured_the_way_the_api_accepts(
+    client, db_sessionmaker, monkeypatch
+):
+    """A key the Responses API does not know is a 400 on the whole request.
+
+    Not a bad suggestion — no suggestion: it is rejected before the model reads
+    the prompt, so every run fails and the panel only ever shows the error.
+    `user_location` is the trap, because it sounds like it should take the
+    coordinates we have and instead takes a city, region, country and timezone.
+    """
+    from agents import WebSearchTool
+    from openai.types.responses.web_search_tool_param import UserLocation
+
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+
+    captured = _stub_agent(
+        monkeypatch,
+        db_sessionmaker,
+        Recommendations(
+            moment="afternoon",
+            items=[
+                Recommendation(
+                    google_place_id="rec-1", name="Kopi Corner", category="coffee", why="Close."
+                )
+            ],
+        ),
+    )
+    await client.post(f"/api/trips/{trip['id']}/recommendations")
+    await _run_pending_job(db_sessionmaker)
+
+    (search,) = [tool for tool in captured["agent"].tools if isinstance(tool, WebSearchTool)]
+    unknown = set(search.user_location or {}) - set(UserLocation.__annotations__)
+    assert not unknown, f"the Responses API rejects these: {sorted(unknown)}"
+
+
+async def test_the_prompt_is_what_localises_the_search(client, db_sessionmaker, monkeypatch):
+    """With the tool unlocated, the prompt has to carry where they are."""
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+
+    captured = _stub_agent(
+        monkeypatch,
+        db_sessionmaker,
+        Recommendations(
+            moment="afternoon",
+            items=[
+                Recommendation(
+                    google_place_id="rec-1", name="Kopi Corner", category="coffee", why="Close."
+                )
+            ],
+        ),
+    )
+    await client.post(f"/api/trips/{trip['id']}/recommendations")
+    await _run_pending_job(db_sessionmaker)
+
+    assert "13.74650, 100.49300" in captured["prompt"]
+    assert "A stop" in captured["prompt"]  # the label of the stop they are at
 
 
 async def test_a_ready_set_is_stored_and_served(client, db_sessionmaker, monkeypatch):
