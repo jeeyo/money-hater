@@ -218,27 +218,49 @@ describe('buildTripExport', () => {
 });
 
 describe('the filename', () => {
-  const stamp = /-[0-9a-f]{8}\.html$/;
-
-  it('slugifies the title, dates the file and stamps the contents', () => {
-    expect(exported(trip()).filename).toMatch(/^bangkok-2026-08-01-[0-9a-f]{8}\.html$/);
-    expect(exported(trip({ title: 'Chiang Mai & back!' })).filename).toMatch(
-      /^chiang-mai-back-2026-08-01-[0-9a-f]{8}\.html$/,
+  it('slugifies the title and dates the file', () => {
+    expect(exported(trip()).filename).toBe('bangkok-2026-08-01.html');
+    expect(exported(trip({ title: 'Chiang Mai & back!' })).filename).toBe(
+      'chiang-mai-back-2026-08-01.html',
     );
   });
 
   it('falls back when the title has nothing to slugify', () => {
-    expect(exported(trip({ title: '🎌' })).filename).toMatch(/^trip-2026-08-01-/);
-    expect(exported(trip({ title: '🎌' })).filename).toMatch(stamp);
+    expect(exported(trip({ title: '🎌' })).filename).toBe('trip-2026-08-01.html');
+  });
+
+  it('names one trip one file, however much the trip has changed', () => {
+    const changed = trip({
+      days: [day('2026-08-01', { visits: [visit({ label: 'Wat Arun', spend: spend(9900) })] })],
+    });
+    expect(exported(changed).filename).toBe(exported(trip()).filename);
+    // …which is exactly why the version has to be inside the page
+    expect(exported(changed).fingerprint).not.toBe(exported(trip()).fingerprint);
   });
 });
 
 describe('the fingerprint', () => {
-  it('is the same for the same trip, so a re-export overwrites rather than piles up', () => {
+  it('is the same for the same trip, however long after it was first exported', () => {
     // A later export of an unchanged trip, on a different day
     const again = exported(trip(), { exportedAt: new Date('2026-12-25T00:00:00Z') });
-    expect(again.filename).toBe(exported(trip()).filename);
+    expect(again.fingerprint).toBe(exported(trip()).fingerprint);
     expect(again.html).not.toBe(exported(trip()).html); // the footer's date did move
+  });
+
+  it('rides in the page, where renaming the file cannot lose it', () => {
+    const { html, fingerprint } = exported(trip());
+    expect(html).toContain(`<meta name="trip-fingerprint" content="${fingerprint}">`);
+    expect(html).toContain(`<meta name="trip-exported" content="2026-09-19">`);
+    // …and where someone can read it off the page without View Source
+    expect(html).toContain(`<span class="stamp">${fingerprint}</span>`);
+  });
+
+  it('is not taken over the footer that carries it', () => {
+    // Otherwise the stamp would be part of its own input, and the export date
+    // beside it would move the version of an unchanged trip.
+    const early = exported(trip(), { exportedAt: new Date('2026-09-19T00:00:00Z') });
+    const late = exported(trip(), { exportedAt: new Date('2027-01-01T00:00:00Z') });
+    expect(late.fingerprint).toBe(early.fingerprint);
   });
 
   it('moves when anything the page shows moves', () => {

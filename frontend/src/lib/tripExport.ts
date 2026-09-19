@@ -20,9 +20,9 @@ import { formatDay, formatMoney, formatSpend, formatTime, isOpenTrip } from './f
 /**
  * Bumped whenever this file changes the page in a way a reader would notice.
  *
- * The filename's fingerprint covers the trip's content; this covers the template
- * around it, so a page rebuilt by a newer version of the app cannot land under a
- * name that already means something else.
+ * The fingerprint covers the trip's content; this covers the template around it,
+ * so two copies that differ only because one was built by a later version of the
+ * app do not claim to be the same version of the trip.
  */
 export const EXPORT_FORMAT_VERSION = 1;
 
@@ -437,6 +437,7 @@ h1 { margin: 0; font-size: 22px; line-height: 1.25; }
   font-size: 14px;
 }
 .foot { margin-top: 32px; text-align: center; color: var(--ink-4); font-size: 12px; }
+.stamp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .lightbox {
   position: fixed;
   inset: 0;
@@ -548,7 +549,7 @@ document.addEventListener('keydown', function (event) {
 }
 
 /**
- * What the file is named after.
+ * What the page's fingerprint is taken over.
  *
  * A trip has no version to read — no `updated_at` anywhere, and its contents are
  * whatever visits and expenses fall inside its window — so the only honest
@@ -595,8 +596,9 @@ function fingerprint(input: string): string {
 }
 
 export interface TripExport {
-  /** Includes the fingerprint: the same trip, exported twice, overwrites itself. */
+  /** Named for the trip alone, so re-exporting replaces the copy you had. */
   filename: string;
+  /** Which version of the trip this is — also in the page's head and footer. */
   fingerprint: string;
   html: string;
 }
@@ -623,6 +625,11 @@ ${sections}`;
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(trip.title)}</title>
 <meta name="description" content="${esc(`${trip.title} — ${rangeLine(trip)}`)}">
+<meta name="generator" content="Money Hater">
+<!-- Which version of the trip this page is, and when it was taken. The name of
+     the file says only which trip, and a file gets renamed; these do not. -->
+<meta name="trip-fingerprint" content="${stamp}">
+<meta name="trip-exported" content="${exportedAt.toISOString().slice(0, 10)}">
 <link rel="stylesheet" href="${MAPLIBRE_CSS}">
 <style>${STYLES}</style>
 </head>
@@ -630,7 +637,8 @@ ${sections}`;
 <main class="page">
 ${content}
 <footer class="foot">
-Made with Money Hater · ${esc(formatDay(exportedAt.toISOString()))} · map tiles © OpenStreetMap contributors
+Made with Money Hater · ${esc(formatDay(exportedAt.toISOString()))} · version
+<span class="stamp">${stamp}</span> · map tiles © OpenStreetMap contributors
 </footer>
 </main>
 <div class="lightbox" id="lightbox" hidden><img alt=""></div>
@@ -640,19 +648,26 @@ Made with Money Hater · ${esc(formatDay(exportedAt.toISOString()))} · map tile
 </html>
 `;
 
-  return { filename: filenameFor(trip, stamp), fingerprint: stamp, html };
+  return { filename: filenameFor(trip), fingerprint: stamp, html };
 }
 
-/** "bangkok-2026-08-01-3f9c1a07.html" — the title, the day it started, and the
- *  fingerprint of what is inside. Untitled trips fall back to the date alone. */
-function filenameFor(trip: TripDetail, stamp: string): string {
+/**
+ * "bangkok-2026-08-01.html" — the trip, and nothing about this export of it.
+ *
+ * One trip is one file: exporting it again, changed or not, replaces the copy
+ * you already had rather than leaving "(1)" beside it. Which version a given
+ * copy is, is a question for the fingerprint in its head and footer — the name
+ * answers "which trip", and it has to keep answering that after someone renames
+ * the file anyway.
+ */
+function filenameFor(trip: TripDetail): string {
   const slug = trip.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
   const start = trip.started_at.slice(0, 10);
-  return `${slug || 'trip'}-${start}-${stamp}.html`;
+  return `${slug || 'trip'}-${start}.html`;
 }
 
 /** Every photo the page would show, in the order it shows them. */
