@@ -1,6 +1,7 @@
 import maplibregl from 'maplibre-gl';
 import { useEffect, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { DARK_BASEMAP_PAINT, OSM_STYLE } from '../lib/basemap';
 import { dayColor, dayDash } from '../lib/dayColors';
 
 export interface MapPoint {
@@ -14,27 +15,6 @@ export interface MapDay {
   label: string;
   points: MapPoint[];
 }
-
-const OSM_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-};
-
-/** Dim and desaturate the light OSM raster so it sits under a dark page.
- *  Applied to the tile layer only, so the day routes keep their exact colours. */
-const DARK_BASEMAP_PAINT = {
-  'raster-brightness-max': 0.3,
-  'raster-saturation': -0.45,
-  'raster-contrast': -0.1,
-} as const;
 
 function marker(color: string, text: string): HTMLElement {
   const el = document.createElement('div');
@@ -89,7 +69,7 @@ export function MapView({ days, className }: { days: MapDay[]; className?: strin
 
     // 'style.load', not 'load': the latter also waits for the basemap tiles to
     // arrive, so a slow or unreachable tile server holds back the routes — they
-    // need only the style, which is the inline object above.
+    // need only the style, which is the inline object in `lib/basemap`.
     map.on('style.load', () => {
       if (dark) {
         for (const [property, value] of Object.entries(DARK_BASEMAP_PAINT)) {
