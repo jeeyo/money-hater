@@ -1,6 +1,6 @@
 """Suggestions for the trip you are on: only when open, cached, never invented."""
 
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
 import sqlalchemy as sa
@@ -325,7 +325,8 @@ async def test_a_ready_set_is_stored_and_served(client, db_sessionmaker, monkeyp
                     name="Kopi Corner",
                     category="coffee",
                     why="Two minutes from where you are.",
-                    event="Night market on tonight",
+                    event="Jazz trio playing from 8pm",
+                    event_date=datetime.now(UTC).date().isoformat(),
                 )
             ],
         ),
@@ -340,13 +341,119 @@ async def test_a_ready_set_is_stored_and_served(client, db_sessionmaker, monkeyp
     (card,) = body["items"]
     assert card["name"] == "Kopi Corner"
     assert card["why"].startswith("Two minutes")
-    assert card["event"] == "Night market on tonight"
+    assert card["event"] == "Jazz trio playing from 8pm"
     assert card["rating"] == 4.5
     assert card["distance_m"] >= 0
 
     async with db_sessionmaker() as db:
         row = await db.scalar(sa.select(TripRecommendation))
         assert row.model == settings.llm_model
+
+
+async def _one_suggestion(client, db_sessionmaker, monkeypatch, trip, **event_fields):
+    """Run the agent with a single suggestion, carrying whatever event is passed."""
+    _stub_agent(
+        monkeypatch,
+        db_sessionmaker,
+        Recommendations(
+            moment="evening",
+            items=[
+                Recommendation(
+                    google_place_id="rec-1",
+                    name="Kopi Corner",
+                    category="coffee",
+                    why="Close.",
+                    **event_fields,
+                )
+            ],
+        ),
+    )
+    await client.post(
+        f"/api/trips/{trip['id']}/recommendations", params={"tz_offset_minutes": 420}
+    )
+    await _run_pending_job(db_sessionmaker)
+    body = (await client.get(
+        f"/api/trips/{trip['id']}/recommendations", params={"tz_offset_minutes": 420}
+    )).json()
+    (card,) = body["items"]
+    return card
+
+
+def _their_today() -> date:
+    """The traveller's date, which is the one an event is measured against."""
+    return (datetime.now(UTC) + timedelta(minutes=420)).date()
+
+
+async def test_an_event_on_today_is_kept(client, db_sessionmaker, monkeypatch):
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+
+    card = await _one_suggestion(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        trip,
+        event="Loi Krathong parade passes at 8pm",
+        event_date=_their_today().isoformat(),
+    )
+    assert card["event"] == "Loi Krathong parade passes at 8pm"
+
+
+async def test_an_event_on_another_day_is_dropped(client, db_sessionmaker, monkeypatch):
+    """The card says go *now*; a parade next Tuesday is not a reason to."""
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+
+    card = await _one_suggestion(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        trip,
+        event="Loi Krathong parade",
+        event_date=(_their_today() + timedelta(days=4)).isoformat(),
+    )
+    assert card["event"] is None
+    assert card["name"] == "Kopi Corner", "only the claim goes, not the suggestion"
+
+
+@pytest.mark.parametrize("event_date", [None, "", "tonight", "next Friday", "2026-13-40"])
+async def test_an_undated_event_is_dropped(client, db_sessionmaker, monkeypatch, event_date):
+    """Undated, it cannot be told apart from something remembered off an old page."""
+    await register(client)
+    await _photo_stop(client, db_sessionmaker, 13.7465, 100.4930)
+    trip = await _open_trip(client)
+
+    card = await _one_suggestion(
+        client,
+        db_sessionmaker,
+        monkeypatch,
+        trip,
+        event="Festival on tonight",
+        event_date=event_date,
+    )
+    assert card["event"] is None
+
+
+def test_an_event_is_measured_against_the_day_it_is_handed():
+    """Their evening is the server's tomorrow often enough to matter.
+
+    `test_an_event_on_today_is_kept` runs this through the job on a +7 offset,
+    where it only tells the two apart for part of the day; this pins the rule
+    itself down at the boundary.
+    """
+    item = Recommendation(
+        google_place_id="rec-1",
+        name="Kopi Corner",
+        category="coffee",
+        why="Close.",
+        event="Lantern parade at 8pm",
+        event_date="2026-03-02",
+    )
+    assert recommend_mod.event_on(item, date(2026, 3, 2)) == "Lantern parade at 8pm"
+    assert recommend_mod.event_on(item, date(2026, 3, 1)) is None
+    assert recommend_mod.event_on(item, date(2026, 3, 3)) is None
 
 
 async def test_invented_places_are_dropped(client, db_sessionmaker, monkeypatch):

@@ -1,4 +1,4 @@
-import { Compass, MapPin, RefreshCw, Star } from 'lucide-react';
+import { CalendarHeart, Compass, MapPin, RefreshCw, Star } from 'lucide-react';
 import { useState } from 'react';
 import { useGenerateRecommendations, useRecommendations } from '../hooks/useData';
 import type { Recommendation } from '../types';
@@ -40,7 +40,16 @@ function Card({ item, onOpen }: { item: Recommendation; onOpen: () => void }) {
           </span>
         )}
         <span className="line-clamp-2 font-medium text-ink">{item.name}</span>
-        <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-3">
+        {/* The whole argument for going *now* rather than tomorrow, so it earns
+            a place on the card and not just inside the opened sheet. Dropped
+            server-side unless the model dated it to today. */}
+        {item.event && (
+          <span className="flex items-start gap-1 text-xs text-brand-700">
+            <CalendarHeart className="mt-0.5 size-3 shrink-0" aria-hidden />
+            <span className="line-clamp-2">{item.event}</span>
+          </span>
+        )}
+        <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5 text-xs text-ink-3">
           {item.rating != null && (
             <span className="flex items-center gap-0.5">
               <Star className="size-3 fill-current text-money" aria-hidden />
