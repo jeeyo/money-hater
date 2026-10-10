@@ -261,7 +261,7 @@ async def test_window_follows_an_edited_bounding_expense(client):
     assert earlier["id"] in [e["id"] for e in refreshed["expenses"]]
 
 
-async def test_window_covers_whole_days_not_just_the_two_moments(client, db_sessionmaker):
+async def test_a_photo_minutes_before_the_starting_receipt_joins(client, db_sessionmaker):
     """A photo taken minutes before its own receipt still belongs to the trip."""
     from app.services.analysis import run_image_analysis
 
@@ -291,6 +291,56 @@ async def test_window_covers_whole_days_not_just_the_two_moments(client, db_sess
 
     assert trip["visit_count"] == 1
     assert trip["days"][0]["date"] == "2026-08-01"
+
+
+async def test_day_one_starts_at_the_starting_expense(client):
+    """Picking a later expense as the start leaves that morning's earlier ones out."""
+    await register(client)
+    await _expense(client, "80", "2026-08-01T07:30:00Z", "Breakfast at home")
+    start = await _expense(client, "600", "2026-08-01T09:00:00Z", "Airport taxi")
+    await _expense(client, "120", "2026-08-01T13:00:00Z", "Lunch")
+    end = await _expense(client, "890", "2026-08-02T11:25:00Z", "Souvenir")
+    await _expense(client, "70", "2026-08-02T19:00:00Z", "Dinner")
+
+    trip = await _trip(client, start, end)
+    assert [e["description"] for e in trip["expenses"]] == [
+        "Airport taxi",
+        "Lunch",
+        "Souvenir",
+        # The last day still counts in full
+        "Dinner",
+    ]
+    assert [e["description"] for e in trip["days"][0]["expenses"]] == ["Airport taxi", "Lunch"]
+    assert trip["day_count"] == 2
+
+    # The day the trip started on is still the trip's day on the timeline
+    day_one = (await client.get("/api/timeline", params={"date": "2026-08-01"})).json()
+    assert day_one["trip"]["id"] == trip["id"]
+
+
+async def test_a_stop_hours_before_the_starting_expense_stays_out(client, db_sessionmaker):
+    from app.services.analysis import run_image_analysis
+
+    await register(client)
+    for name, when in [
+        ("home.jpg", datetime(2026, 8, 1, 6, 0)),
+        ("temple.jpg", datetime(2026, 8, 1, 15, 0)),
+    ]:
+        created = (
+            await client.post(
+                "/api/images",
+                files=[("files", (name, make_jpeg(18.79, 98.98, taken_at=when), "image/jpeg"))],
+            )
+        ).json()
+        async with db_sessionmaker() as db:
+            await run_image_analysis(db, created[0]["id"])
+
+    start = await _expense(client, "600", "2026-08-01T09:00:00Z", "Airport taxi")
+    end = await _expense(client, "890", "2026-08-02T11:25:00Z", "Souvenir")
+    trip = await _trip(client, start, end)
+
+    assert trip["visit_count"] == 1
+    assert trip["days"][0]["visits"][0]["started_at"].startswith("2026-08-01T15:00")
 
 
 async def test_two_trips_may_not_share_a_day(client):

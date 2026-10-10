@@ -17,7 +17,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.models import Expense, Image, Trip, User, Visit
+from app.services.clustering import nearest_visit_id
 from app.services.localtime import local_now
 
 
@@ -39,18 +41,23 @@ def moment_of(expense: Expense) -> datetime:
     return _aware(expense.spent_at or expense.created_at)
 
 
-def snap_to_days(start: datetime, end: datetime) -> TripWindow:
-    """Widen a pair of moments to cover their whole local days.
+def window_between(start: datetime, end: datetime) -> TripWindow:
+    """The span a pair of moments bounds: from the starting expense to the end of the last day.
 
-    A trip groups *days*: the two expenses only say which days. Without this a
-    photo taken minutes before its own receipt would fall outside the trip.
+    The start is the expense itself, not its day: picking the airport taxi as
+    the start says the coffee before it was not part of the trip, so day 1 opens
+    there. A photo taken minutes before its own receipt still joins — see
+    `visits_in`.
+
+    The end is widened to its whole local day. "End trip now" picks the latest
+    expense, and the photos you took after that last receipt are still the
+    trip's.
 
     Both moments are already local wall clocks
     (`app.services.localtime`), so the days are read straight off them.
     """
-    first = datetime.combine(start.date(), time.min, tzinfo=UTC)
     last = datetime.combine(end.date(), time.max, tzinfo=UTC)
-    return TripWindow(started_at=first, ended_at=last)
+    return TripWindow(started_at=_aware(start), ended_at=last)
 
 
 def is_open(trip: Trip) -> bool:
@@ -59,7 +66,7 @@ def is_open(trip: Trip) -> bool:
 
 
 def window_of(trip: Trip, tz_offset_minutes: int = 0, now: datetime | None = None) -> TripWindow:
-    """The trip's span: the full local days its bounding expenses fall on.
+    """The trip's span: from its starting expense to the end of its last day.
 
     An open trip has no ending expense, so it runs to ``now`` — today's local
     day — and grows by itself. ``now`` is injectable so tests can pin it.
@@ -74,7 +81,7 @@ def window_of(trip: Trip, tz_offset_minutes: int = 0, now: datetime | None = Non
         if trip.end_expense is not None
         else local_now(tz_offset_minutes, now)
     )
-    return snap_to_days(moment_of(trip.start_expense), ends_at)
+    return window_between(moment_of(trip.start_expense), ends_at)
 
 
 async def resolve_bounds(
@@ -198,27 +205,36 @@ def covers(window: TripWindow, start: datetime, end: datetime) -> bool:
     """Does the trip's span meet the half-open UTC range ``[start, end)``?
 
     Half-open matters at the seam: a calendar day runs to the next midnight,
-    which is the same instant a trip starting the following morning is snapped
-    back to. Comparing that end inclusively put the day *before* a trip inside
+    which is the same instant a trip starting at that midnight begins.
+    Comparing that end inclusively put the day *before* a trip inside
     it, so the timeline offered to show you a trip you had not left for yet.
     """
     return start <= window.ended_at and end > window.started_at
 
 
 def day_range(window: TripWindow) -> list[date]:
-    """Local calendar days the window touches — it is snapped to them already."""
+    """Local calendar days the window touches, the starting expense's day first."""
     first = window.started_at.date()
     last = window.ended_at.date()
     return [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
 
 
 async def visits_in(db: AsyncSession, user: User, window: TripWindow) -> list[Visit]:
+    """The stops in the window, plus the one its starting expense belongs to.
+
+    The window opens at the starting expense, but a photo taken minutes before
+    that receipt is the same stop. So the stop that ended just before the start
+    joins too — picked by the same rule that places a photo with no location of
+    its own (`nearest_visit_id`), and only that one: breakfast at home an hour
+    before the airport taxi stays out.
+    """
+    gap = timedelta(minutes=settings.visit_max_gap_minutes)
     result = await db.execute(
         sa.select(Visit)
         .where(
             Visit.user_id == user.id,
             Visit.started_at <= window.ended_at,
-            Visit.ended_at >= window.started_at,
+            Visit.ended_at >= window.started_at - gap,
         )
         .order_by(Visit.started_at)
         .options(
@@ -231,7 +247,10 @@ async def visits_in(db: AsyncSession, user: User, window: TripWindow) -> list[Vi
             selectinload(Visit.images).selectinload(Image.place),
         )
     )
-    return list(result.scalars())
+    visits = list(result.scalars())
+    before = [visit for visit in visits if _aware(visit.ended_at) < window.started_at]
+    opening = nearest_visit_id(window.started_at, before, gap)
+    return [visit for visit in visits if visit not in before or visit.id == opening]
 
 
 def _spent(model=Expense):
