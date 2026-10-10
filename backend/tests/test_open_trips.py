@@ -139,7 +139,7 @@ async def test_end_trip_now_picks_the_latest_expense(client):
     assert ended["day_count"] == 3
 
     # Frozen: the window no longer follows the clock. (Today is still included
-    # in full — the window covers whole days — but tomorrow never joins.)
+    # in full — the last day counts whole — but tomorrow never joins.)
     tomorrow = (datetime.now(UTC) + timedelta(days=1)).replace(hour=9)
     await _expense(client, "70", tomorrow.isoformat(), "Groceries")
     refreshed = (await client.get(f"/api/trips/{trip['id']}")).json()

@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # An OpenAI model that can see images (photo analysis) and use the hosted
     # web search tool (next-stop recommendations).
-    llm_model: str = "gpt-4.1-mini"
+    llm_model: str = "gpt-6-luna"
     # Optional. Left blank, the SDK reads OPENAI_API_KEY from the environment.
     llm_api_key: str = ""
     # How long one photo's model call may take before the pipeline gives up on

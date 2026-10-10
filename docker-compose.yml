@@ -28,7 +28,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-insecure-dev-secret-change-me-in-production}
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini}
+      LLM_MODEL: ${LLM_MODEL:-gpt-6-luna}
       LLM_API_KEY: ${LLM_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}

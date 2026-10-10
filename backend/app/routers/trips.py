@@ -43,7 +43,7 @@ def _bounds_window(start: Expense, end: Expense | None, tz_offset_minutes: int):
     ends_at = (
         trip_service.moment_of(end) if end is not None else local_now(tz_offset_minutes)
     )
-    return trip_service.snap_to_days(trip_service.moment_of(start), ends_at)
+    return trip_service.window_between(trip_service.moment_of(start), ends_at)
 
 
 async def _render(db: DbSession, user, trip: Trip, tz_offset_minutes: int, detail: bool):
