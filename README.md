@@ -103,7 +103,7 @@ to `.env` to enable image analysis, place matching, and recommendations:
 
 ```bash
 OPENAI_API_KEY=sk-…
-LLM_MODEL=gpt-4.1-mini   # must support image input
+LLM_MODEL=gpt-6-luna   # must support image input
 GOOGLE_MAPS_API_KEY=…
 ```
 
