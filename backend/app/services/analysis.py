@@ -20,7 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Expense, ExpenseItem, Image, ImageAnalysis, Place, User
+from app.models import AnalysisRun, Expense, ExpenseItem, Image, ImageAnalysis, Place, User
 from app.services import storage
 from app.services.clustering import recluster_user
 from app.services.exif import extract_exif
@@ -316,9 +316,8 @@ async def _analysis_allowed(db: AsyncSession, image: Image) -> bool:
     day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     analyzed_today = await db.scalar(
         sa.select(sa.func.count())
-        .select_from(ImageAnalysis)
-        .join(Image, Image.id == ImageAnalysis.image_id)
-        .where(Image.user_id == image.user_id, ImageAnalysis.analyzed_at >= day_start)
+        .select_from(AnalysisRun)
+        .where(AnalysisRun.user_id == image.user_id, AnalysisRun.ran_at >= day_start)
     )
     return (analyzed_today or 0) < settings.daily_analysis_cap
 
@@ -349,6 +348,10 @@ async def run_image_analysis(db: AsyncSession, image_id: int) -> None:
         vision: VisionResult | None = None
         if await _analysis_allowed(db, image):
             try:
+                # Counted before the call, and committed, so a timeout or a
+                # later rollback still counts as the spend it was
+                db.add(AnalysisRun(user_id=image.user_id))
+                await db.commit()
                 source = Path(image.thumb_path) if image.thumb_path else original
                 vision = await _run_vision(source, await _photo_context(db, image))
             except Exception:

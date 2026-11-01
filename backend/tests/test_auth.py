@@ -1,8 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 import sqlalchemy as sa
 
-from app.config import settings
+from app.config import DEV_JWT_SECRET, Settings, settings
 from app.models import AuthSession
 from tests.conftest import register
 
@@ -140,3 +141,36 @@ async def test_settings_update(client):
     body = response.json()
     assert body["preferred_currency"] == "THB"
     assert body["home_lat"] == 13.75
+
+
+async def test_home_location_can_be_cleared(client):
+    await register(client)
+    home = {"home_lat": 13.7, "home_lng": 100.5, "home_label": "x"}
+    await client.patch("/api/auth/me", json=home)
+    cleared = (
+        await client.patch(
+            "/api/auth/me", json={"home_lat": None, "home_lng": None, "home_label": None}
+        )
+    ).json()
+    assert cleared["home_lat"] is None and cleared["home_label"] is None
+
+
+async def test_settings_patch_without_home_keys_keeps_it(client):
+    await register(client)
+    await client.patch("/api/auth/me", json={"home_label": "Home"})
+    kept = (await client.patch("/api/auth/me", json={"preferred_currency": "THB"})).json()
+    assert kept["home_label"] == "Home"
+
+
+async def test_duplicate_registration_is_a_409(client):
+    await register(client)
+    again = await client.post(
+        "/api/auth/register", json={"email": "user@example.com", "password": "password123"}
+    )
+    assert again.status_code == 409
+
+
+def test_default_secret_is_refused_with_secure_cookies():
+    with pytest.raises(ValueError, match="JWT_SECRET"):
+        Settings(cookie_secure=True, jwt_secret=DEV_JWT_SECRET, _env_file=None)
+    Settings(cookie_secure=True, jwt_secret="a-private-value", _env_file=None)

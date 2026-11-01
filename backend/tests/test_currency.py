@@ -19,7 +19,7 @@ JPY_THB = Decimal("0.235")
 def fake_rate(monkeypatch):
     """Avoid hitting the live FX API in tests."""
 
-    async def _fetch(from_currency, to_currency):
+    async def _fetch(from_currency, to_currency, on=None):
         if (from_currency, to_currency) == ("JPY", "THB"):
             return JPY_THB, datetime(2026, 8, 7, tzinfo=UTC).date()
         return None
@@ -46,9 +46,9 @@ async def test_rate_is_cached_after_first_lookup(db, fake_rate, monkeypatch):
     calls = []
     original = fx_mod._fetch_rate
 
-    async def counting(from_currency, to_currency):
+    async def counting(from_currency, to_currency, on=None):
         calls.append((from_currency, to_currency))
-        return await original(from_currency, to_currency)
+        return await original(from_currency, to_currency, on)
 
     monkeypatch.setattr(fx_mod, "_fetch_rate", counting)
 
@@ -140,7 +140,7 @@ async def test_manual_rate_at_creation_skips_review(client, fake_rate):
 async def test_unavailable_rate_leaves_amount_unconverted(client, monkeypatch):
     """FX outage must not invent a number — the expense waits for the user."""
 
-    async def _no_rate(from_currency, to_currency):
+    async def _no_rate(from_currency, to_currency, on=None):
         return None
 
     monkeypatch.setattr(fx_mod, "_fetch_rate", _no_rate)
@@ -201,7 +201,7 @@ async def test_summary_rolls_mixed_currencies_into_base(client, fake_rate):
 async def test_base_currency_follows_user_setting(client, fake_rate, monkeypatch):
     """A user who thinks in JPY sees THB spending converted, not the reverse."""
 
-    async def _fetch(from_currency, to_currency):
+    async def _fetch(from_currency, to_currency, on=None):
         if (from_currency, to_currency) == ("THB", "JPY"):
             return Decimal("4.25"), datetime(2026, 8, 7, tzinfo=UTC).date()
         return None
@@ -216,3 +216,77 @@ async def test_base_currency_follows_user_setting(client, fake_rate, monkeypatch
     ).json()
     assert expense["base_currency"] == "JPY"
     assert expense["base_total_minor"] == 425  # 100 THB * 4.25
+
+
+def _stub_rate(monkeypatch, pair, rate):
+    async def _fetch(from_currency, to_currency, on=None):
+        if (from_currency, to_currency) == pair:
+            return Decimal(rate), datetime(2026, 8, 7, tzinfo=UTC).date()
+        return None
+
+    monkeypatch.setattr(fx_mod, "_fetch_rate", _fetch)
+
+
+async def _add_expense(client, **body) -> dict:
+    response = await client.post("/api/expenses", json={"total": "100", "currency": "THB", **body})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def test_relabelling_the_currency_keeps_the_amount(client, monkeypatch):
+    _stub_rate(monkeypatch, ("JPY", "THB"), "0.25")
+    await register(client)
+    expense = await _add_expense(client, items=[{"name": "Tea", "qty": 1, "amount": "100"}])
+    assert expense["total_minor"] == 10000
+
+    patched = await client.patch(f"/api/expenses/{expense['id']}", json={"currency": "JPY"})
+    updated = patched.json()
+    assert updated["currency"] == "JPY"
+    assert updated["total_minor"] == 100  # 100 yen, not 10,000
+    assert updated["items"][0]["amount_minor"] == 100
+
+
+async def test_changing_base_currency_reconverts_existing_totals(client, monkeypatch):
+    _stub_rate(monkeypatch, ("THB", "USD"), "0.03")
+    await register(client)
+    await _add_expense(client)
+
+    me = await client.patch("/api/auth/me", json={"preferred_currency": "usd"})
+    assert me.status_code == 200
+    listed = (await client.get("/api/expenses")).json()[0]
+    assert listed["base_currency"] == "USD"
+    assert listed["base_total_minor"] == 300
+    assert listed["needs_review"] is True
+
+
+async def test_accepting_the_suggested_rate_keeps_it_an_api_rate(client, monkeypatch):
+    _stub_rate(monkeypatch, ("JPY", "THB"), "0.25")
+    await register(client)
+    expense = await _add_expense(client, currency="JPY")
+    assert expense["fx_rate_source"] == "api" and expense["needs_review"] is True
+
+    confirmed = (await client.post(f"/api/expenses/{expense['id']}/confirm", json={})).json()
+    assert confirmed["needs_review"] is False
+    assert confirmed["fx_rate_source"] == "api"
+
+    again = await client.post(f"/api/expenses/{expense['id']}/confirm", json={"fx_rate": 0.3})
+    assert again.json()["fx_rate_source"] == "manual"
+
+
+async def test_a_past_expense_asks_for_its_own_days_rate(client, monkeypatch):
+    asked: list = []
+
+    async def _fetch(from_currency, to_currency, on=None):
+        asked.append(on)
+        return Decimal("0.2"), datetime(2026, 1, 2, tzinfo=UTC).date()
+
+    monkeypatch.setattr(fx_mod, "_fetch_rate", _fetch)
+    await register(client)
+    await _add_expense(client, currency="JPY", spent_at="2026-01-03T12:00:00")
+    assert asked == [datetime(2026, 1, 3).date()]
+
+
+def test_rate_url_for_a_day(monkeypatch):
+    monkeypatch.setattr(fx_mod.settings, "exchange_rate_api_url", "https://x.test/v1/latest")
+    assert fx_mod._rate_url(None) == "https://x.test/v1/latest"
+    assert fx_mod._rate_url(datetime(2026, 1, 3).date()) == "https://x.test/v1/2026-01-03"

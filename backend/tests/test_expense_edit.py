@@ -170,7 +170,7 @@ async def test_editing_currency_reconverts_and_asks_for_review(client, monkeypat
 
     import app.services.fx as fx_mod
 
-    async def _fetch(from_currency, to_currency):
+    async def _fetch(from_currency, to_currency, on=None):
         if (from_currency, to_currency) == ("JPY", "THB"):
             return Decimal("0.235"), datetime(2026, 8, 7).date()
         return None

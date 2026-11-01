@@ -183,6 +183,22 @@ class ImageAnalysis(Base):
     image: Mapped[Image] = relationship(back_populates="analysis")
 
 
+class AnalysisRun(Base):
+    """One call to the vision model, kept so the daily cap counts calls.
+
+    Counting ``ImageAnalysis`` rows instead undercounts: re-analysing a photo
+    rewrites its one row, and a call that timed out writes none, so pressing
+    "Re-analyze" repeatedly spent without ever reaching the cap.
+    """
+
+    __tablename__ = "analysis_runs"
+    __table_args__ = (sa.Index("ix_analysis_runs_user_ran_at", "user_id", "ran_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id", ondelete="CASCADE"))
+    ran_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=sa.func.now())
+
+
 class TripRecommendation(Base):
     """A generated "what next?" set for a trip the user is still on.
 

@@ -163,3 +163,42 @@ async def test_the_expense_follows_the_photo(client, db_sessionmaker, monkeypatc
             expense = await db.scalar(sa.select(Expense).where(Expense.image_id == image_id))
             assert expense is not None
             assert expense.visit_id == (await db.get(Image, image_id)).visit_id
+
+
+async def test_a_pinned_photo_far_away_does_not_force_a_rebuild(client, db_sessionmaker):
+    from app.services.clustering import place_edit_regroups
+
+    await register(client)
+    async with db_sessionmaker() as db:
+        user = await db.scalar(sa.select(User))
+        visit = Visit(
+            user_id=user.id,
+            started_at=datetime(2026, 1, 1, 10, tzinfo=UTC),
+            ended_at=datetime(2026, 1, 1, 11, tzinfo=UTC),
+        )
+        db.add(visit)
+        await db.flush()
+
+        def photo(sha, when, pinned, visit_id=None):
+            return Image(
+                user_id=user.id,
+                sha256=sha * 64,
+                original_path="x",
+                mime="image/jpeg",
+                size_bytes=1,
+                lat=13.7,
+                lng=100.5,
+                taken_at=when,
+                visit_id=visit_id,
+                place_pinned=pinned,
+            )
+
+        mine = photo("a", datetime(2026, 1, 1, 10, 30, tzinfo=UTC), False, visit.id)
+        faraway = photo("b", datetime(2026, 3, 1, 10, 30, tzinfo=UTC), True)
+        db.add_all([mine, faraway])
+        await db.commit()
+        assert not await place_edit_regroups(db, mine)
+
+        db.add(photo("c", datetime(2026, 1, 1, 10, 40, tzinfo=UTC), True))
+        await db.commit()
+        assert await place_edit_regroups(db, mine)

@@ -157,3 +157,15 @@ async def test_grouped_respects_needs_review_filter(client, db_sessionmaker):
     ).json()
     assert page["groups"] == []
     assert page["total"] == 0
+
+
+async def test_summary_merges_merchants_that_differ_in_case(client):
+    await register(client)
+    for merchant in ("7-Eleven", "7-ELEVEN "):
+        response = await client.post(
+            "/api/expenses", json={"total": "10", "currency": "THB", "merchant": merchant}
+        )
+        assert response.status_code == 201, response.text
+    summary = (await client.get("/api/expenses/summary")).json()
+    assert len(summary["by_merchant"]) == 1
+    assert summary["by_merchant"][0]["count"] == 2

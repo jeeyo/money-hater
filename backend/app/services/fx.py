@@ -46,13 +46,28 @@ async def _cached_for_date(
     )
 
 
-async def _fetch_rate(from_currency: str, to_currency: str) -> tuple[Decimal, date] | None:
+def _rate_url(on: date | None) -> str:
+    """The latest-rate endpoint, or the same service's endpoint for one day.
+
+    Frankfurter serves ``/latest`` and ``/YYYY-MM-DD`` side by side; for a
+    weekend or holiday the dated one answers with the last rate published
+    before it, which is the rate that applied that day.
+    """
+    url = settings.exchange_rate_api_url
+    if on is None or not url.endswith("/latest"):
+        return url
+    return f"{url[: -len('latest')]}{on.isoformat()}"
+
+
+async def _fetch_rate(
+    from_currency: str, to_currency: str, on: date | None = None
+) -> tuple[Decimal, date] | None:
     if not settings.exchange_rate_api_url:
         return None
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(
-                settings.exchange_rate_api_url,
+                _rate_url(on),
                 params={"base": from_currency, "symbols": to_currency},
             )
             response.raise_for_status()
@@ -65,14 +80,54 @@ async def _fetch_rate(from_currency: str, to_currency: str) -> tuple[Decimal, da
     return Decimal(str(rate)), as_of
 
 
-async def get_rate(db: AsyncSession, from_currency: str, to_currency: str) -> Decimal | None:
-    """Today's rate, from cache when possible. Returns None if unavailable."""
+async def _rate_on(
+    db: AsyncSession, from_currency: str, to_currency: str, on: date
+) -> Decimal | None:
+    """The rate that applied on a past day.
+
+    It never changes once published, so it is cached under the day asked for
+    (not the day the ECB happened to publish it) and fetched at most once.
+    """
+    cached = await _cached_for_date(db, from_currency, to_currency, on)
+    if cached is not None:
+        return Decimal(str(cached.rate))
+    fetched = await _fetch_rate(from_currency, to_currency, on=on)
+    if fetched is None:
+        return None
+    rate, _published = fetched
+    db.add(
+        ExchangeRate(
+            from_currency=from_currency,
+            to_currency=to_currency,
+            rate=rate,
+            as_of_date=on,
+            fetched_at=datetime.now(UTC),
+        )
+    )
+    await db.flush()
+    return rate
+
+
+async def get_rate(
+    db: AsyncSession, from_currency: str, to_currency: str, on: date | None = None
+) -> Decimal | None:
+    """The rate for ``on`` (default today), from cache when possible.
+
+    A past ``on`` gets that day's rate rather than today's, so a receipt from
+    last month is not converted at whatever the market did since. If that day's
+    rate cannot be had, today's stands in — the expense is flagged for review
+    either way. Returns None if nothing is available.
+    """
     from_currency, to_currency = from_currency.upper(), to_currency.upper()
     if from_currency == to_currency:
         return Decimal(1)
 
     now = datetime.now(UTC)
     today = now.date()
+    if on is not None and on < today:
+        historical = await _rate_on(db, from_currency, to_currency, on)
+        if historical is not None:
+            return historical
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # ECB publishes on weekdays only, so the newest rate is often dated

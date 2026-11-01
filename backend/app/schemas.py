@@ -40,8 +40,11 @@ class UserOut(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    preferred_currency: str | None = Field(default=None, min_length=3, max_length=3)
-    # Bounded, which also turns away NaN — it compares false against everything
+    preferred_currency: str | None = Field(
+        default=None, min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$"
+    )
+    # Bounded, which also turns away NaN — it compares false against everything.
+    # An explicit null clears the home location; leaving a key out keeps it.
     home_lat: float | None = Field(default=None, ge=-90, le=90)
     home_lng: float | None = Field(default=None, ge=-180, le=180)
     home_label: str | None = None

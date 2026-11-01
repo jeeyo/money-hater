@@ -8,7 +8,8 @@ places, expenses, and trips.
 - Reconstructs daily stops from photo timestamps, EXIF data, and optional GPS coordinates.
 - Matches coordinates to Google Places and analyzes photo content with OpenAI vision models.
 - Extracts merchants, totals, and line items from receipts; manual expenses are supported too.
-- Tracks spending in multiple currencies with user-confirmed exchange rates.
+- Tracks spending in multiple currencies, converting each expense at the rate for the day it was
+  spent and asking you to confirm it.
 - Groups days into optional finished or ongoing trips.
 - Exports a trip as one self-contained HTML page — map, days and photos in a single file to send.
 - Suggests nearby places to visit while a trip is in progress.
@@ -127,6 +128,10 @@ limited. OpenAI SDK tracing is disabled by default.
    and so never moves a map pin or a stop.
 5. Nearby images taken within a similar time window are clustered into stops and daily timelines.
 
+Every recorded time (`taken_at`, `spent_at`, a stop's bounds) is the local wall clock where it
+happened, stored as-is; see `backend/app/services/localtime.py`. Endpoints that need "now" take a
+`tz_offset_minutes` query parameter, including `POST /api/expenses` when no time is sent.
+
 Photos without GPS can join the nearest stop by time or be assigned a place manually. User edits
 to dates, places, expenses, and stop names are preserved when the timeline is rebuilt.
 
@@ -134,10 +139,23 @@ Trips are optional ranges bounded by expenses. An ongoing trip has no end expens
 closed, and can use the current location, itinerary, local time, web search, and Google Places to
 recommend a next stop.
 
+## Money and limits
+
+- Foreign expenses are converted into your base currency using ECB reference rates from
+  [Frankfurter](https://frankfurter.dev) (`EXCHANGE_RATE_API_URL`): the rate for the day the money
+  was spent, falling back to today's if that day cannot be fetched. Converted expenses wait for you
+  to confirm the rate; accepting the suggested one keeps it an "api" rate, typing one makes it
+  "manual".
+- Changing the base currency in Settings re-converts every existing expense and sends foreign spend
+  back for review.
+- `DAILY_ANALYSIS_CAP` counts calls to the vision model (one row per call, so re-analysing a photo
+  counts each time); `DAILY_RECOMMENDATION_CAP` limits suggestion runs.
+- With `COOKIE_SECURE=true` the app refuses to start on the default `JWT_SECRET`.
+
 ## Tests and checks
 
 ```bash
-cd backend && uv run pytest
+cd backend && uv run pytest   # exchange-rate lookups are stubbed; no network needed
 cd backend && uv run ruff check .
 cd frontend && npm run typecheck
 cd frontend && npm test

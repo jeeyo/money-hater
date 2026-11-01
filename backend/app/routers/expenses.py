@@ -25,8 +25,10 @@ from app.services.expenses import (
     apply_conversion,
     attach_to_visit,
     create_expense,
+    rescale_for_currency,
     resolve_where,
 )
+from app.services.localtime import MAX_OFFSET_MINUTES, local_now
 from app.services.money import convert_minor, to_minor
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -93,8 +95,8 @@ async def list_expenses(
     date_to: datetime | None = Query(default=None),
     needs_review: bool | None = Query(default=None),
     q: str | None = Query(default=None, max_length=120),
-    limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ):
     query = _range_filter(
         sa.select(Expense).options(selectinload(Expense.items), selectinload(Expense.place)),
@@ -181,7 +183,17 @@ async def list_expenses_grouped(
 
 
 @router.post("", response_model=ExpenseOut, status_code=201)
-async def add_expense(body: ExpenseCreate, user: CurrentUser, db: DbSession):
+async def add_expense(
+    body: ExpenseCreate,
+    user: CurrentUser,
+    db: DbSession,
+    tz_offset_minutes: int = Query(
+        default=0,
+        ge=-MAX_OFFSET_MINUTES,
+        le=MAX_OFFSET_MINUTES,
+        description="Your UTC offset, for dating an expense that was sent without a time",
+    ),
+):
     """Log spending with no receipt photo — cash, a tip, a fare, a split bill.
 
     Also how a photo the vision model didn't read as a receipt becomes one: pass
@@ -208,7 +220,9 @@ async def add_expense(body: ExpenseCreate, user: CurrentUser, db: DbSession):
         description=body.description,
         merchant=body.merchant,
         place_id=body.place_id,
-        spent_at=body.spent_at or datetime.now(tz=None).astimezone(),
+        # Stored times are local wall clocks (`app.services.localtime`), so
+        # "now" is the uploader's wall clock, not the server's instant.
+        spent_at=body.spent_at or local_now(tz_offset_minutes),
         note=body.note,
         tax_minor=to_minor(body.tax, currency),
         tip_minor=to_minor(body.tip, currency),
@@ -241,15 +255,15 @@ async def expense_summary(
         .scalars()
         .all()
     )
+    # Grouped the way the list groups them: the same shop typed in a different
+    # case is one merchant. The label shown is the first spelling met.
+    merchant_key = sa.func.lower(sa.func.trim(Expense.merchant))
+    merchant_total = sa.func.sum(sa.func.coalesce(Expense.base_total_minor, 0))
     merchants_q = _range_filter(
-        sa.select(
-            Expense.merchant,
-            sa.func.sum(sa.func.coalesce(Expense.base_total_minor, 0)),
-            sa.func.count(),
-        )
-        .where(Expense.merchant.isnot(None))
-        .group_by(Expense.merchant)
-        .order_by(sa.func.sum(sa.func.coalesce(Expense.base_total_minor, 0)).desc())
+        sa.select(sa.func.min(Expense.merchant), merchant_total, sa.func.count())
+        .where(Expense.merchant.isnot(None), sa.func.trim(Expense.merchant) != "")
+        .group_by(merchant_key)
+        .order_by(merchant_total.desc())
         .limit(25),
         user.id,
         date_from,
@@ -307,8 +321,14 @@ async def confirm_expense(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "No exchange rate available — provide fx_rate",
         )
+    # Accepting the suggested rate confirms it without making it a typed one.
     await apply_conversion(
-        db, expense, user.preferred_currency, rate=rate, rate_is_manual=True
+        db,
+        expense,
+        user.preferred_currency,
+        rate=rate,
+        rate_is_manual=True,
+        rate_source=None if body.fx_rate is not None else (expense.fx_rate_source or "api"),
     )
     await db.commit()
     return expense_out(expense)
@@ -338,8 +358,12 @@ async def update_expense(
         expense.spent_at_source = "manual"
         await attach_to_visit(db, expense, reattach=True)
     currency_changed = body.currency is not None and body.currency.upper() != expense.currency
-    if body.currency is not None:
+    if currency_changed:
+        old_currency = expense.currency
         expense.currency = body.currency.upper()
+        # Keep the same amount in the new money's units, unless a new total is
+        # sent alongside, which overwrites it just below.
+        rescale_for_currency(expense, old_currency)
     if body.total is not None:
         expense.total_minor = to_minor(body.total, expense.currency) or 0
     if body.note is not None or "note" in sent:

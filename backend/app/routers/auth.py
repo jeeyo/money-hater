@@ -3,6 +3,7 @@ from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.deps import CurrentUser, DbSession
@@ -19,9 +20,12 @@ from app.security import (
     verify_password,
 )
 from app.serialize import user_out
+from app.services.expenses import reconvert_all
 from app.services.turnstile import verify_turnstile
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+_DUMMY_HASH = hash_password("not-a-real-password")
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -56,7 +60,12 @@ async def register(body: RegisterRequest, db: DbSession, response: Response):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
     user = User(email=body.email.lower(), password_hash=hash_password(body.password))
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        # Two sign-ups for one address raced past the check above
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered") from exc
     await _start_session(db, response, user)
     return user_out(user)
 
@@ -65,7 +74,11 @@ async def register(body: RegisterRequest, db: DbSession, response: Response):
 async def login(body: LoginRequest, db: DbSession, response: Response):
     await verify_turnstile(body.turnstile_token)
     user = await db.scalar(sa.select(User).where(User.email == body.email.lower()))
-    if user is None or not verify_password(body.password, user.password_hash):
+    # Hash against a dummy when the address is unknown, so the response time
+    # does not say which emails have accounts.
+    stored_hash = user.password_hash if user is not None else _DUMMY_HASH
+    password_ok = verify_password(body.password, stored_hash)
+    if user is None or not password_ok:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     await _start_session(db, response, user)
     return user_out(user)
@@ -139,10 +152,13 @@ async def me(user: CurrentUser):
 @router.patch("/me", response_model=UserOut)
 async def update_settings(body: SettingsUpdate, user: CurrentUser, db: DbSession):
     if body.preferred_currency is not None:
-        user.preferred_currency = body.preferred_currency.upper()
-    for field in ("home_lat", "home_lng", "home_label"):
-        value = getattr(body, field)
-        if value is not None:
-            setattr(user, field, value)
+        new_base = body.preferred_currency.upper()
+        if new_base != user.preferred_currency.upper():
+            user.preferred_currency = new_base
+            # Every stored base total is in the old currency; redo them
+            await reconvert_all(db, user, new_base)
+    # Only what was sent: `null` clears a field, an absent key leaves it alone
+    for field in body.model_fields_set & {"home_lat", "home_lng", "home_label"}:
+        setattr(user, field, getattr(body, field))
     await db.commit()
     return user_out(user)

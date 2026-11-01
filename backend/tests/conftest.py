@@ -13,6 +13,22 @@ from app.models import Base
 from app.queue import queue_app
 
 
+@pytest.fixture(autouse=True)
+def no_live_fx(monkeypatch):
+    """Never reach the exchange-rate API from a test.
+
+    Any foreign-currency expense looks a rate up, and an unstubbed one would
+    make a real request. "No rate available" is the safe default; tests that
+    need a rate stub `_fetch_rate` themselves, which replaces this.
+    """
+    import app.services.fx as fx_mod
+
+    async def _no_rate(from_currency, to_currency, on=None):
+        return None
+
+    monkeypatch.setattr(fx_mod, "_fetch_rate", _no_rate)
+
+
 @pytest.fixture
 async def db_sessionmaker(tmp_path, monkeypatch):
     engine = create_async_engine(

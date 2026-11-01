@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.deps import CurrentUser, DbSession
-from app.models import Expense, Image, Trip, TripRecommendation, Visit
+from app.models import Expense, Trip, TripRecommendation
 from app.schemas import (
     RecommendationRequest,
     RecommendationsOut,
@@ -16,16 +16,13 @@ from app.schemas import (
     TripEnd,
     TripOut,
     TripUpdate,
-    VisitOut,
-    VisitUpdate,
 )
-from app.serialize import trip_detail_out, trip_out, visit_label, visit_out
+from app.serialize import trip_detail_out, trip_out, visit_label
 from app.services import export as export_service
 from app.services import recommend as recommend_service
 from app.services import trips as trip_service
 from app.services.llm import llm_enabled
 from app.services.localtime import MAX_OFFSET_MINUTES, local_now
-from app.services.places import search_place_by_text
 from app.services.trips import TripWindowError
 
 router = APIRouter(tags=["trips"])
@@ -54,6 +51,28 @@ async def _render(db: DbSession, user, trip: Trip, tz_offset_minutes: int, detai
     return render(trip, window, visits, expenses, user.preferred_currency)
 
 
+async def _render_many(db: DbSession, user, trips: list[Trip], tz_offset_minutes: int):
+    """The list view of several trips, with one query pair instead of one per trip.
+
+    Loads the stops and expenses over the span of all the trips at once and
+    hands each trip the ones inside its own window.
+    """
+    if not trips:
+        return []
+    windows = [trip_service.window_of(trip, tz_offset_minutes) for trip in trips]
+    span = trip_service.window_between(
+        min(window.started_at for window in windows), max(window.ended_at for window in windows)
+    )
+    visits = await trip_service.visits_in(db, user, span)
+    expenses = await trip_service.expenses_in(db, user, span)
+    rendered = []
+    for trip, window in zip(trips, windows, strict=True):
+        own_visits = trip_service.visits_within(visits, window)
+        own_expenses = [e for e in expenses if trip_service.expense_within(e, window)]
+        rendered.append(trip_out(trip, window, own_visits, own_expenses, user.preferred_currency))
+    return rendered
+
+
 @router.get("/trips", response_model=list[TripOut])
 async def list_trips(
     user: CurrentUser,
@@ -75,7 +94,7 @@ async def list_trips(
         .scalars()
         .all()
     )
-    rendered = [await _render(db, user, trip, tz_offset_minutes, detail=False) for trip in trips]
+    rendered = await _render_many(db, user, trips, tz_offset_minutes)
     return sorted(rendered, key=lambda t: t.started_at, reverse=True)
 
 
@@ -382,33 +401,3 @@ async def delete_trip(trip_id: int, user: CurrentUser, db: DbSession):
     await db.delete(trip)
     await db.commit()
     export_service.clear_for_trip(user.id, trip_id)
-
-
-@router.patch("/visits/{visit_id}", response_model=VisitOut)
-async def update_visit(visit_id: int, body: VisitUpdate, user: CurrentUser, db: DbSession):
-    visit = await db.scalar(
-        sa.select(Visit)
-        .where(Visit.id == visit_id, Visit.user_id == user.id)
-        .options(
-            selectinload(Visit.place),
-            selectinload(Visit.expenses).options(
-                selectinload(Expense.items), selectinload(Expense.place)
-            ),
-            selectinload(Visit.images).selectinload(Image.analysis),
-            selectinload(Visit.images).selectinload(Image.expense),
-            selectinload(Visit.images).selectinload(Image.place),
-        )
-    )
-    if visit is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Visit not found")
-    if body.label_override is not None:
-        visit.label_override = body.label_override or None
-    if body.place_query is not None:
-        place = await search_place_by_text(db, body.place_query)
-        if place is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No matching place found")
-        visit.place_id = place.id
-    visit.pinned = True
-    await db.commit()
-    await db.refresh(visit)
-    return visit_out(visit, user.preferred_currency)
