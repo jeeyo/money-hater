@@ -116,3 +116,9 @@ async def test_the_flat_list_takes_the_same_search(client, db_sessionmaker):
 
     expenses = (await client.get("/api/expenses", params={"q": "itto"})).json()
     assert [e["merchant"] for e in expenses] == ["Menya Itto"]
+
+
+async def test_list_rejects_negative_paging(client):
+    await register(client)
+    assert (await client.get("/api/expenses?offset=-1")).status_code == 422
+    assert (await client.get("/api/expenses?limit=0")).status_code == 422

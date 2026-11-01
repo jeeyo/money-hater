@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Expense, Image, Place, User, Visit
 from app.services import fx
-from app.services.money import convert_minor
+from app.services.money import convert_minor, minor_factor, to_major, to_minor
 
 
 async def apply_conversion(
@@ -17,12 +17,18 @@ async def apply_conversion(
     base_currency: str,
     rate: Decimal | None = None,
     rate_is_manual: bool = False,
+    rate_source: str | None = None,
 ) -> None:
     """Fill in base-currency fields, flagging for review when the rate is a guess.
 
     Same-currency spend needs no confirmation. A foreign amount converted with a
     looked-up rate does — the user may have paid a card rate, or nothing at all
     if the lookup failed.
+
+    ``rate_is_manual`` says the user stood behind the rate, whether they typed
+    it or accepted the suggested one; it clears the review flag. The rate's
+    ``fx_rate_source`` only says "manual" when a person actually typed it, so
+    callers that confirm a looked-up rate pass ``rate_source`` to keep "api".
     """
     expense.base_currency = base_currency
     if expense.currency.upper() == base_currency.upper():
@@ -33,13 +39,55 @@ async def apply_conversion(
         return
 
     if rate is None:
-        rate = await fx.get_rate(db, expense.currency, base_currency)
+        # The rate for the day it was spent, not the day it was logged
+        on = expense.spent_at.date() if expense.spent_at is not None else None
+        rate = await fx.get_rate(db, expense.currency, base_currency, on=on)
     expense.fx_rate = rate
-    expense.fx_rate_source = "manual" if rate_is_manual else ("api" if rate else None)
+    expense.fx_rate_source = rate_source or (
+        "manual" if rate_is_manual else ("api" if rate else None)
+    )
     expense.base_total_minor = convert_minor(
         expense.total_minor, expense.currency, base_currency, rate
     )
     expense.needs_review = not rate_is_manual
+
+
+def rescale_for_currency(expense: Expense, old_currency: str) -> None:
+    """Keep the same amount when the expense's currency label changes.
+
+    Amounts are integer minor units, so the number means different money in
+    different currencies: 10000 is 100.00 baht but 10000 yen. Relabelling an
+    expense THB -> JPY without this turns ฿100 into ¥10,000. Re-expressing the
+    same major amount in the new unit keeps "100" as "100".
+    """
+    new_currency = expense.currency
+    if minor_factor(old_currency) == minor_factor(new_currency):
+        return
+
+    def _rescale(minor: int | None) -> int | None:
+        return to_minor(to_major(minor, old_currency), new_currency)
+
+    expense.total_minor = _rescale(expense.total_minor) or 0
+    expense.tax_minor = _rescale(expense.tax_minor)
+    expense.tip_minor = _rescale(expense.tip_minor)
+    for item in expense.items:
+        item.unit_price_minor = _rescale(item.unit_price_minor)
+        item.amount_minor = _rescale(item.amount_minor) or 0
+
+
+async def reconvert_all(db: AsyncSession, user: User, base_currency: str) -> None:
+    """Re-express every expense in a new base currency.
+
+    The base total is a rollup in one currency; after the user switches it, the
+    old figures are in the wrong money but would be summed and labelled as the
+    new one. Foreign spend gets the rate for its day and goes back to review,
+    since a rate confirmed against the old base says nothing about the new one.
+    """
+    expenses = (
+        (await db.execute(sa.select(Expense).where(Expense.user_id == user.id))).scalars().all()
+    )
+    for expense in expenses:
+        await apply_conversion(db, expense, base_currency)
 
 
 async def attach_to_visit(

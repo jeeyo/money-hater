@@ -46,7 +46,7 @@ async def test_seed_builds_a_usable_demo_account(db_sessionmaker, monkeypatch):
         )
         await db.execute(sa.delete(TripRecommendation))
         await seed_recommendations(
-            db, user, open_trip, now=datetime.now(UTC).replace(hour=23, minute=0)
+            db, user, open_trip, now=seed_mod.now_local().replace(hour=23, minute=0)
         )
         recommendation = await db.scalar(sa.select(TripRecommendation))
         assert recommendation is not None

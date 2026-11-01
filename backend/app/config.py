@@ -3,6 +3,8 @@ from pathlib import Path
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEV_JWT_SECRET = "insecure-dev-secret-change-me-in-production"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -25,7 +27,7 @@ class Settings(BaseSettings):
         # Procrastinate connects with psycopg and wants a plain URI
         return value.replace("postgresql+asyncpg://", "postgresql://", 1)
 
-    jwt_secret: str = "insecure-dev-secret-change-me-in-production"
+    jwt_secret: str = DEV_JWT_SECRET
     access_token_ttl_seconds: int = 3600
     refresh_token_ttl_days: int = 30
     cookie_secure: bool = False
@@ -51,6 +53,15 @@ class Settings(BaseSettings):
         if bool(self.turnstile_site_key) != bool(self.turnstile_secret_key):
             missing = "TURNSTILE_SECRET_KEY" if self.turnstile_site_key else "TURNSTILE_SITE_KEY"
             raise ValueError(f"Turnstile needs both keys or neither — {missing} is missing")
+        return self
+
+    @model_validator(mode="after")
+    def _no_default_secret_when_secure(self):
+        # Secure cookies mean this is served over HTTPS for real. Signing
+        # sessions with the published development secret there would let anyone
+        # mint a login, so refuse to start rather than run that way.
+        if self.cookie_secure and self.jwt_secret == DEV_JWT_SECRET:
+            raise ValueError("JWT_SECRET must be set to a private value when COOKIE_SECURE is on")
         return self
 
     media_root: Path = Path("./data/media")

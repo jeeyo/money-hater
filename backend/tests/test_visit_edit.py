@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
-import app.routers.trips as trips_router
+import app.routers.visits as trips_router
 from app.models import Image, Place, Visit
 from app.services.analysis import run_image_analysis
 from tests.conftest import register
@@ -167,3 +167,19 @@ async def test_a_photo_can_be_moved_to_another_stop(client, db_sessionmaker):
     async with db_sessionmaker() as db:
         assert (await db.get(Image, ids[1])).visit_id == morning
         assert (await db.get(Visit, morning)).pinned is True, "a move must survive re-clustering"
+
+
+async def test_empty_visit_edit_does_not_pin(client, db_sessionmaker):
+    await register(client)
+    visit_id = await _a_stop(client, db_sessionmaker)
+    async with db_sessionmaker() as db:
+        visit = await db.get(Visit, visit_id)
+        visit.pinned = False
+        await db.commit()
+
+    assert (await client.patch(f"/api/visits/{visit_id}", json={})).status_code == 200
+    async with db_sessionmaker() as db:
+        assert (await db.get(Visit, visit_id)).pinned is False
+    await client.patch(f"/api/visits/{visit_id}", json={"label_override": "Lunch"})
+    async with db_sessionmaker() as db:
+        assert (await db.get(Visit, visit_id)).pinned is True

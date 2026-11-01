@@ -211,6 +211,13 @@ async def place_edit_regroups(db: AsyncSession, image: Image) -> bool:
         # No fix of its own: a place is the only location it will ever have, so
         # naming one lets it form or join a stop, and taking one away unmakes it.
         return True
+    # "Near" is in time, which is what decides whether two photos share a stop:
+    # an answer hours away cannot change how this photo groups. Photos already
+    # in the same stop count too, whenever they were taken.
+    gap = timedelta(minutes=settings.visit_max_gap_minutes)
+    nearby = [Image.visit_id == image.visit_id]
+    if image.taken_at is not None:
+        nearby.append(Image.taken_at.between(image.taken_at - 2 * gap, image.taken_at + 2 * gap))
     other_answers = await db.scalar(
         sa.select(sa.func.count())
         .select_from(Image)
@@ -218,6 +225,7 @@ async def place_edit_regroups(db: AsyncSession, image: Image) -> bool:
             Image.user_id == image.user_id,
             Image.id != image.id,
             Image.place_pinned.is_(True),
+            sa.or_(*nearby),
         )
     )
     return bool(other_answers)
@@ -229,6 +237,11 @@ async def recluster_user(db: AsyncSession, user: User) -> None:
     Idempotent: safe to run after every upload. Visits the user has edited are
     pinned, so they and their images are left exactly as they are.
     """
+    # Two workers finishing photos together would otherwise each delete and
+    # rebuild the stops under the other, leaving duplicates. The lock is held to
+    # the end of this transaction; sqlite (tests) has one writer and skips it.
+    if db.get_bind().dialect.name == "postgresql":
+        await db.execute(sa.select(sa.func.pg_advisory_xact_lock(user.id)))
     protected_visit_ids = set(
         (
             await db.execute(

@@ -253,6 +253,24 @@ async def visits_in(db: AsyncSession, user: User, window: TripWindow) -> list[Vi
     return [visit for visit in visits if visit not in before or visit.id == opening]
 
 
+def expense_within(expense: Expense, window: TripWindow) -> bool:
+    return window.started_at <= moment_of(expense) <= window.ended_at
+
+
+def visits_within(visits: list[Visit], window: TripWindow) -> list[Visit]:
+    """The subset of already-loaded stops `visits_in` would return for ``window``."""
+    gap = timedelta(minutes=settings.visit_max_gap_minutes)
+    inside = [
+        visit
+        for visit in visits
+        if _aware(visit.started_at) <= window.ended_at
+        and _aware(visit.ended_at) >= window.started_at - gap
+    ]
+    before = [visit for visit in inside if _aware(visit.ended_at) < window.started_at]
+    opening = nearest_visit_id(window.started_at, before, gap)
+    return [visit for visit in inside if visit not in before or visit.id == opening]
+
+
 def _spent(model=Expense):
     return sa.func.coalesce(model.spent_at, model.created_at)
 

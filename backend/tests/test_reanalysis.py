@@ -237,3 +237,24 @@ async def test_an_ordinary_failure_still_says_what_happened(
 
     async with db_sessionmaker() as db:
         assert "missing from disk" in (await db.get(Image, image_id)).error
+
+
+async def test_repeat_analyses_of_one_photo_count_against_the_cap(
+    client, db_sessionmaker, monkeypatch
+):
+    from app.config import settings
+    from app.models import AnalysisRun, User
+
+    await register(client)
+    monkeypatch.setattr(settings, "daily_analysis_cap", 2)
+    async with db_sessionmaker() as db:
+        user = await db.scalar(sa.select(User))
+        image = Image(
+            user_id=user.id, sha256="a" * 64, original_path="x", mime="image/jpeg", size_bytes=1
+        )
+        db.add(image)
+        await db.commit()
+        assert await analysis_mod._analysis_allowed(db, image)
+        db.add_all([AnalysisRun(user_id=user.id), AnalysisRun(user_id=user.id)])
+        await db.commit()
+        assert not await analysis_mod._analysis_allowed(db, image)

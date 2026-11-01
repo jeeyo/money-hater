@@ -147,8 +147,10 @@ async def upload_images(
     for image in created:
         await _defer_analysis(image.id)
     # Ordered by id, which follows insertion, which follows the order the files
-    # arrived in. Without it Postgres answers in whatever order it likes, and a
-    # caller pairing the response with the files it sent gets them shuffled.
+    # arrived in. Without it Postgres answers in whatever order it likes and the
+    # list comes back shuffled. Empty files and photos already uploaded are left
+    # out, so the response can be shorter than the upload: identify photos by
+    # `id`, not by position.
     result = await db.execute(
         sa.select(Image)
         .where(Image.id.in_([i.id for i in created]))

@@ -58,7 +58,9 @@ async def _photo_stop(client, db_sessionmaker, lat: float, lng: float, hours_ago
             db.add(_fake_place(gid, "A stop", lat, lng))
             await db.commit()
 
-    taken = datetime.now() - timedelta(hours=hours_ago)
+    # The UTC wall clock: the requests below send no offset, so "now" to the
+    # server is UTC whatever zone the machine running the tests is in.
+    taken = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours_ago)
     created = (
         await client.post(
             "/api/images",

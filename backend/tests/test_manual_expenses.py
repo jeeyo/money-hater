@@ -1,6 +1,6 @@
 """Expenses logged by hand, with no receipt photo."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
@@ -245,3 +245,13 @@ async def test_deleting_receipt_image_removes_its_expense(client, db_sessionmake
     assert (await client.delete(f"/api/images/{created[0]['id']}")).status_code == 204
     remaining = (await client.get("/api/expenses")).json()
     assert [e["id"] for e in remaining] == [manual["id"]]
+
+
+async def test_manual_expense_without_time_uses_the_callers_wall_clock(client):
+    await register(client)
+    sent = await client.post(
+        "/api/expenses?tz_offset_minutes=840", json={"total": "5", "currency": "THB"}
+    )
+    spent = datetime.fromisoformat(sent.json()["spent_at"]).replace(tzinfo=None)
+    utc_now = datetime.now(UTC).replace(tzinfo=None)
+    assert 13.5 * 3600 < (spent - utc_now).total_seconds() < 14.5 * 3600
